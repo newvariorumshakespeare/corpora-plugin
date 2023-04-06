@@ -375,7 +375,7 @@
                 color: var(--nvs-background-color);
             }
 
-            label.checkbox-white, .btn-link {
+            label.checkbox-white, .btn-link, .btn-link:hover {
                 color: var(--nvs-mid-gray);
             }
 
@@ -417,6 +417,7 @@
 
             .header-block {
                 min-height: var(--nvs-play-row-min-height);
+                flex-grow: 1;
             }
 
             .bg-nvs {
@@ -703,6 +704,10 @@
             span.difference {
                 color: #e9702b;
                 background-color: #FFFFFF;
+            }
+
+            .act-scene-comm-col {
+                display: flex;
             }
 
             .comm-heading {
@@ -1198,7 +1203,7 @@
                     <div class="row no-gutters pt-3">
                         <div class="col-sm-7 d-flex align-items-end">
                             <div id="play-title">
-                                {{ play.title }} {% include 'svg/arrow.svg' %} <span class="title-section">Variorum Reader</span>
+                              <a href="{% if site_request %}/{% else %}/corpus/{{ corpus_id }}/home/{% endif %}" style="color: #000000;">HOME</a> {% include 'svg/arrow.svg' %} {{ play.title }} {% include 'svg/arrow.svg' %} <span class="title-section" style="white-space: nowrap;">Variorum Reader</span>
                             </div>
                         </div>
                         <div class="col-sm-5 byline-div d-flex align-items-end">
@@ -1329,8 +1334,11 @@
                                                     HIGHLIGHT COMMENTARY REFERENTS
                                                 </label>
                                             </div>
-                                            <div class="form-group mr-3">
-                                                <button id="filter-lines-button" type="button" class="btn btn-link checkbox-white pl-0"><i class="fas fa-filter mr-1"></i> FILTER LINES</button>
+                                            <div id="filter-lines-button-div" class="form-group mr-3">
+                                                <button id="filter-lines-button" type="button" class="btn btn-link checkbox-white px-0"><i class="fas fa-filter mr-1"></i> FILTER LINES</button>
+                                            </div>
+                                            <div class="form-group ml-auto">
+                                              <a href="#main-header" class="checkbox-white px-0"><i class="fas fa-arrow-up mr-1"></i> GO TOP</a>
                                             </div>
                                         </div>
                                     </div>
@@ -1412,11 +1420,7 @@
                             <div class="row">
                                 <div class="col-sm-1 p-0 m-0 act-scene-col">
                                     <div id="act-scene-frame">
-                                        {% for label, actscene in act_scenes.items %}
-                                            <div class="actscene-indicator{% if forloop.first %} active{% endif %}" data-actscene="{{ actscene }}">
-                                                {{ label }}
-                                            </div>
-                                        {% endfor %}
+                                        <!-- populated by javascript -->
                                     </div>
                                 </div>
                                 <div class="col-sm-11 p-0 m-0 comm-col">
@@ -1577,7 +1581,7 @@
     let notes = {};
     let notes_populated = {};
     let line_note_map = {{ line_note_map|safe }};
-    let act_scenes = {{ act_scenes|safe }};
+    let act_scenes = {};
 
     let characters = {{ characters|safe }};
     let lines = {};
@@ -1885,12 +1889,11 @@
         let selected_scenes = current_act_scene.split(',');
 
         if (filter_applied) {
-            $('#playtext-header-controls').append(`
+            $('#filter-lines-button-div').after(`
                 <div class="form-group mr-3">
                     <a href="?reset=y" class="checkbox-white pl-0"><i class="fas fa-times-circle mr-1"></i> CLEAR LINE FILTER</a>
                 </div>
             `);
-            //$();
         }
 
         let evaluate_filters = () => {
@@ -2368,6 +2371,8 @@
 
         if (which === 'next') {
             nvs_search[`current_${type}_result`] += 1;
+            if (nvs_search[`current_${type}_result`] > nvs_search[`${type}_results`].length)
+                nvs_search[`current_${type}_result`] = 1;
         } else {
             nvs_search[`current_${type}_result`] -= 1;
         }
@@ -2400,7 +2405,7 @@
             $(`#search-${type}-prev`).removeClass('d-none');
         }
 
-        if (nvs_search[`current_${type}_result`] === nvs_search[`${type}_results`].length) {
+        if (nvs_search[`${type}_results`].length === 1) {
             $(`#search-${type}-next`).addClass('d-none');
         } else {
             $(`#search-${type}-next`).removeClass('d-none');
@@ -2903,7 +2908,8 @@
     }
 
     function setup_lines() {
-        var line_observer = new IntersectionObserver(function(entries) {
+        let actscene_frame = $('#act-scene-frame');
+        const line_observer = new IntersectionObserver(function(entries) {
             entries.map((entry, index) => {
                 if (entry.isIntersecting) {
                     let line_id = entry.target.id.replace('-row', '');
@@ -2953,6 +2959,21 @@
             };
 
             line_observer.observe(this);
+
+            let actscene_label = `${lines[xml_id].act}.${lines[xml_id].scene}`;
+            if (actscene_label.startsWith('Dramatis Personae.'))
+                actscene_label = "DP";
+            else if (actscene_label.startsWith('Trailer.'))
+                actscene_label = "TR";
+
+            if (!(actscene_label in act_scenes)) {
+                actscene_frame.append(`
+                    <div class="actscene-indicator${Object.keys(act_scenes).length === 0 ? ' active' : ''}" data-actscene="${lines[xml_id].act}.${lines[xml_id].scene}">
+                        ${actscene_label}
+                    </div>
+                `);
+                act_scenes[actscene_label] = `${lines[xml_id].act}.${lines[xml_id].scene}`;
+            }
 
             if (lines[xml_id].number < 50)
                 populate_line(xml_id);
