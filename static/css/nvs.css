@@ -417,16 +417,20 @@ sub { top: 0.4em; }
     line-height: 18px;
 }
 
-.anchor-link.is-level-2 {
+.anchor-link.is-level-2, .anchor-link.is-level-3 {
     display: none;
     padding-left: 10px;
+}
+
+.anchor-link.is-level-3 {
+    padding-left: 20px;
 }
 
 @media ( min-width: 992px ) {
     .anchor-link {
         margin: 3px 0;
     }
-    .anchor-link.is-level-2 {
+    .anchor-link.is-level-2, .anchor-link.is-level-3 {
         display: block;
     }
     .anchor-link.mobile-only {
