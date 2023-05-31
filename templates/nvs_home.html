@@ -74,13 +74,15 @@
         padding: 10px;
         position: relative;
         overflow: hidden;
+        display: flex;
+        justify-content: center;
     }
     .edition-card--holder.current .edition-card--image-holder {
         background-color: var(--blue6);
     }
     .edition-card--image-holder img {
-        width: 100%;
-        height: auto;
+        max-height: 160px;
+        width: auto;
         display: block;
     }
     .edition-card--image-holder svg {
@@ -190,7 +192,7 @@
               </div>
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
-                  <h2>The Winter's Tale <span class="year">(1623)</span></h2>
+                  <h2>The Winter's Tale</h2>
                 </div>
                 <div class="edition-card--nav">
                   <ul>
@@ -221,7 +223,7 @@
               </div>
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
-                  <h2>A Midsummer Night's Dream <span class="year">(1600)</span></h2>
+                  <h2>A Midsummer Night's Dream</h2>
                 </div>
                 <div class="edition-card--nav">
                   <ul>
@@ -253,7 +255,7 @@
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>Coming soon<sup>*</sup></small>
-                  <h2>The Comedy of Errors <span class="year">(1623)</span></h2>
+                  <h2>The Comedy of Errors</h2>
                 </div>
               </div>
             </div>
@@ -269,7 +271,7 @@
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                     <small>Coming soon<sup>*</sup></small>
-                  <h2>King Lear <span class="year">(1608)</span></h2>
+                  <h2>King Lear</h2>
                 </div>
                 <div class="edition-card--nav">
                   <ul>
@@ -296,12 +298,108 @@
             <div class="edition-card--holder">
               <div class="edition-card--image-holder">
                 {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/AWW-card.png' %}" alt="All's Well that Ends Well"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>All's Well that Ends Well</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Jay L. Halio</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/AC-card.png' %}" alt="Anthony and Cleopatra"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Anthony and Cleopatra</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editors: Marvin Spevack, with revisions and updates by Michael Steppat</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/C-card.png' %}" alt="Cymbeline"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Cymbeline</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Frederika Bain</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/H-card.png' %}" alt="Hamlet"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Hamlet</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editors: Eric Rasmussen, Hardin Levine Aasand, Frank Nicholas Clary, Marvin Hunt, and Laury Magnus</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/HV-card.png' %}" alt="Henry V"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Henry V</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Margaret Jane Kidnie</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/JC-card.png' %}" alt="Julius Caesar"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Julius Caesar</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Editor: M. L. Stapleton</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
                 <img src="{% static 'img/home/MWW-card.png' %}" alt="Merry Wives of Windsor"/>
               </div>
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>In production<sup>*</sup></small>
-                  <h2>Merry Wives of Windsor <span class="year">(1623)</span></h2>
+                  <h2>Merry Wives of Windsor</h2>
                 </div>
               </div>
             </div>
@@ -312,32 +410,16 @@
             <div class="edition-card--holder">
               <div class="edition-card--image-holder">
                 {% include 'svg/edition-overlay.svg' %}
-                <img src="{% static 'img/home/C-card.png' %}" alt="Julius Caesar"/>
+                <img src="{% static 'img/home/O-card.png' %}" alt="Othello"/>
               </div>
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>In production<sup>*</sup></small>
-                  <h2>Julius Caesar <span class="year">(1623)</span></h2>
+                  <h2>Othello</h2>
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editor: M. L. Stapleton</p>
-          </div>
-
-          <div>
-            <div class="edition-card--holder">
-              <div class="edition-card--image-holder">
-                {% include 'svg/edition-overlay.svg' %}
-                <img src="{% static 'img/home/TT-card.png' %}" alt="The Tempest"/>
-              </div>
-              <div class="edition-card--text">
-                <div class="edition-card--text-inner">
-                  <small>In production<sup>*</sup></small>
-                  <h2>The Tempest <span class="year">(1623)</span></h2>
-                </div>
-              </div>
-            </div>
-            <p class="edition-card--editors">Editor: Ian De Jong</p>
+            <p class="edition-card--editors">Editor: C. Edward McGee</p>
           </div>
 
           <div>
@@ -349,13 +431,95 @@
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>In production<sup>*</sup></small>
-                  <h2>Richard The Third <span class="year">(1623)</span></h2>
+                  <h2>Richard The Third</h2>
                 </div>
               </div>
             </div>
             <p class="edition-card--editors">Editors: Lara Hansen, Mark Farnsworth</p>
           </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/RJ-card.png' %}" alt="Romeo and Juliet"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Romeo and Juliet</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Paul Werstine and Emily Sugerman</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/TT-card.png' %}" alt="The Tempest"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>The Tempest</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Ian De Jong</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/TA-card.png' %}" alt="Titus Andronicus"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Titus Andronicus</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editors: William P. Williams, J. K. Rogers, William Long, and Matteo Pangallo</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/TN-card.png' %}" alt="Twelfth Night"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Twelfth Night</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editors: James Schiffer, William C. McAvoy, Gayle Gaskill,Walter Cannon,Duncan Salkeld, and Dorothy P. Boerner</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/TGV-card.png' %}" alt="Two Gentlemen of Verona"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Two Gentlemen of Verona</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editors: Gabriel Egan and Trevor Howard-Hill</p>
+          </div>
+
         </div>
+
         <small class="note"><sup>*</sup>Production status: print editions of <a
             href="https://www.mla.org/Publications/Bookstore/A-New-Variorum-Edition-of-Shakespeare/The-Comedy-of-Errors"
             target="_blank" rel="noopener noreferrer">The Comedy of Errors</a> and <a
