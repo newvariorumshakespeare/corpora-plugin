@@ -141,34 +141,6 @@ def playviewer(request, corpus_id=None, play_prefix=None):
                 'speeches': num_speeches
             })
 
-    # ACT SCENES
-    act_scenes = {}
-    as_search = {
-        'page-size': 0,
-        'e_act': 'y',
-        'e_scene': 'y',
-        'f_play.id': str(play.id),
-        'a_terms_act_scenes': 'act,scene',
-    }
-    as_search_params = build_search_params_from_dict(as_search)
-    as_results = corpus.search_content('PlayLine', **as_search_params)
-    if as_results:
-        if 'Dramatis Personae|||0' in as_results['meta']['aggregations']['act_scenes']:
-            act_scenes['DP'] = "Dramatis Personae.0"
-
-        act_scene_keys = sorted(as_results['meta']['aggregations']['act_scenes'].keys())
-        for act_scene in act_scene_keys:
-            if act_scene not in ['Dramatis Personae|||0', 'Trailer|||0']:
-                as_parts = act_scene.split('|||')
-                act = as_parts[0]
-                scene = as_parts[1]
-                # act_label = to_roman(int(act))
-                act_scene_label = "{0}.{1}".format(act, scene)
-                act_scenes[act_scene_label] = "{0}.{1}".format(act, scene)
-
-        if 'Trailer|||0' in as_results['meta']['aggregations']['act_scenes']:
-            act_scenes['TR'] = "Trailer.0"
-
     # WITNESSES
     witnesses, wit_counter, witness_centuries = get_nvs_witnesses(corpus, play)
 
@@ -183,7 +155,6 @@ def playviewer(request, corpus_id=None, play_prefix=None):
             'corpora_url': corpora_url,
             'corpus_id': corpus_id,
             'lines': lines,
-            'act_scenes': act_scenes,
             'characters': characters,
             'comm_ids': comm_ids,
             'line_note_map': line_note_map,
@@ -1133,7 +1104,7 @@ def filter_session_lines_by_character(corpus, play, nvs_session):
             content_type='Speech',
             page=1,
             page_size=5000,
-            fields_filter={'play.id': str(play.id), 'speaking.xml_id': '__'.join(nvs_session['filter']['character'].split(','))},
+            fields_filter={'play.id': str(play.id), 'speaking.xml_id|': '__'.join(nvs_session['filter']['character'].split(','))},
             fields_sort=[{'lines.line_number': {'order': 'ASC'}}],
             only=['lines.id']
         )
