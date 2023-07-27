@@ -48,7 +48,8 @@
 
   .large-header--logo-holder a svg:first-child {
       display: none;
-      height: 250px;
+      height: 323px;
+      margin-left: -5px;
   }
   .large-header--logo-holder a svg:last-child {
       width: auto;
@@ -94,7 +95,7 @@
     <div class="large-header--inner">
       <div class="large-header--logo-holder">
         <a href="{% if site_request %}/{% else %}/corpus/{{ corpus_id }}/home/{% endif %}">
-          {% include 'svg/logo-w-type.svg' %}
+          {% include 'svg/logo-w-type2.svg' %}
           {% include 'svg/logo.svg' %}
         </a>
       </div>

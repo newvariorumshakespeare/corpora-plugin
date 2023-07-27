@@ -17,7 +17,7 @@
     @media ( min-width: 992px ) {
         .home--intro-inner {
             position: sticky;
-            top: 280px;
+            top: 333px;
             left: 0;
             margin-right: 40px;
         }
@@ -74,13 +74,15 @@
         padding: 10px;
         position: relative;
         overflow: hidden;
+        display: flex;
+        justify-content: center;
     }
     .edition-card--holder.current .edition-card--image-holder {
         background-color: var(--blue6);
     }
     .edition-card--image-holder img {
-        width: 100%;
-        height: auto;
+        max-height: 160px;
+        width: auto;
         display: block;
     }
     .edition-card--image-holder svg {
@@ -190,7 +192,7 @@
               </div>
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
-                  <h2>The Winter's Tale <span class="year">(1623)</span></h2>
+                  <h2>The Winter's Tale</h2>
                 </div>
                 <div class="edition-card--nav">
                   <ul>
@@ -210,7 +212,7 @@
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editors: Robert Kean Turner, Virginia Westling Haas</p>
+            <p class="edition-card--editors">Editors: Virginia Westling Haas and Robert Kean Turner, with Robert A. Jones, Andrew A. Sabol, and Patricia E. Tatspaugh</p>
           </div>
 
           <div>
@@ -221,7 +223,7 @@
               </div>
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
-                  <h2>A Midsummer Night's Dream <span class="year">(1600)</span></h2>
+                  <h2>A Midsummer Night's Dream</h2>
                 </div>
                 <div class="edition-card--nav">
                   <ul>
@@ -241,7 +243,7 @@
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editors: Judith M. Kennedy and Richard Kennedy, with Susan May, Roberta Barker, David Nicol</p>
+            <p class="edition-card--editors">Editors: Judith M. Kennedy and Richard Kennedy, with Susan May, Roberta Barker, and David Nicol</p>
           </div>
 
           <div>
@@ -253,11 +255,11 @@
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>Coming soon<sup>*</sup></small>
-                  <h2>The Comedy of Errors <span class="year">(1623)</span></h2>
+                  <h2>The Comedy of Errors</h2>
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editor: Standish Henning</p>
+            <p class="edition-card--editors">Editor: Standish Henning after T. W. Baldwin and John Hazel Smith</p>
           </div>
 
           <div>
@@ -269,7 +271,7 @@
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                     <small>Coming soon<sup>*</sup></small>
-                  <h2>King Lear <span class="year">(1608)</span></h2>
+                  <h2>King Lear</h2>
                 </div>
                 <div class="edition-card--nav">
                   <ul>
@@ -289,7 +291,103 @@
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editors: Richard Knowles, Kevin Donovan, with Paula Glatzer</p>
+            <p class="edition-card--editors">Editor: Richard Knowles, with Kevin Donovan and Paula Glatzer</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/AWW-card.png' %}" alt="All's Well that Ends Well"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>All's Well that Ends Well</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Jay Halio, with John Quintus after Barbara Millard</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/AC-card.png' %}" alt="Antony and Cleopatra"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Antony and Cleopatra</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Marvin Spevack, with Michael Steppat and Marga Munkelt; with revisions and updates by Michael Steppat</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/C-card.png' %}" alt="Cymbeline"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Cymbeline</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Frederika Bain</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/H-card.png' %}" alt="Hamlet"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Hamlet</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editors: Hardin Aasand, Nicholas Clary, and Eric Rasmussen, with Marvin Hunt and Laury Magnus after Bernice Kliman, Paul Bertram, Robert Hapgood, and William Hutchings</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/HV-card.png' %}" alt="Henry V"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Henry V</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: M. J. Kidnie after George Walton Williams, Thomas L. Berger, and James Loehlin</p>
+          </div>
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/JC-card.png' %}" alt="Julius Caesar"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Julius Caesar</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: Michael Stapleton after John Velz</p>
           </div>
 
           <div>
@@ -301,27 +399,59 @@
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>In production<sup>*</sup></small>
-                  <h2>Merry Wives of Windsor <span class="year">(1623)</span></h2>
+                  <h2>Merry Wives of Windsor</h2>
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editor: Michael Steppat</p>
+            <p class="edition-card--editors">Editor: Michael Steppat after Gerald Johnson and Jeanne Addison Roberts</p>
+          </div>
+
+          <!--<div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/O-card.png' %}" alt="Othello"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Othello</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: C. Edward McGee with Jill Levenson and Robert Ormsby</p>
+          </div>/-->
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/TRT-card.png' %}" alt="Richard III"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Richard The Third</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editors: Mark Farnsworth and Lara Hansen after R. Chris Hassel, Scott Colley, and Ann Jennalie Cook</p>
           </div>
 
           <div>
             <div class="edition-card--holder">
               <div class="edition-card--image-holder">
                 {% include 'svg/edition-overlay.svg' %}
-                <img src="{% static 'img/home/C-card.png' %}" alt="Julius Caesar"/>
+                <img src="{% static 'img/home/RJ-card.png' %}" alt="Romeo and Juliet"/>
               </div>
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>In production<sup>*</sup></small>
-                  <h2>Julius Caesar <span class="year">(1623)</span></h2>
+                  <h2>Romeo and Juliet</h2>
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editor: M. L. Stapleton</p>
+            <p class="edition-card--editors">Editor: Paul Werstine, with Emily Sugerman after Lester Barber and Gail Kern Paster</p>
           </div>
 
           <div>
@@ -333,29 +463,63 @@
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>In production<sup>*</sup></small>
-                  <h2>The Tempest <span class="year">(1623)</span></h2>
+                  <h2>The Tempest</h2>
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editor: Ian De Jong</p>
+            <p class="edition-card--editors">Editor: Ian De Jong after Andrew Gurr, Christine Dymkowski, Christopher Hardman, Christopher Wilson, Brent Whitted, and David Mateer</p>
+          </div>
+
+          <!--<div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/TA-card.png' %}" alt="Titus Andronicus"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Titus Andronicus</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: William P. Williams, with J. K. Rogers, William Long, and Matteo Pangallo</p>
+          </div>/-->
+
+          <div>
+            <div class="edition-card--holder">
+              <div class="edition-card--image-holder">
+                {% include 'svg/edition-overlay.svg' %}
+                <img src="{% static 'img/home/TN-card.png' %}" alt="Twelfth Night"/>
+              </div>
+              <div class="edition-card--text">
+                <div class="edition-card--text-inner">
+                  <small>In production<sup>*</sup></small>
+                  <h2>Twelfth Night</h2>
+                </div>
+              </div>
+            </div>
+            <p class="edition-card--editors">Editor: James Schiffer, with Walter Cannon, Duncan Salkeld, Gayle Gaskill, and Dorothy Boerner after William McAvoy</p>
           </div>
 
           <div>
             <div class="edition-card--holder">
               <div class="edition-card--image-holder">
                 {% include 'svg/edition-overlay.svg' %}
-                <img src="{% static 'img/home/TRT-card.png' %}" alt="Richard III"/>
+                <img src="{% static 'img/home/TGV-card.png' %}" alt="Two Gentlemen of Verona"/>
               </div>
               <div class="edition-card--text">
                 <div class="edition-card--text-inner">
                   <small>In production<sup>*</sup></small>
-                  <h2>Richard The Third <span class="year">(1623)</span></h2>
+                  <h2>Two Gentlemen of Verona</h2>
                 </div>
               </div>
             </div>
-            <p class="edition-card--editors">Editors: Lara Hansen, Mark Farnsworth</p>
+            <p class="edition-card--editors">Editor: Gabriel Egan after T. H. Howard-Hill, Carol Carlisle, Patti Derrick, and Dana Aspinall</p>
           </div>
+
         </div>
+
         <small class="note"><sup>*</sup>Production status: print editions of <a
             href="https://www.mla.org/Publications/Bookstore/A-New-Variorum-Edition-of-Shakespeare/The-Comedy-of-Errors"
             target="_blank" rel="noopener noreferrer">The Comedy of Errors</a> and <a
