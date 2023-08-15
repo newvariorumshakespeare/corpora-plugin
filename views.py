@@ -614,6 +614,47 @@ def info_print_editions(request, corpus_id=None):
         }
     )
 
+def info_news(request, corpus_id=None):
+    nvs_page = "info-print-editions"
+    site_request = False
+    news_page = int(request.GET.get('page', '1'))
+    news_per_page = 10
+    has_prev = False
+    has_next = False
+
+    if not corpus_id and hasattr(request, 'corpus_id'):
+        corpus_id = request.corpus_id
+        site_request = True
+
+    corpus = get_corpus(corpus_id)
+    news_items = corpus.get_content('NewsItem', all=True)
+    news_count = news_items.count()
+    if news_page < 1:
+        news_page = 1
+    news_start = (news_page - 1) * news_per_page
+
+    news_items = news_items.order_by('-publication_date')
+    news_items = news_items.skip(news_start).limit(news_per_page)
+    if news_start + news_per_page < news_count:
+        has_next = True
+    if news_page > 1:
+        has_prev = True
+
+
+    return render(
+        request,
+        'info_news.html',
+        {
+            'corpus_id': corpus_id,
+            'site_request': site_request,
+            'nvs_page': nvs_page,
+            'news_items': news_items,
+            'news_page': news_page,
+            'has_prev': has_prev,
+            'has_next': has_next
+        }
+    )
+
 
 def info_how_to(request, corpus_id=None):
     nvs_page = "info-how-to"

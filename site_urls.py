@@ -7,6 +7,7 @@ urlpatterns = [
     path('about/', nvs_views.info_about),
     path('contributors/', nvs_views.info_contributors),
     path('print-editions/', nvs_views.info_print_editions),
+    path('news/', nvs_views.info_news),
     path('how-to/', nvs_views.info_how_to),
     path('faqs/', nvs_views.info_faqs),
     path('tools/', nvs_views.tools_about),
