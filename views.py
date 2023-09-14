@@ -830,6 +830,8 @@ def api_lines(request, corpus_id=None, play_prefix=None, starting_line_id=None, 
 
 def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
     lines = []
+    actscene_line_nos = []
+    character_line_nos = []
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
@@ -838,9 +840,20 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
         corpus = get_corpus(corpus_id)
         play = corpus.get_content('Play', {'prefix': play_prefix}, only=['id'], single_result=True)
 
-        # determine witness meter slot for this edition based on siglum
-        references = corpus.get_content("Reference", {'play': play.id, 'ref_type': 'primary_witness'}, only=['document']).order_by('+id')
-        sigla = [ref.document.siglum for ref in references]
+        sigla = []
+        references = corpus.search_content(
+            'Reference',
+            **build_search_params_from_dict({
+                'page-size': 1000,
+                'f_play.id': str(play.id),
+                'f_ref_type': 'primary_witness',
+                'only': 'document.siglum',
+                's_id': 'asc'
+            })
+        )
+        if 'records' in references:
+            sigla = [ref['document']['siglum'] for ref in references['records']]
+
         edition_slot = -1
         for slot in range(0, len(sigla)):
             if sigla[slot] == siglum:
@@ -848,7 +861,7 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
                 break
 
         if edition_slot > -1:
-            play_lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_label', 'text']).order_by('+line_number')
+            play_lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_label', 'act', 'scene', 'text']).order_by('+line_number')
             for play_line in play_lines:
                 lines.append({
                     'tlns': [play_line.line_label],
@@ -856,28 +869,80 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
                     'text': play_line.text
                 })
 
-            textual_notes = corpus.get_content('TextualNote', {'play': play.id}).order_by('+lines.line_number')
-            for tn in textual_notes:
-                if tn.witness_meter[edition_slot] != '0':
-                    for variant in tn.variants:
-                        if variant.witness_meter[edition_slot] != '0' and variant.variant:
-                            line_nos = []
-                            tlns = []
+            textual_notes = corpus.search_content(
+                'TextualNote',
+                **build_search_params_from_dict({
+                    'page-size': 10000,
+                    'f_play.id': str(play.id),
+                    'only': 'lines.line_number,lines.line_label,witness_meter,variants.witness_meter,variants.variant',
+                    's_lines.line_number': 'asc'
+                })
+            )
+            if 'records' in textual_notes:
+                textual_notes = textual_notes['records']
 
-                            for line in tn.lines:
-                                line_nos.append(line.line_number)
-                                tlns.append(line.line_label)
+                for tn in textual_notes:
+                    if tn['witness_meter'][edition_slot] != '0':
+                        for variant in tn['variants']:
+                            if variant['witness_meter'][edition_slot] != '0' and variant['variant']:
+                                line_nos = []
+                                tlns = []
 
-                            first_line_no = line_nos[0]
+                                for line in tn['lines']:
+                                    line_nos.append(line['line_number'])
+                                    tlns.append(line['line_label'])
 
-                            if lines[first_line_no] and not lines[first_line_no]['modified']:
-                                lines[first_line_no]['tlns'] = tlns
-                                lines[first_line_no]['text'] = variant.variant
-                                lines[first_line_no]['modified'] = True
+                                first_line_no = line_nos[0]
 
-                                if len(line_nos) > 1:
-                                    for line_no in line_nos[1:]:
-                                        lines[line_no] = None
+                                if lines[first_line_no] and not lines[first_line_no]['modified']:
+                                    lines[first_line_no]['tlns'] = tlns
+                                    lines[first_line_no]['text'] = variant['variant']
+                                    lines[first_line_no]['modified'] = True
+
+                                    if len(line_nos) > 1:
+                                        for line_no in line_nos[1:]:
+                                            lines[line_no] = None
+
+                if 'act' in request.GET:
+                    actscene_search = {
+                        'page-size': 10000,
+                        'f_play.id': str(play.id),
+                        'f_act': request.GET['act'],
+                        'only': 'line_number',
+                        's_lines.line_number': 'asc'
+                    }
+
+                    if 'scene' in request.GET:
+                        actscene_search['f_scene'] = request.GET['scene']
+
+                    actscene_lines = corpus.search_content(
+                        'PlayLine',
+                        **build_search_params_from_dict(actscene_search)
+                    )
+                    if 'records' in actscene_lines:
+                        actscene_line_nos = [l['line_number'] for l in actscene_lines['records']]
+
+                if 'character-id' in request.GET:
+                    speeches = corpus.search_content(
+                        'Speech',
+                        **build_search_params_from_dict({
+                            'page-size': 10000,
+                            'f_play.id': str(play.id),
+                            'f_speaking.id': request.GET['character-id'],
+                            'only': 'lines.line_number',
+                            's_lines.line_number': 'asc',
+                        })
+                    )
+                    if 'records' in speeches:
+                        for speech in speeches['records']:
+                            for line in speech['lines']:
+                                character_line_nos.append(line['line_number'])
+
+    for line_index in range(0, len(lines)):
+        if not ((line_index in actscene_line_nos or not actscene_line_nos) and (line_index in character_line_nos or not character_line_nos)):
+            lines[line_index] = None
+
+    lines = [l for l in lines if l]
 
     return HttpResponse(
         json.dumps(lines),
