@@ -828,6 +828,62 @@ def api_lines(request, corpus_id=None, play_prefix=None, starting_line_id=None, 
     )
 
 
+def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
+    lines = []
+
+    if not corpus_id and hasattr(request, 'corpus_id'):
+        corpus_id = request.corpus_id
+
+    if corpus_id and play_prefix and siglum:
+        corpus = get_corpus(corpus_id)
+        play = corpus.get_content('Play', {'prefix': play_prefix}, only=['id'], single_result=True)
+
+        # determine witness meter slot for this edition based on siglum
+        references = corpus.get_content("Reference", {'play': play.id, 'ref_type': 'primary_witness'}, only=['document']).order_by('+id')
+        sigla = [ref.document.siglum for ref in references]
+        edition_slot = -1
+        for slot in range(0, len(sigla)):
+            if sigla[slot] == siglum:
+                edition_slot = slot
+                break
+
+        if edition_slot > -1:
+            play_lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_label', 'text']).order_by('+line_number')
+            for play_line in play_lines:
+                lines.append({
+                    'tlns': [play_line.line_label],
+                    'modified': False,
+                    'text': play_line.text
+                })
+
+            textual_notes = corpus.get_content('TextualNote', {'play': play.id}).order_by('+lines.line_number')
+            for tn in textual_notes:
+                if tn.witness_meter[edition_slot] != '0':
+                    for variant in tn.variants:
+                        if variant.witness_meter[edition_slot] != '0' and variant.variant:
+                            line_nos = []
+                            tlns = []
+
+                            for line in tn.lines:
+                                line_nos.append(line.line_number)
+                                tlns.append(line.line_label)
+
+                            first_line_no = line_nos[0]
+
+                            if lines[first_line_no] and not lines[first_line_no]['modified']:
+                                lines[first_line_no]['tlns'] = tlns
+                                lines[first_line_no]['text'] = variant.variant
+                                lines[first_line_no]['modified'] = True
+
+                                if len(line_nos) > 1:
+                                    for line_no in line_nos[1:]:
+                                        lines[line_no] = None
+
+    return HttpResponse(
+        json.dumps(lines),
+        content_type='application/json'
+    )
+
 def api_search(request, corpus_id=None, play_prefix=None):
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
