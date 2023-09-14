@@ -1,0 +1,54 @@
+{% extends 'nvs_base.html' %}
+{% load static %}
+
+{% block headrefs %}
+<!-- This goes inside the head tag specific for this page -->
+{% endblock %}
+
+{% block main %}
+<div class="page-title is-blue">
+  <h1>News</h1>
+</div>
+<div class="page-holder is-blue">
+  <div class="container">
+    <div class="page-holder--inner has-max-width">
+      <div class="anchor-links--holder">
+        <button class="anchor-links--toggle link roboto-uppercase">page navigation</button>
+        <ul class="anchor-links--inner">
+          {% for news_item in news_items %}
+            <li class="anchor-link">
+              <a href="#{{ news_item.id }}">{{ news_item.title }}</a>
+            </li>
+          {% endfor %}
+
+          <li class="anchor-link mobile-only">
+            <a href="#top">Back to top</a>
+          </li>
+        </ul>
+
+        {% if has_prev %}<a href="?page={{ news_page|add:"-1" }}" style="margin-right: 10px;">Newer</a>{% endif %}
+        {% if has_next %}<a href="?page={{ news_page|add:"1" }}">Older</a>{% endif %}
+      </div>
+      <div>
+        <div id="top" class="anchor"></div>
+
+        {% for news_item in news_items %}
+
+          <div class="anchor active" id="{{ news_item.id }}" style="margin-bottom: 100px;">
+            <h2>{{ news_item.title }}</h2>
+            Date: {{ news_item.publication_date }}
+
+            <p>{{ news_item.content|safe }}</p>
+          </div>
+
+        {% endfor %}
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<!-- If you wanted this particular page to have a javascript library referenced, put it here -->
+{% endblock %}

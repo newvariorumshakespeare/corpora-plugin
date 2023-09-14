@@ -10,6 +10,7 @@ urlpatterns = [
     path('corpus/<str:corpus_id>/about/', nvs_views.info_about),
     path('corpus/<str:corpus_id>/contributors/', nvs_views.info_contributors),
     path('corpus/<str:corpus_id>/print/', nvs_views.info_print_editions),
+    path('corpus/<str:corpus_id>/news/', nvs_views.info_news),
     path('corpus/<str:corpus_id>/how-to/', nvs_views.info_how_to),
     path('corpus/<str:corpus_id>/faqs/', nvs_views.info_faqs),
     path('corpus/<str:corpus_id>/tools/', nvs_views.tools_about),
@@ -24,4 +25,5 @@ urlpatterns = [
     path('api/corpus/<str:corpus_id>/nvs-lines/<str:play_prefix>/', nvs_views.api_lines),
     path('api/corpus/<str:corpus_id>/nvs-lines/<str:play_prefix>/<str:starting_line_id>/', nvs_views.api_lines),
     path('api/corpus/<str:corpus_id>/nvs-lines/<str:play_prefix>/<str:starting_line_id>/<str:ending_line_id>/', nvs_views.api_lines),
+    path('api/corpus/<str:corpus_id>/nvs-edition-lines/<str:play_prefix>/<str:siglum>/', nvs_views.api_edition_lines),
 ]
