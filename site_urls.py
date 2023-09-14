@@ -7,6 +7,7 @@ urlpatterns = [
     path('about/', nvs_views.info_about),
     path('contributors/', nvs_views.info_contributors),
     path('print-editions/', nvs_views.info_print_editions),
+    path('news/', nvs_views.info_news),
     path('how-to/', nvs_views.info_how_to),
     path('faqs/', nvs_views.info_faqs),
     path('tools/', nvs_views.tools_about),
@@ -23,4 +24,5 @@ urlpatterns = [
     path('lines/<str:play_prefix>/', nvs_views.api_lines),
     path('lines/<str:play_prefix>/<str:starting_line_id>/', nvs_views.api_lines),
     path('lines/<str:play_prefix>/<str:starting_line_id>/<str:ending_line_id>/', nvs_views.api_lines),
+    path('edition-lines/<str:play_prefix>/<str:siglum>/', nvs_views.api_edition_lines),
 ]

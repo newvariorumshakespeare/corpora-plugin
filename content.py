@@ -1925,6 +1925,113 @@ REGISTRY = [
         ],
         "view_widget_url": None,
         "edit_widget_url": None
+    },
+{
+        "name": "NewsItem",
+        "plural_name": "News Items",
+        "fields": [
+            {
+                "name": "title",
+                "label": "Title",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "text",
+                "choices": [],
+                "cross_reference_type": "",
+                "has_intensity": False,
+                "language": "english",
+                "autocomplete": False,
+                "synonym_file": None,
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
+                "name": "publication_date",
+                "label": "Publication Date",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "date",
+                "choices": [],
+                "cross_reference_type": "",
+                "has_intensity": False,
+                "language": None,
+                "autocomplete": False,
+                "synonym_file": None,
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
+                "name": "author",
+                "label": "Author",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "text",
+                "choices": [],
+                "cross_reference_type": "",
+                "has_intensity": False,
+                "language": "english",
+                "autocomplete": False,
+                "synonym_file": None,
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
+                "name": "content",
+                "label": "Content",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "html",
+                "choices": [],
+                "cross_reference_type": "",
+                "has_intensity": False,
+                "language": "english",
+                "autocomplete": False,
+                "synonym_file": None,
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            }
+        ],
+        "show_in_nav": True,
+        "autocomplete_labels": False,
+        "proxy_field": "",
+        "templates": {
+            "Label": {
+                "template": "{{ NewsItem.title }}",
+                "mime_type": "text/html"
+            }
+        },
+        "view_widget_url": None,
+        "edit_widget_url": None,
+        "inherited_from_module": None,
+        "inherited_from_class": None,
+        "base_mongo_indexes": None,
+        "has_file_field": False,
+        "invalid_field_names": [
+            "corpus_id",
+            "content_type",
+            "last_updated",
+            "provenance",
+            "field_intensities",
+            "path",
+            "label",
+            "uri"
+        ]
     }
 ]
 
