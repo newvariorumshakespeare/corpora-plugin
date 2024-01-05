@@ -137,6 +137,9 @@ p { font-variant-numeric: oldstyle-nums; }
 .type-size--3 { font-size: 13px; }
 .type-size--4 { font-size: 12px; }
 
+h2.news-item { font-size: 25px; }
+.news-container p { font-size: 16px; }
+
 .anchor:before {
     content: "";
     display: block;
