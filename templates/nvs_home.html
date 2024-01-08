@@ -4,13 +4,59 @@
 
 {% block headrefs %}
 <style>
+    :root {
+        --sideBar: 190px;
+    }
+
+    .nvs_base--main {
+        margin-top: 23px;
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
 
     .home--intro {
         color: var(--blue);
     }
+    .home--masthead {
+        display: none;
+    }
+
     @media ( min-width: 992px ) {
         .home--intro {
             position: relative;
+        }
+
+        .page-holder {
+            padding: 35px 0 140px 0;
+        }
+
+        .home--masthead {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            height: 220px;
+            border-top: solid 2px var(--blue);
+            border-bottom: solid 2px var(--blue);
+        }
+
+        .home--masthead--link-holder {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            font-size: 23px;
+            margin-bottom: 20px;
+        }
+
+        .home--masthead--banner-holder {
+            width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .home--intro-text > p {
+            color: var(--blue);
+            text-align: center;
         }
     }
 
@@ -44,6 +90,7 @@
         grid-gap: 15px;
         margin: 30px 0 10px 0;
         align-items: start;
+        justify-content: center;
     }
     @media ( min-width: 576px ) {
         .home--cards { grid-template-columns: 260px 260px; }
@@ -175,13 +222,37 @@
 <div class="page-holder is-white">
   <div class="container">
     <div class="page-holder--inner">
+
       <div class="home--intro">
         <div class="home--intro-inner">
+          <p>&nbsp;</p>
+          <!--
+          <p>NVS Digital Editions contain the complete text of each play along with a full collation of textual notes from the earliest editions to the present, including extensive previous commentary.</p>
+          <p>This site is in BETA mode. Your <a href="mailto:torabik@tamu.edu">feedback</a> can help us define future versions.</p>
+          -->
+        </div>
+      </div>
+
+      <div class="home--main-content">
+
+        <div class="home--masthead">
+          <div class="home--masthead--banner-holder">
+            {% include 'svg/brand_banner.svg' %}
+          </div>
+          <div class="home--masthead--link-holder roboto-uppercase">
+            <span></span>
+            <a href="{% if site_request %}/about/{% else %}/corpus/{{ corpus_id }}/about/{% endif %}">About</a>
+            <a href="{% if site_request %}/how-to/{% else %}/corpus/{{ corpus_id }}/how-to/{% endif %}">How to Digital NVS</a>
+            <a href="{% if site_request %}/faqs/{% else %}/corpus/{{ corpus_id }}/faqs/{% endif %}">FAQs & Lexicon</a>
+            <span></span>
+          </div>
+        </div>
+
+        <div class="home--intro-text">
           <p>NVS Digital Editions contain the complete text of each play along with a full collation of textual notes from the earliest editions to the present, including extensive previous commentary.</p>
           <p>This site is in BETA mode. Your <a href="mailto:torabik@tamu.edu">feedback</a> can help us define future versions.</p>
         </div>
-      </div>
-      <div class="home--main-content">
+
         <div class="home--cards">
 
           <div>
@@ -541,6 +612,13 @@
         holder.classList.toggle('open');
       })
     })
+
+    if (window.innerWidth >= 992) {
+        let nav = document.querySelectorAll('.large-header--holder > .container')
+        nav = nav[0]
+        nav.style.maxWidth = '1400px'
+        nav.style.margin = '0 auto'
+    }
   })
 </script>
 {% endblock %}
