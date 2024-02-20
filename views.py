@@ -321,6 +321,11 @@ def witness_meter(request, witness_flags, height, width, inactive_color_hex, lab
             end_x = start_x + indicator_width - 2
             end_y = height
 
+            if end_x < start_x:
+                end_x = start_x
+            if end_y < start_y:
+                end_y = start_y
+
             draw.rectangle(
                 [(start_x, start_y), (end_x, end_y)],
                 fill=indicator_color,
