@@ -619,6 +619,7 @@ def info_print_editions(request, corpus_id=None):
         }
     )
 
+
 def info_news(request, corpus_id=None):
     nvs_page = "info-print-editions"
     site_request = False
@@ -954,6 +955,7 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
         content_type='application/json'
     )
 
+
 def api_search(request, corpus_id=None, play_prefix=None):
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
@@ -1195,9 +1197,14 @@ def progressive_search(corpus, search_params, fields, query, search_type):
         fields_dict[field] = query
 
     if search_type in ['fuzzy', 'exact']:
-        print('trying term...')
-        search_params['fields_term'] = fields_dict
+        print('trying general...')
+        search_params['general_query'] = query
         results = corpus.search_content(**search_params)
+
+        if not results['records'] and search_type in ['fuzzy', 'exact']:
+            print('trying term...')
+            search_params['fields_term'] = fields_dict
+            results = corpus.search_content(**search_params)
 
         if not results['records'] and search_type in ['fuzzy', 'exact']:
             print('trying phrase...')
