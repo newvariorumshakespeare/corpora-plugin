@@ -34,14 +34,16 @@
 
         {% for news_item in news_items %}
 
-          <div class="anchor active" id="{{ news_item.id }}" style="margin-bottom: 100px;">
-            <h2>{{ news_item.title }}</h2>
-            Date: {{ news_item.publication_date }}
+          <div class="anchor active news-container" id="{{ news_item.id }}" style="margin-bottom: 100px;">
+            <h2 class="news-item">{{ news_item.title }}</h2>
+            <i>{{ news_item.publication_date }}</i>
 
             <p>{{ news_item.content|safe }}</p>
           </div>
 
         {% endfor %}
+
+        {% if has_next %}<div style="margin-top: 20px;"><a href="?page={{ news_page|add:"1" }}" style="font-size: 18px;">Read more news</a></div>{% endif %}
 
       </div>
     </div>
