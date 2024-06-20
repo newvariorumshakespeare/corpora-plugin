@@ -624,7 +624,7 @@ def info_news(request, corpus_id=None):
     nvs_page = "info-print-editions"
     site_request = False
     news_page = int(request.GET.get('page', '1'))
-    news_per_page = 10
+    news_per_page = 7
     has_prev = False
     has_next = False
 
