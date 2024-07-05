@@ -2,6 +2,9 @@
 
 {% block headrefs %}<!-- This goes inside the head tag specific for this page -->
 <style>
+    div.anchor {
+        margin-bottom: 40px;
+    }
     .contributors--grid {
         list-style: none;
         padding-left: 0;
@@ -24,6 +27,7 @@
     }
     .contributors--person-tile h3 {
         margin-top: 5px;
+        margin-bottom: 15px;
     }
     .contributors--person-tile img {
         filter: grayscale(100%) contrast(120%);
@@ -93,6 +97,9 @@
           <li class="anchor-link">
             <a href="#student-researchers">Student Research Assistants</a>
           </li>
+          <li class="anchor-link">
+            <a href="#former">Former Contributors</a>
+          </li>
         </ul>
       </div>
       <div>
@@ -122,18 +129,6 @@
                   <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
                 </span>
               </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Matt_Cohen.jpg' %}" alt="Matt Cohen"/>
-              <h3 class="type-size-0">Matt Cohen, NVS Board</h3>
-              <p class="type-size--1">Matt Cohen teaches in the Department of English at the University of
-                Nebraska-Lincoln and is a Fellow in the Center for Digital Research in the Humanities there. He is the
-                author of <em>The Networked Wilderness: Communicating in Early America,</em> and the co-editor, with
-                Jeffrey Glover, of <em>Colonial Mediascapes: Sensory Worlds of the Early Americas</em>. With Kenneth M.
-                Price and Ed Folsom, he co-directs the <em>Walt Whitman Archive</em> (http://www.whitmanarchive.org);
-                and with Price and Stephanie Browner, co-edits the <em>Charles W. Chesnutt Archive</em>
-                (http://www.chesnuttarchive.org). </p>
             </li>
 
             <li class="contributors--person-tile">
@@ -203,6 +198,28 @@
                 18th-c. texts via high performance and cluster computing, and is currently at work on a text-mining
                 project to discover emergent genders in essays and novels comprising the Feminist Controversy debates in
                 England, 1788-1810.
+                </span>
+                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
+                </span>
+              </p>
+            </li>
+
+            <li class="contributors--person-tile">
+              <img src="{% static 'img/contribs/Sarah_Neville.jpg' %}" alt="Sarah Neville"/>
+              <h3 class="type-size-0">Sarah Neville, NVS Board</h3>
+              <p class="type-size--1">is Associate Professor in the departments of English and Theatre, Film, and
+                Media Arts at the Ohio State University. She is the author of <em>Early Modern Herbals and the Book
+                Trade: English Stationers and the Commodification of Botany</em> (Cambridge, 2022). She has published articles on early modern English
+                literature, bibliography, theories of textuality, and performance, chiefly examining the ways that
+                authority is negotiated in print, digital, and live media.
+                <span class="contributors--more-section">
+                  <span class="contributors--more-content">
+                She is an assistant editor of the <em>New
+                Oxford Shakespeare</em> (2016-17), for which she edited five plays, associate coordinating editor of the
+                <em>Digital Renaissance Editions</em>, and the creative director of Lord Denney’s Players, an academic
+                theatre company that enables audiences to see how technologies of textual transmission have shaped the
+                reception of Shakespeare’s plays. She is currently at work on an edition of <em>2 Henry VI</em> for Arden
+                Shakespeare Fourth Series.
                 </span>
                 <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
                 </span>
@@ -541,26 +558,7 @@
           <h2>Research & Design</h2>
           <ul class="contributors--grid">
 
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Anne_Burdick.jpg' %}" alt="Anne Burdick"/>
-              <h3 class="type-size-0">Anne Burdick, Site Designer</h3>
-              <p class="type-size--1">Anne Burdick is a Research Professor in the School of Design at the University of
-                Technology Sydney where she is co-director of the Knowledge Design Lab. Her practice-based research
-                explores new forms of knowledge production through the design of media, visualisations, interfaces and
-                publications. <span class="contributors--more-section">
-                  <span class="contributors--more-content">She collaborated with the Commission for Non-Literary Text Types at the Austrian Academy
-                of
-                Sciences on the design of the <em>Austrian Academy Corpus</em>, the <em>Fackel Wörterbuch:
-                  Redensarten</em>, and the <em>Fackel
-                  Schimpfwörterbuch</em>, with N. Katherine Hayles on the design of Writing Machines. She was co-author,
-                with
-                Johanna Drucker, Peter Lunenfeld, Todd Presner, and Jeffrey Schnapp, of <em>Digital_Humanities</em> (MIT
-                Press,
-                2012) and was design editor of electronicbookreview.com for over twenty years.</span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
+
 
             <li class="contributors--person-tile">
               <img src="{% static 'img/contribs/Bryan_Tarpley.jpg' %}" alt="Bryan Tarpley"/>
@@ -589,19 +587,12 @@
 
             <li class="contributors--person-tile">
               <img src="{% static 'img/contribs/Kayley_Hart.jpg' %}" alt="Kayley Hart"/>
-              <h3 class="type-size-0">Kayley Hart, Program Coordinator for CoDHR</h3>
+              <h3 class="type-size-0">Kayley Hart, Program Coordinator for CoDHR, Designer</h3>
               <p class="type-size--1">Kayley Hart is the Program Coordinator for the Center of Digital Humanities Research.
                 She also holds an MA in English from Texas A&M University. Her areas of
                 interest are Women’s and Gender Studies, Victorian Studies, and Digital Humanities. She is also the
                 Project Manager for The <em>Feminist Controversy in England</em>, a data visualization project in
                 progress at Texas A&M's Center of Digital Humanities Research.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Will_McLean.jpg' %}" alt="Will McLean"/>
-              <h3 class="type-size-0">Will McLean, Front-end Developer</h3>
-              <p class="type-size--1">Will McLean is a front-end developer and interaction designer who holds a
-                Bachelor's Degree in Design (Visual Communication) from University of Technology, Sydney.</p>
             </li>
 
             <li class="contributors--person-tile">
@@ -629,21 +620,6 @@
           <ul class="contributors--grid">
 
             <li class="contributors--person-tile">
-              <h3 class="type-size-0">Jade Gooden</h3>
-              <p class="type-size--1">Undergraduate Student, Anthropology</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <h3 class="type-size-0">Shyam Prasad Nagulavancha</h3>
-              <p class="type-size--1">MS Student, Computer Science</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <h3 class="type-size-0">Mounika Balivada</h3>
-              <p class="type-size--1">MS Student, Computer Science</p>
-            </li>
-
-            <li class="contributors--person-tile">
               <h3 class="type-size-0">Andrew Hoyt</h3>
               <p class="type-size--1">Undergraduate Student, Applied Mathematics with a Computer Science emphasis</p>
             </li>
@@ -661,6 +637,67 @@
           </ul>
         </div>
 
+        <div id="former" class="anchor">
+          <h2>Former Contributors</h2>
+          <ul class="contributors--grid">
+
+            <li class="contributors--person-tile">
+              <img src="{% static 'img/contribs/Matt_Cohen.jpg' %}" alt="Matt Cohen"/>
+              <h3 class="type-size-0">Matt Cohen, NVS Board</h3>
+              <p class="type-size--1">Matt Cohen teaches in the Department of English at the University of
+                Nebraska-Lincoln and is a Fellow in the Center for Digital Research in the Humanities there. He is the
+                author of <em>The Networked Wilderness: Communicating in Early America,</em> and the co-editor, with
+                Jeffrey Glover, of <em>Colonial Mediascapes: Sensory Worlds of the Early Americas</em>. With Kenneth M.
+                Price and Ed Folsom, he co-directs the <em>Walt Whitman Archive</em> (http://www.whitmanarchive.org);
+                and with Price and Stephanie Browner, co-edits the <em>Charles W. Chesnutt Archive</em>
+                (http://www.chesnuttarchive.org). </p>
+            </li>
+
+            <li class="contributors--person-tile">
+              <img src="{% static 'img/contribs/Anne_Burdick.jpg' %}" alt="Anne Burdick"/>
+              <h3 class="type-size-0">Anne Burdick, Site Designer</h3>
+              <p class="type-size--1">Anne Burdick is a Research Professor in the School of Design at the University of
+                Technology Sydney where she is co-director of the Knowledge Design Lab. Her practice-based research
+                explores new forms of knowledge production through the design of media, visualisations, interfaces and
+                publications. <span class="contributors--more-section">
+                  <span class="contributors--more-content">She collaborated with the Commission for Non-Literary Text Types at the Austrian Academy
+                of
+                Sciences on the design of the <em>Austrian Academy Corpus</em>, the <em>Fackel Wörterbuch:
+                  Redensarten</em>, and the <em>Fackel
+                  Schimpfwörterbuch</em>, with N. Katherine Hayles on the design of Writing Machines. She was co-author,
+                with
+                Johanna Drucker, Peter Lunenfeld, Todd Presner, and Jeffrey Schnapp, of <em>Digital_Humanities</em> (MIT
+                Press,
+                2012) and was design editor of electronicbookreview.com for over twenty years.</span>
+                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
+                </span>
+              </p>
+            </li>
+
+            <li class="contributors--person-tile">
+              <img src="{% static 'img/contribs/Will_McLean.jpg' %}" alt="Will McLean"/>
+              <h3 class="type-size-0">Will McLean, Front-end Developer</h3>
+              <p class="type-size--1">Will McLean is a front-end developer and interaction designer who holds a
+                Bachelor's Degree in Design (Visual Communication) from University of Technology, Sydney.</p>
+            </li>
+
+            <li class="contributors--person-tile">
+              <h3 class="type-size-0">Jade Gooden, Student Research Assistant</h3>
+              <p class="type-size--1">Undergraduate Student, Anthropology</p>
+            </li>
+
+            <li class="contributors--person-tile">
+              <h3 class="type-size-0">Shyam Prasad Nagulavancha, Student Research Assistant</h3>
+              <p class="type-size--1">MS Student, Computer Science</p>
+            </li>
+
+            <li class="contributors--person-tile">
+              <h3 class="type-size-0">Mounika Balivada, Student Research Assistant</h3>
+              <p class="type-size--1">MS Student, Computer Science</p>
+            </li>
+
+          </ul>
+        </div>
       </div>
     </div>
   </div>
