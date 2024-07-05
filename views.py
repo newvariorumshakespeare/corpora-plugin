@@ -17,9 +17,9 @@ from elasticsearch_dsl import A
 
 # TEMPORARY FIX FOR SOFT LAUNCH
 editors = {
-    'wt': "ROBERT KEAN TURNER, VIRGINIA WESTLING HAAS, with ROBERT A. JONES, ANDREW J. SABOL, PATRICIA E. TATSPAUGH",
-    'mnd': "Judith M. Kennedy and Richard Kennedy, with Susan May, Roberta Barker, David Nicol",
-    'lr': "Richard Knowles, Kevin Donovan, with Paula Glatzer"
+    'wt': "ROBERT KEAN TURNER, VIRGINIA WESTLING HAAS, with ROBERT A. JONES, ANDREW J. SABOL, PATRICIA E. TATSPAUGH; GENERAL EDITORS Paul Werstine and Eric Rasmussen",
+    'mnd': "Judith M. Kennedy and Richard Kennedy, with Susan May, Roberta Barker, David Nicol; GENERAL EDITORS Paul Werstine and Eric Rasmussen",
+    'lr': "Richard Knowles, Kevin Donovan, with Paula Glatzer; GENERAL EDITORS Paul Werstine and Eric Rasmussen"
 }
 
 def splash(request):
@@ -624,7 +624,7 @@ def info_news(request, corpus_id=None):
     nvs_page = "info-print-editions"
     site_request = False
     news_page = int(request.GET.get('page', '1'))
-    news_per_page = 10
+    news_per_page = 7
     has_prev = False
     has_next = False
 
