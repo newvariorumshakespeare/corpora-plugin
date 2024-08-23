@@ -1790,9 +1790,6 @@ def handle_bibl_tag(corpus, bibl, unhandled, xml_id=None, date='', siglum_label=
             if hasattr(doc, key) and key != 'bibliographic_entry' and doc_data[key]:
                 setattr(doc, key, doc_data[key])
 
-        #if doc.bibliographic_entry:
-        #    doc.bibliographic_entry_text = strip_tags(doc.bibliographic_entry).strip()
-
         if doc_data['unhandled']:
             unhandled.extend(doc_data['unhandled'])
 
@@ -1843,9 +1840,14 @@ def extract_bibl_components(element, doc_data, inside_note=False):
                 classes.append('inline-bibl')
 
         elif element.name == 'ref' and _contains(element.attrs, ['targType', 'target']):
+            ref_target = element['target']
+
+            if element['targType'] == 'lb' and 'targetEnd' in element.attrs:
+                ref_target += f" {element['targetEnd']}"
+
             open = '''<a ref="#" class="ref-{0}" onClick="navigate_to('{0}', '{1}', this); return false;">'''.format(
                 element['targType'],
-                element['target']
+                ref_target
             )
             close = "</a>"
 
