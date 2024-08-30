@@ -806,13 +806,13 @@ def api_lines(request, corpus_id=None, play_prefix=None, starting_line_id=None, 
             all_lines = corpus.get_content('PlayLine', {'play': play.id}).order_by('line_number')
             started_collecting = False
             for line in all_lines:
-                if line.xml_id == starting_line_id:
+                if line.xml_id == starting_line_id or starting_line_id in line.alt_xml_ids:
                     lines.append(line.to_dict())
                     if ending_line_id:
                         started_collecting = True
                     else:
                         break
-                elif line.xml_id == ending_line_id:
+                elif line.xml_id == ending_line_id or ending_line_id in line.alt_xml_ids:
                     lines.append(line.to_dict())
                     break
                 elif started_collecting:
