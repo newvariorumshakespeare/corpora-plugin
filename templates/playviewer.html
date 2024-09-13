@@ -1635,6 +1635,15 @@
             'scroll_anchor': false,
             'filter_play': true,
         },
+        'div': {
+            'content_type': 'ParaText',
+            'xml_id_field': 'xml_id',
+            'content_field': 'html_content',
+            'title': "APPENDIX",
+            'title_plural': "APPENDIX",
+            'scroll_anchor': true,
+            'filter_play': true,
+        },
         'anchor': {
             'content_type': 'ParaText',
             'xml_id_field': 'child_xml_ids',
@@ -2683,10 +2692,13 @@
                 let content_type = nav_map[nav_type]['content_type'];
                 let search_field = nav_map[nav_type]['xml_id_field'];
                 search_params[`t_${search_field}`] = xml_ids.join('__');
+
                 corpora.list_content(corpus_id, content_type, search_params, function (search_data) {
-                    if (search_data.hasOwnProperty('records')) {
+                    if (search_data.hasOwnProperty('records') && search_data.records.length) {
                         let ids = search_data.records.map(record => record.id);
                         populate_nav_contents(nav_type, ids, [], xml_ids[0], link);
+                    } else if (nav_type == 'div') {
+                        navigate_to('anchor', xml_id, link)
                     }
                 });
             }

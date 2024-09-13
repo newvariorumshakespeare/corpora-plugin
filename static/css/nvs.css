@@ -330,6 +330,7 @@ sub { top: 0.4em; }
 @media ( min-width: 992px ) {
     .page-holder--inner {
         margin-left: calc(var(--sideBar) + 10px);
+        overflow-x: hidden;
     }
     .home .page-holder--inner {
         margin: 0;

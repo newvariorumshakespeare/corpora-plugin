@@ -1845,7 +1845,7 @@ def extract_bibl_components(element, doc_data, inside_note=False):
             if element['targType'] == 'lb' and 'targetEnd' in element.attrs:
                 ref_target += f" {element['targetEnd']}"
 
-            open = '''<a ref="#" class="ref-{0}" onClick="navigate_to('{0}', '{1}', this); return false;">'''.format(
+            open = '''<a href="#" class="ref-{0}" onClick="navigate_to('{0}', '{1}', this); return false;">'''.format(
                 element['targType'],
                 ref_target
             )
@@ -2309,6 +2309,7 @@ def handle_paratext_tag(tag, pt, pt_data):
 
     simple_conversions = {
         'p': 'p',
+        'ab': 'p',
         'hi': 'span',
         'title': 'i',
         'quote': 'q',
@@ -2848,7 +2849,7 @@ def process_link(reffed, pointer=False):
             text = match.group(3)
 
     if link_type and target and text:
-        return '''<a ref="#" class="ref-{0}" onClick="navigate_to('{0}', '{1}', this); return false;">{2}</a>'''.format(
+        return '''<a href="#" class="ref-{0}" onClick="navigate_to('{0}', '{1}', this); return false;">{2}</a>'''.format(
             link_type,
             target,
             text
