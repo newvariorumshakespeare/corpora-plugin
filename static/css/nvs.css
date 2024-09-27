@@ -187,7 +187,6 @@ em, i { font-style: italic; }
 strong, b { font-weight: bold; }
 
 blockquote {
-    font-weight: bold;
     padding-left: 10px;
 }
 
