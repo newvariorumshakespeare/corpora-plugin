@@ -17,7 +17,7 @@ from mongoengine.queryset.visitor import Q
 
 REGISTRY = {
     "Import NVS Data from TEI": {
-        "version": "1.1",
+        "version": "1.2",
         "jobsite_type": "HUEY",
         "track_provenance": True,
         "create_report": True,
@@ -49,7 +49,7 @@ REGISTRY = {
                 "ingestion_scope": {
                     "value": "Full",
                     "type": "choice",
-                    "choices": ["Full", "Playtext Only", "Textual Notes Only", "Commentary Only"],
+                    "choices": ["Full", "Playtext Only", "Textual Notes Only", "Commentary Only", "Appendix Only"],
                     "label": "Scope for Ingestion?",
                     "note": "'Full' will delete all data for play and completely re-ingest from TEI. 'Playtext Only' will also delete all play data but will only ingest playtext for testing. 'Textual Notes Only' will only delete textual note data and then re-ingest textual notes. 'Commentary Only' will only delete commentary note data and then re-ingest commentary notes. NOTE: For either 'Textual Notes Only' or 'Commentary Only', the playtext must have already been ingested."
                 }
@@ -346,7 +346,7 @@ Ingestion Scope:    {4}
                         job.set_status('running', percent_complete=75)
 
                     # PARSE APPENDIX
-                    if ingestion_scope == 'Full':
+                    if ingestion_scope in ['Full', 'Appendix Only']:
                         time_it("Parsing Appendix")
                         job.report(
                             parse_appendix(
@@ -471,6 +471,14 @@ def delete_play_data(corpus, play_prefix, ingestion_scope):
             com_spans = corpus.get_content('PlayTag', {'play': play.id, 'name': 'comspan'})
             for com_span in com_spans:
                 com_span.delete(track_deletions=False)
+
+        elif ingestion_scope == 'Appendix Only':
+            nvs_content_types = []
+            appendices = corpus.get_content('ParaText', {'play': play.id, 'section': 'Appendix'})
+            count = appendices.count()
+            for appendix in appendices:
+                appendix.delete(track_deletions=False)
+            report += '{0} {1}(s) deleted.\n'.format(count, 'ParaText')
 
         for nvs_ct in nvs_content_types:
             contents = corpus.get_content(nvs_ct, {'play': play.id})
@@ -2348,6 +2356,7 @@ def handle_paratext_tag(tag, pt, pt_data):
         'date': 'span:date',
         'docDate': 'span:doc-date',
         'stage': 'span:stage',
+        'nvsSeg': 'span:nvs-seg'
     }
 
     silent = [
@@ -2446,6 +2455,8 @@ def handle_paratext_tag(tag, pt, pt_data):
             html += "</a>"
 
         elif tag.name == 'note':
+            html_tag = 'div'
+
             curr_note = {
                 'xml_id': '',
                 'target_tln': ''
@@ -2459,15 +2470,19 @@ def handle_paratext_tag(tag, pt, pt_data):
             if 'type' in tag.attrs and tag.attrs['type'] in ['textual', 'irregular', 'unadopted']:
                 classes.append('pt_textual_note')
 
+            if 'place' in tag.attrs and tag.attrs['place'] == 'margin':
+                html_tag = 'span'
+                classes.append('note-margin')
+
             if classes:
                 attributes += ' class="{0}"'.format(
                     " ".join(classes)
                 )
 
-            html += "<div{0}>".format(attributes)
+            html += "<{0}{1}>".format(html_tag, attributes)
             for child in tag.children:
                 html += handle_paratext_tag(child, pt, pt_data)
-            html += "</div>"
+            html += "</{0}>".format(html_tag)
             pt_data['current_note'] = None
 
         elif tag.name == "label" and pt_data['current_note']:
@@ -2478,7 +2493,7 @@ def handle_paratext_tag(tag, pt, pt_data):
                 html += handle_paratext_tag(child, pt, pt_data)
             html += "</a>"
 
-        elif tag.name == "quote" and 'rend' in tag and tag['rend'] == 'block':
+        elif tag.name == "quote" and 'rend' in tag.attrs and tag['rend'] == 'block':
             if classes:
                 attributes += ' class="{0}"'.format(
                     " ".join(classes)
