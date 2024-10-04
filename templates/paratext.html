@@ -811,7 +811,9 @@
                 }
             );
         } else if (nav_type === 'siglum'){
-            if (!xml_id.startsWith('s_')) xml_id = `s_${xml_id.toLowerCase()}`;
+            if (!xml_id.startsWith('s_')) xml_id = `s_${xml_id.toLowerCase()}`
+
+            if (!Object.keys(witnesses).includes(xml_id)) { xml_id = `${xml_id}_${play_prefix}` }
 
             if (xml_id in witnesses) {
                 let title = 'Collated Edition';
