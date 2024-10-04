@@ -2463,7 +2463,10 @@ def handle_paratext_tag(tag, pt, pt_data):
             }
 
             if 'target' in tag.attrs:
-                curr_note['target_tln'] = tag['target'].replace('#', '')
+                target = tag['target'].replace('#', '')
+                if 'targetEnd' in tag.attrs:
+                    target += " " + tag['targetEnd'].replace('#', '')
+                curr_note['target_tln'] = target
 
             pt_data['current_note'] = curr_note
 
