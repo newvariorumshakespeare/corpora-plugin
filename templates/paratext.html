@@ -151,10 +151,22 @@
         text-decoration: none;
     }
 
-    .name, .author, .editor {
+    .name, .author, .editor, .note-toggler {
         color: var(--blue);
         font-weight: 700;
     }
+
+    .note-toggler { cursor: pointer; }
+
+    .tooltip {
+        background-color: white;
+        border: solid 1px var(--blue);
+        padding: 10px;
+        max-width: 500px;
+        z-index: 1000;
+    }
+    .tooltip-inner { background-color: white; }
+
     .date {
         font-weight: 700;
     }
@@ -627,6 +639,8 @@
 
 {% block js %}
 <script src="{% static 'js/jquery-3.3.1.min.js' %}"></script>
+<script src="{% static 'js/popper.min.js' %}"></script>
+<script src="{% static 'js/bootstrap.min.js' %}"></script>
 <script src="{% static 'js/corpora.js' %}"></script>
 <script type="application/javascript">
     let corpora;
@@ -749,6 +763,26 @@
             let span = $(this);
             span.html(`&mdash;&mdash;${span.html().endsWith('.') ? '.' : ''}`);
         });
+
+        // attempt to address marginal notes problem via tooltips
+        let margin_notes = $('.type-source.note-margin')
+        margin_notes.each(function() {
+            let note_html = this.outerHTML.replaceAll('-<br><br>', '').replaceAll('<br><br>', ' ')
+            let note = $(this)
+            let note_toggler = $(`
+                <span class="note-toggler"
+                    data-toggle="tooltip"
+                    data-html="true"
+                    data-placement="top">
+                    [note]
+                </span>
+            `)
+            note_toggler.attr('title', note_html)
+            note.after(note_toggler)
+            note.remove()
+        })
+        $('.note-toggler').tooltip()
+
     })
 
     function romanize (num) {
