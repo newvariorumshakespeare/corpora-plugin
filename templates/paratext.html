@@ -2,10 +2,27 @@
 {% load static %}
 
 {% block headrefs %}
-
+<link href="{% static 'css/fontawesome.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/regular.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/solid.min.css' %}" rel="stylesheet">
 <style>
     :root {
         --sideBar: 400px;
+    }
+
+    html {
+        scroll-padding-top: 80px;
+    }
+
+    .anchor:before {
+        content: unset;
+        display: unset;
+        padding-top: unset;
+        margin-top: unset;
+    }
+
+    .modal-opening {
+        overflow: hidden;
     }
 
     .paratext {
@@ -96,11 +113,13 @@
         text-decoration: underline;
         font-family: "Roboto Condensed", sans-serif;
         font-weight: 700;
+        cursor: pointer;
     }
     .ref-bibl {
         color: var(--blue);
         text-decoration: underline;
         font-weight: 700;
+        cursor: pointer;
     }
     .ref-siglum {
         color: var(--orange);
@@ -108,6 +127,7 @@
         font-weight: 700;
         font-variant-numeric: normal;
         font-size: 14px;
+        cursor: pointer;
     }
     .witness-list {
         margin: 20px 0;
@@ -133,10 +153,27 @@
         text-decoration: none;
     }
 
-    .name, .author, .editor {
+    .name, .author, .editor, .note-toggler {
         color: var(--blue);
         font-weight: 700;
     }
+
+    .note-toggler {
+        cursor: pointer;
+        font-weight: unset;
+        margin-left: 3px;
+        margin-right: 3px;
+    }
+
+    .tooltip {
+        background-color: white;
+        border: solid 1px var(--blue);
+        padding: 10px;
+        max-width: 500px;
+        z-index: 1000;
+    }
+    .tooltip-inner { background-color: white; }
+
     .date {
         font-weight: 700;
     }
@@ -201,8 +238,16 @@
     }
 
     .speech {
-        margin-left: 40px;
+        margin-left: 280px;
     }
+
+    .speech .type-source {
+        margin-left: -280px;
+        width: 280px;
+        padding-right: 20px;
+        display: inline-block;
+    }
+
     .speaker {
         font-style: italic;
     }
@@ -231,6 +276,11 @@
     .rend-alignleft, .rend-alignleft p { text-align: left !important; }
     .rend-alignright, .rend-alignright p { text-align: right !important; }
     .rend-allcaps { text-transform: uppercase; }
+    .rend_smcaps { font-variant: small-caps; font-weight: bold; }
+
+    .type-marginalia.nvs-seg, .note-margin {
+        float: right;
+    }
 
     .floating-text,
     .floating-text h3,
@@ -471,6 +521,17 @@
         font-family: 'HalyardTextBook';
         max-height: calc(40vh);
         overflow-y: scroll;
+        overscroll-behavior: contain;
+    }
+
+    .ref-modal-content a.anchor[name] {
+        display: inline-block;
+        scroll-margin-top: 20px;
+    }
+
+    .ref-modal-content .anchor[name]:before {
+        padding-top: 0;
+        margin-top: 0;
     }
 
     .ref-row {
@@ -585,6 +646,8 @@
 
 {% block js %}
 <script src="{% static 'js/jquery-3.3.1.min.js' %}"></script>
+<script src="{% static 'js/popper.min.js' %}"></script>
+<script src="{% static 'js/bootstrap.min.js' %}"></script>
 <script src="{% static 'js/corpora.js' %}"></script>
 <script type="application/javascript">
     let corpora;
@@ -633,6 +696,15 @@
             'title': "COMMENTARY",
             'title_plural': "COMMENTARY",
             'scroll_anchor': false,
+            'filter_play': true,
+        },
+        'div': {
+            'content_type': 'ParaText',
+            'xml_id_field': 'xml_id',
+            'content_field': 'html_content',
+            'title': "APPENDIX",
+            'title_plural': "APPENDIX",
+            'scroll_anchor': true,
             'filter_play': true,
         },
         'anchor': {
@@ -698,6 +770,25 @@
             let span = $(this);
             span.html(`&mdash;&mdash;${span.html().endsWith('.') ? '.' : ''}`);
         });
+
+        // attempt to address marginal notes problem via tooltips
+        let margin_notes = $('.type-source.note-margin')
+        margin_notes.each(function() {
+            let note_html = this.outerHTML.replaceAll('-<br><br>', '').replaceAll('<br><br>', ' ')
+            let note = $(this)
+            let note_toggler = $(`
+                <span class="note-toggler far fa-sticky-note"
+                    data-toggle="tooltip"
+                    data-html="true"
+                    data-placement="top">
+                </span>
+            `)
+            note_toggler.attr('title', note_html)
+            note.after(note_toggler)
+            note.remove()
+        })
+        $('.note-toggler').tooltip()
+
     })
 
     function romanize (num) {
@@ -759,40 +850,46 @@
                     }
                 }
             );
-        } else {
-            if (nav_type === 'siglum'){
-                if (!xml_id.startsWith('s_')) xml_id = `s_${xml_id.toLowerCase()}`;
+        } else if (nav_type === 'siglum'){
+            if (!xml_id.startsWith('s_')) xml_id = `s_${xml_id.toLowerCase()}`
 
-                if (xml_id in witnesses) {
-                    let title = 'Collated Edition';
-                    if (witnesses[xml_id].bibliographic_entry.includes('<br /><br />')) title += 's';
-                    display_nav_modal(title, witnesses[xml_id].bibliographic_entry, link);
-                }
-            } else {
-                if (!nav_map.hasOwnProperty(nav_type)) nav_type = 'anchor';
+            if (!Object.keys(witnesses).includes(xml_id)) { xml_id = `${xml_id}_${play_prefix}` }
 
-                let xml_ids = xml_id.split(' ');
-                let search_params = {
-                    page: 1,
-                    'page-size': xml_ids.length,
-                    only: 'id',
-                    operator: xml_ids.length > 1 ? 'or' : 'and'
-                };
-
-                if (nav_map[nav_type]['filter_play']) {
-                    search_params['f_play.id'] = play_id;
-                }
-
-                let content_type = nav_map[nav_type]['content_type'];
-                let search_field = nav_map[nav_type]['xml_id_field'];
-                search_params[`t_${search_field}`] = xml_ids.join('__');
-                corpora.list_content(corpus_id, content_type, search_params, function (search_data) {
-                    if (search_data.hasOwnProperty('records') && search_data.records.length === xml_ids.length) {
-                        let ids = search_data.records.map(record => record.id);
-                        populate_nav_contents(nav_type, ids, [], xml_ids[0], link);
-                    }
-                });
+            if (xml_id in witnesses) {
+                let title = 'Collated Edition';
+                if (witnesses[xml_id].bibliographic_entry.includes('<br /><br />')) title += 's';
+                display_nav_modal(title, witnesses[xml_id].bibliographic_entry, link);
             }
+        } else if (nav_type === 'url') {
+            if (!xml_id.startsWith('http')) xml_id = `https://${xml_id}`
+            window.open(xml_id, '_blank').focus()
+        } else {
+            if (!nav_map.hasOwnProperty(nav_type)) nav_type = 'anchor';
+
+            let xml_ids = xml_id.split(' ');
+            let search_params = {
+                page: 1,
+                'page-size': xml_ids.length,
+                only: 'id',
+                operator: xml_ids.length > 1 ? 'or' : 'and'
+            };
+
+            if (nav_map[nav_type]['filter_play']) {
+                search_params['f_play.id'] = play_id;
+            }
+
+            let content_type = nav_map[nav_type]['content_type'];
+            let search_field = nav_map[nav_type]['xml_id_field'];
+            search_params[`t_${search_field}`] = xml_ids.join('__');
+
+            corpora.list_content(corpus_id, content_type, search_params, function (search_data) {
+                if (search_data.hasOwnProperty('records') && search_data.records.length === xml_ids.length) {
+                    let ids = search_data.records.map(record => record.id);
+                    populate_nav_contents(nav_type, ids, [], xml_ids[0], link);
+                } else if (nav_type === 'div') {
+                    navigate_to('anchor', xml_id, link)
+                }
+            });
         }
     }
 
@@ -808,22 +905,49 @@
                     populate_nav_contents(nav_type, ids, contents, first_xml_id, link);
                 } else {
                     let nav_title = nav_map[nav_type]['title'];
-                    let controls = '';
                     if (contents.length > 1) { nav_title = nav_map[nav_type]['title_plural']; }
-
+                    let controls = '';
                     let nav_content = '';
-                    contents.map(content => {
+
+                    contents.map(function(content, content_index) {
                         if (nav_content === '') nav_content += '<a name="nav-content-start"></a>';
                         else nav_content += '<br><br>';
 
                         if (nav_type === 'note_cn') {
                             nav_content += `
                                 <div class="comm-heading">
-                                    n. ${content.line_label}: ${content.subject_matter}
+                                    <span class="comm-indicator">n. ${content.line_label}:</span> ${content.subject_matter}
                                 </div>
                             `;
-                        } else if (nav_type === 'anchor') {
-                            nav_title = `<span>${content.section}<br/><div class="ref-subtitle-marker">&nbsp;</div><span class="text-nvs-dark-blue">${content.title}</span></span>`;
+                        } else if (nav_type === 'bibl' && first_xml_id && !controls) {
+                            let biblio_url = paratext_prefix;
+                            if (first_xml_id.startsWith('b_')) {
+                                if (biblio_url) {
+                                    biblio_url += `Bibliography/#${first_xml_id}`;
+                                } else {
+                                    biblio_url = `/bibliography/${play_prefix}/#${first_xml_id}`;
+                                }
+                            } else if (first_xml_id.startsWith('pw_') || first_xml_id.startsWith('s_')) {
+                                if (biblio_url) {
+                                    biblio_url += `Front Matter/#${first_xml_id}`;
+                                } else {
+                                    biblio_url = `/front/${play_prefix}/#${first_xml_id}`;
+                                }
+                            }
+                            controls += `<a href="${biblio_url}" target="_blank"><i class="ref-modal-control new-tab"></i></a>`;
+                        } else if (['anchor', 'div'].includes(nav_type)) {
+                            if (content_index === 0) {
+                                nav_title = `
+                                    <span>
+                                        ${content.section}
+                                        <br/>
+                                        <div class="ref-subtitle-marker">&nbsp;</div>
+                                        <span class="text-nvs-dark-blue">
+                                            ${content.title}
+                                        </span>
+                                    </span>
+                                `;
+                            }
 
                             let paratext_url = ''
                             let paratext_section_map = {
@@ -839,13 +963,9 @@
                             }
                             paratext_url += `#paratext-${content.id}`;
 
-                            controls = `
-                                <a href="${paratext_url}" target="_blank">
-                                    <img src="{% static 'img/nav-external.png' %}"
-                                        class="ref-modal-control"
-                                        border="0">
-                                </a>
-                            `;
+                            if (!controls) {
+                                controls += `<a href="${paratext_url}" target="_blank"><i class="ref-modal-control new-tab"></i></a>`;
+                            }
                         }
 
                         nav_content += content[nav_map[nav_type]['content_field']];
@@ -973,16 +1093,22 @@
     }
 
     function delayed_scroll(anchor, smooth=true, parent=null) {
-        let scroll_opts = {behavior: 'smooth'};
+        let scroll_opts = { behavior: 'smooth'};
         if (!smooth) scroll_opts = null;
 
         let id_selector = `${parent ? '#' + parent + ' ' : ''}#${anchor}`;
         let anchor_selector = `${parent ? '#' + parent + ' ' : ''}a[name=${anchor}]`;
 
-        if ($(id_selector).length) {
-            $(id_selector)[0].scrollIntoView(scroll_opts);
+        let target = $(id_selector)
+        if (!target.length) target = $(anchor_selector)
+
+        if (parent) {
+            parent = $(`#${parent} .ref-modal-content`)
+            parent.scrollTop(
+                target.offset().top - parent.offset().top + parent.scrollTop() - 10
+            )
         }
-        else $(anchor_selector)[0].scrollIntoView(scroll_opts);
+        else target[0].scrollIntoView(scroll_opts);
     }
 </script>
 {% endblock %}

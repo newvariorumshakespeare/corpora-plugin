@@ -470,78 +470,6 @@ def home(request, corpus_id=None):
     )
 
 
-def frontmatter(request, corpus_id=None):
-    dynamic_content = "Some <i>dynamically</i> generated content!"
-    site_request = False
-
-    if not corpus_id and hasattr(request, 'corpus_id'):
-        corpus_id = request.corpus_id
-        site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'nvs_frontmatter'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
-
-    return render(
-        request,
-        'nvs_frontmatter.html',
-        {
-            'corpus_id': corpus_id,
-            'site_request': site_request,
-            'content': dynamic_content
-        }
-    )
-
-
-def appendix(request, corpus_id=None):
-    dynamic_content = "Some <i>dynamically</i> generated content!"
-    site_request = False
-
-    if not corpus_id and hasattr(request, 'corpus_id'):
-        corpus_id = request.corpus_id
-        site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'nvs_appendix'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
-
-    return render(
-        request,
-        'nvs_appendix.html',
-        {
-            'corpus_id': corpus_id,
-            'site_request': site_request,
-            'content': dynamic_content
-        }
-    )
-
-
-def bibliography(request, corpus_id=None):
-    dynamic_content = "Some <i>dynamically</i> generated content!"
-    site_request = False
-
-    if not corpus_id and hasattr(request, 'corpus_id'):
-        corpus_id = request.corpus_id
-        site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'nvs_bibliography'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
-
-    return render(
-        request,
-        'nvs_bibliography.html',
-        {
-            'corpus_id': corpus_id,
-            'site_request': site_request,
-            'content': dynamic_content
-        }
-    )
-
-
 def info_about(request, corpus_id=None):
     nvs_page = "info-about"
     dynamic_content = "Some <i>dynamically</i> generated content!"
@@ -806,13 +734,13 @@ def api_lines(request, corpus_id=None, play_prefix=None, starting_line_id=None, 
             all_lines = corpus.get_content('PlayLine', {'play': play.id}).order_by('line_number')
             started_collecting = False
             for line in all_lines:
-                if line.xml_id == starting_line_id:
+                if line.xml_id == starting_line_id or starting_line_id in line.alt_xml_ids:
                     lines.append(line.to_dict())
-                    if ending_line_id:
+                    if ending_line_id and not (line.xml_id == ending_line_id or ending_line_id in line.alt_xml_ids):
                         started_collecting = True
                     else:
                         break
-                elif line.xml_id == ending_line_id:
+                elif line.xml_id == ending_line_id or ending_line_id in line.alt_xml_ids:
                     lines.append(line.to_dict())
                     break
                 elif started_collecting:
