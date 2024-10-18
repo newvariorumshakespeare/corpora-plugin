@@ -187,7 +187,6 @@ em, i { font-style: italic; }
 strong, b { font-weight: bold; }
 
 blockquote {
-    font-weight: bold;
     padding-left: 10px;
 }
 
@@ -330,6 +329,7 @@ sub { top: 0.4em; }
 @media ( min-width: 992px ) {
     .page-holder--inner {
         margin-left: calc(var(--sideBar) + 10px);
+        overflow-x: hidden;
     }
     .home .page-holder--inner {
         margin: 0;
