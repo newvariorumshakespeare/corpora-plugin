@@ -2,7 +2,9 @@
 {% load static %}
 
 {% block headrefs %}
-
+<link href="{% static 'css/fontawesome.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/regular.min.css' %}" rel="stylesheet">
+<link href="{% static 'css/solid.min.css' %}" rel="stylesheet">
 <style>
     :root {
         --sideBar: 400px;
@@ -156,7 +158,12 @@
         font-weight: 700;
     }
 
-    .note-toggler { cursor: pointer; }
+    .note-toggler {
+        cursor: pointer;
+        font-weight: unset;
+        margin-left: 3px;
+        margin-right: 3px;
+    }
 
     .tooltip {
         background-color: white;
@@ -770,11 +777,10 @@
             let note_html = this.outerHTML.replaceAll('-<br><br>', '').replaceAll('<br><br>', ' ')
             let note = $(this)
             let note_toggler = $(`
-                <span class="note-toggler"
+                <span class="note-toggler far fa-sticky-note"
                     data-toggle="tooltip"
                     data-html="true"
                     data-placement="top">
-                    [note]
                 </span>
             `)
             note_toggler.attr('title', note_html)
