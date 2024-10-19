@@ -1379,7 +1379,6 @@
                                      data-scene="{{ line.scene }}"
                                      data-line_number="{{ line.line_number }}"
                                      data-line_label="{{ line.line_label }}"
-                                     data-text="{{ line.text }}"
                                      data-text-length="{{ line.text|length }}"
                                      data-witness_indicators="{{ line.witness_meter }}"
                                      {% if line.alt_xml_ids %}data-alt_xml_ids="{{ line.alt_xml_ids|join:"," }}"{% endif %}
@@ -2619,7 +2618,7 @@
                 let line_template = () =>
                     `<div class="row no-gutters ref-row">
                         <div class="col-sm-10 m-0 p-0 play-words">
-                            ${line_row.data('text')}
+                            ${line_row.find('div.play-words').text().trim()}
                         </div>
                         <div class="col-sm-1 m-0 p-1 play-label d-flex justify-content-center">
                             ${line_row.data('line_label')}
