@@ -32,7 +32,7 @@ def splash(request):
     )
 
 
-def playviewer(request, corpus_id=None, play_prefix=None):
+async def playviewer(request, corpus_id=None, play_prefix=None):
     start_time = time.time()
 
     nvs_page = "variorum-viewer"
@@ -48,9 +48,9 @@ def playviewer(request, corpus_id=None, play_prefix=None):
     if _contains_any(user_agent, ['Mobile', 'Opera Mini', 'Android']):
         on_mobile = True
 
-    corpus = get_corpus(corpus_id)
-    play = corpus.get_content('Play', {'prefix': play_prefix})[0]
-    nvs_session = get_nvs_session(request, play_prefix, reset='reset' in request.GET)
+    corpus = await sync_to_async(get_corpus)(corpus_id)
+    play = await sync_to_async(corpus.get_content)('Play', {'prefix': play_prefix}, single_result=True)
+    nvs_session = await sync_to_async(get_nvs_session)(request, play_prefix, reset='reset' in request.GET)
 
     # HANDLE GET PARAMS
     act_scene = request.GET.get('scene', nvs_session['filter']['act_scene'])
@@ -75,14 +75,14 @@ def playviewer(request, corpus_id=None, play_prefix=None):
         nvs_session['is_filtered'] = character != 'all' or act_scene != 'all'
         nvs_session['filter']['no_results'] = False
 
-        filter_session_lines_by_character(corpus, play, nvs_session)
-        set_nvs_session(request, nvs_session, play_prefix)
+        sync_to_async(filter_session_lines_by_character)(corpus, play, nvs_session)
+        sync_to_async(set_nvs_session)(request, nvs_session, play_prefix)
 
-    lines = get_session_lines(corpus, nvs_session)
+    lines = await sync_to_async(get_session_lines)(corpus, nvs_session)
 
     # LINE NOTE MAP
     line_note_map = {}
-    note_results = corpus.search_content(
+    note_results = await sync_to_async(corpus.search_content)(
         'TextualNote',
         page_size=10000,
         fields_filter={
@@ -91,7 +91,7 @@ def playviewer(request, corpus_id=None, play_prefix=None):
         fields_sort=[{'lines.line_number': {'order': 'asc'}}],
         only=['id', 'xml_id', 'lines.xml_id']
     )
-    if note_results and 'records':
+    if note_results and 'records' in note_results:
         for note in note_results['records']:
             #notes[note['xml_id']] = note
             for line in note['lines']:
@@ -121,7 +121,7 @@ def playviewer(request, corpus_id=None, play_prefix=None):
         ],
         'only': ['id', 'xml_id'],
     }
-    comm_results = corpus.search_content(**comm_search)
+    comm_results = await sync_to_async(corpus.search_content)(**comm_search)
     for comm_result in comm_results['records']:
         comm_ids.append({'xml_id': comm_result['xml_id'], 'id': comm_result['id']})
 
@@ -132,8 +132,8 @@ def playviewer(request, corpus_id=None, play_prefix=None):
         'f_play.id': str(play.id),
         'a_terms_chars': 'speaking.xml_id,speaking.label.raw',
     }
-    char_search_params = build_search_params_from_dict(char_search)
-    char_results = corpus.search_content('Speech', **char_search_params)
+    char_search_params = await sync_to_async(build_search_params_from_dict)(char_search)
+    char_results = await sync_to_async(corpus.search_content)('Speech', **char_search_params)
     if char_results and 'aggregations' in char_results['meta'] and 'chars' in char_results['meta']['aggregations']:
         for char_info, num_speeches in char_results['meta']['aggregations']['chars'].items():
             char_id, char_name = char_info.split('|||')
@@ -144,7 +144,7 @@ def playviewer(request, corpus_id=None, play_prefix=None):
             })
 
     # WITNESSES
-    witnesses, wit_counter, witness_centuries = get_nvs_witnesses(corpus, play)
+    witnesses, wit_counter, witness_centuries = await sync_to_async(get_nvs_witnesses)(corpus, play)
 
     print(time.time() - start_time)
 
