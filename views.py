@@ -266,7 +266,7 @@ def paratext(request, corpus_id=None, play_prefix=None, section=None):
                 section_html += '<ul id="{0}" class="anchor">'.format(marker)
                 last_marker = marker
 
-            section_html += '<a name="{0}" class="anchor"></a><li class="bibl">{1}</li>'.format(
+            section_html += '<a id="{0}" class="anchor"></a><li class="bibl">{1}</li>'.format(
                 bib.document.siglum,
                 bib.bibliographic_entry
             )

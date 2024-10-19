@@ -2508,7 +2508,7 @@ def handle_paratext_tag(tag, pt, pt_data):
             html += "</blockquote>"
 
         elif tag.name == "anchor" and 'xml:id' in tag.attrs:
-            html += "<a name='{0}' class='anchor'></a>".format(tag['xml:id'])
+            html += "<a id='{0}' class='anchor'></a>".format(tag['xml:id'])
 
         elif tag.name == "closer":
             if classes:
