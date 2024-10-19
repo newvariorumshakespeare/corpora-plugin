@@ -1397,7 +1397,7 @@
                                                    aria-controls="{{ line.xml_id }}-variant-div">
                                             </a>
                                         {% endif %}
-                                        <div class="w-100 play-html"></div>
+                                        <div class="w-100 play-html">{{ line.rendered_html|safe }}</div>
                                     </div>
                                     <div id="{{ line.xml_id }}-number-col" class="col-sm-1 m-0 p-0">
                                         <div class="row no-gutters h-100 bg-nvs">
@@ -3000,16 +3000,6 @@
         if (!lines[line_id].populated) {
             setTimeout(() => {
                 if (visible_lines.has(line_id)) {
-                    corpora.list_content(
-                        corpus_id,
-                        'PlayLine',
-                        {'f_xml_id': line_id, 'f_play.prefix': play_prefix, 'only': 'rendered_html'},
-                        function (line) {
-                            if (line.hasOwnProperty('records') && line.records.length === 1)
-                                lines[line_id].row.find('div.play-html').html(line.records[0].rendered_html)
-                        }
-                    )
-
                     show_notes(line_id);
 
                     draw_witness_meter(

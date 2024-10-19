@@ -182,7 +182,7 @@ def get_session_lines(corpus, session, only_ids=False):
     if session['filter']['character_lines']:
         line_criteria['id__in'] = session['filter']['character_lines']
 
-    lines = corpus.get_content('PlayLine', line_criteria).no_dereference().order_by('line_number')
+    lines = corpus.get_content('PlayLine', line_criteria).exclude('play', 'witness_locations').order_by('line_number')
 
     if session['filter']['act_scene'] != 'all':
         act_scenes = session['filter']['act_scene'].split(',')
