@@ -1,6 +1,8 @@
 import time
 import re
+import asyncio
 from django.shortcuts import render, HttpResponse, redirect
+from asgiref.sync import sync_to_async
 from django.http import Http404
 from django.contrib.auth.decorators import login_required
 from django.utils.text import slugify
@@ -292,7 +294,7 @@ def paratext(request, corpus_id=None, play_prefix=None, section=None):
     )
 
 
-def witness_meter(request, witness_flags, height, width, inactive_color_hex, label_buffer):
+async def witness_meter(request, witness_flags, height, width, inactive_color_hex, label_buffer):
     if height.isdigit() and width.isdigit() and label_buffer.isdigit():
         height = int(height)
         width = int(width)
