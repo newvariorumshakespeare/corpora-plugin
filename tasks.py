@@ -1931,11 +1931,14 @@ COMMENTARY NOTE INGESTION
 
         primary_witnesses = corpus.get_content("Reference", {'play': play.id, 'ref_type': 'primary_witness'}).order_by('+id')
         pw_sigla = [pw.document.siglum for pw in primary_witnesses]
+        note_sequence = 0
 
         for note_tag in note_tags:
             note = corpus.get_content('Commentary')
             note.play = play.id
             note.xml_id = note_tag['xml:id']
+            note.sequence = note_sequence
+            note_sequence += 1
 
             note.lines, line_err_msg = get_line_ids(
                 note_tag['target'],

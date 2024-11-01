@@ -1,0 +1,173 @@
+<div id="reader-view" class="row flex-grow-1">
+    <div id="main-col" class="col-md-12 col-lg-12 p-1 view-col">
+
+        <!-- header row -->
+        <div id="playviewer-header-row" class="row">
+            <div class="col-sm-8 pe-0 bg-nvs-light-blue var-playtext-col">
+                <div class="row gx-0 header-block">
+                    <div id="variant-header-col" class="d-none d-sm-flex col-sm-4 align-items-center justify-content-center">
+                        <div class="heading-label text-white">
+                            TEXTUAL VARIANTS BY YEAR
+                        </div>
+                    </div>
+                    <div id="playtext-search-tln-col" class="col-sm-8 m-0 p-0 d-flex align-items-center">
+                        <div id="playtext-header-label" class="heading-label text-white mx-auto" style="padding-left: 100px;">
+                            PLAY TEXT
+                        </div>
+                        <div id="playtext-search-div" class="d-flex flex-column me-1">
+                            <div id="hdr-quick-search-box" class="nvs-search" contentEditable="true"></div>
+                            <div id="hdr-quick-search-drawer" class="collapse">
+                                <div class="row">
+                                    <div class="col-sm-12">
+                                        <div class="d-flex flex-row ms-2 mb-2">
+                                            <span class="heading-label text-white me-3" style="display: inline-flex; align-items: center; width: 100px; justify-content: end;">
+                                                SEARCH TYPE:
+                                            </span>
+                                            <div class="me-3">
+                                                <input class="form-check-input" type="radio" name="search-type" id="search-type-fuzzy" value="fuzzy" checked>
+                                                <label class="form-check-label radio" for="search-type-fuzzy">
+                                                    FUZZY
+                                                </label>
+                                            </div>
+                                            <div class="me-3">
+                                                <input class="form-check-input" type="radio" name="search-type" id="search-type-exact" value="exact">
+                                                <label class="form-check-label radio" for="search-type-exact">
+                                                    EXACT
+                                                </label>
+                                            </div>
+                                            <div>
+                                                <input class="form-check-input" type="radio" name="search-type" id="search-type-wildcard" value="wildcard">
+                                                <label class="form-check-label radio" for="search-type-wildcard">
+                                                    WILDCARD (*)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-sm-12">
+                                        <div class="d-flex flex-row ms-2 mb-2">
+                                            <span class="heading-label text-white me-3" style="display: inline-flex; align-items: center; width: 100px; justify-content: end;">
+                                                INCLUDE:
+                                            </span>
+                                            <div class="me-3">
+                                                <input class="form-check-input" type="checkbox" value="" id="search-playtext" checked>
+                                                <label class="form-check-label checkbox" for="search-playtext">
+                                                    PLAY TEXT
+                                                </label>
+                                            </div>
+                                            <div class="me-3">
+                                                <input class="form-check-input" type="checkbox" value="" id="search-variants" checked>
+                                                <label class="form-check-label checkbox" for="search-variants">
+                                                    VARIANTS
+                                                </label>
+                                            </div>
+                                            <div>
+                                                <input class="form-check-input" type="checkbox" value="" id="search-commentary" checked>
+                                                <label class="form-check-label checkbox" for="search-commentary">
+                                                    COMMENTARY
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <i id="playtext-search-close-button" class="fas fa-times d-none" aria-label="Close"></i>
+                        <div id="playtext-tln-div">
+                            <input id="hdr-line-no-box" class="nvs-tln" type="text" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-4 act-scene-comm-col bg-nvs-light-blue">
+                <div class="d-none d-sm-flex row header-block bg-nvs-light-blue">
+                    <div class="col-sm-1 m-0 p-0 act-scene-col">
+                        &nbsp;
+                    </div>
+                    <div id="commentary-header-col" class="col-sm-11 m-0 p-0 comm-col d-flex align-items-center justify-content-center">
+                        <div class="heading-label text-white">
+                            COMMENTARY NOTES BY LINE
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-none d-sm-flex row">
+            <div id="playtext-header-col" class="col-sm-8 pe-0 bg-nvs-light-orange var-playtext-col">
+                <div class="row gx-0 header-block h-100">
+                    <div id="witness-header" class="col-sm-4 m-0 p-0">
+                        &nbsp;
+                    </div>
+                    <div class="col-sm-7 bg-nvs">
+                        <div class="heading-label mt-1 ms-2">
+                            <div id="playtext-header-controls" class="d-flex flex-row align-items-center justify-content-between">
+                                <div class="d-none">
+                                    <input class="form-check-input" type="checkbox" value="" id="show-variants-by-line" checked>
+                                    <label class="form-check-label checkbox-white" for="show-variants-by-line">
+                                        SHOW VARIANTS BY LINE
+                                    </label>
+                                </div>
+                                <div>
+                                    <input class="form-check-input" type="checkbox" value="" id="show-commentary-referents" checked>
+                                    <label class="form-check-label checkbox-white" for="show-commentary-referents">
+                                        HIGHLIGHT COMMENTARY REFERENTS
+                                    </label>
+                                </div>
+                                <div id="filter-lines-button-div">
+                                    <button id="filter-lines-button" type="button" class="btn btn-link checkbox-white px-0"><i class="fas fa-filter me-1"></i> FILTER LINES</button>
+                                </div>
+                                <div>
+                                  <a href="#main-header" class="checkbox-white px-0"><i class="fas fa-arrow-up me-1"></i> GO TOP</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-1 bg-nvs">
+                        <div class="row gx-0 h-100">
+                            <div id="tln-header-col" class="col-sm-8 offset-4 play-label">
+                                <div class="heading-label vertical d-flex h-100 justify-content-center align-items-end">
+                                    TLN
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-4 act-scene-comm-col">
+                <div class="row header-block">
+                    <div id="act-scene-header-col" class="col-sm-1 bg-nvs-lightest-gray act-scene-col p-0 m-0">
+                        <div class="heading-label vertical d-flex h-100 align-items-end" style="top: -9px;">
+                            ACT<br>SCN
+                        </div>
+                    </div>
+                    <div class="col-sm-11 bg-nvs-light-yellow comm-col p-0 m-0">
+                        &nbsp;
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- PLAYTEXT -->
+            <div id="playtext-col" class="col-sm-8 pe-0 var-playtext-col">
+            </div>
+
+            <!-- COMMENTARY -->
+            <div id="act-scene-commentary-col" class="col-sm-4 act-scene-comm-col mx-0 px-0">
+                <div class="row w-100 gx-0">
+                    <div class="col-sm-1 p-0 m-0 act-scene-col">
+                        <div id="act-scene-frame">
+                            <!-- populated by javascript -->
+                        </div>
+                    </div>
+                    <div class="col-sm-11 p-0 m-0 comm-col">
+                        <div id="commentary-frame">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

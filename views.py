@@ -93,7 +93,6 @@ def playviewer(request, corpus_id=None, play_prefix=None):
     )
     if note_results and 'records':
         for note in note_results['records']:
-            #notes[note['xml_id']] = note
             for line in note['lines']:
                 if line['xml_id'] not in line_note_map:
                     line_note_map[line['xml_id']] = [{
@@ -170,6 +169,29 @@ def playviewer(request, corpus_id=None, play_prefix=None):
         }
     )
 
+
+def prototype(request, corpus_id=None, play_prefix=None):
+    corpora_url = 'https://' if settings.USE_SSL else 'http://'
+    corpora_url += settings.ALLOWED_HOSTS[0]
+    if not corpus_id and hasattr(request, 'corpus_id'):
+        corpus_id = request.corpus_id
+        site_request = True
+
+    corpus = get_corpus(corpus_id)
+    play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+
+    return render(
+        request,
+        'prototype.html',
+        {
+            'corpora_host': corpora_url,
+            'corpus_id': corpus_id,
+            'play_prefix': play_prefix,
+            'play': play,
+            'editors': editors[play_prefix],
+
+        }
+    )
 
 def get_session_lines(corpus, session, only_ids=False):
     if session['filter']['no_results']:
@@ -894,9 +916,9 @@ def api_search(request, corpus_id=None, play_prefix=None):
     nvs_session = get_nvs_session(request, play_prefix)
     results = {}
 
-    quick_search = request.POST.get('quick_search', None)
-    search_type = request.POST.get('search_type', None)
-    search_contents = request.POST.get('search_contents', None)
+    quick_search = request.GET.get('quick_search', None)
+    search_type = request.GET.get('search_type', None)
+    search_contents = request.GET.get('search_contents', None)
 
     if 'clear' in request.GET:
         nvs_session['search'] = {}
@@ -1113,6 +1135,29 @@ def api_search(request, corpus_id=None, play_prefix=None):
 
     return HttpResponse(
         json.dumps(results),
+        content_type='application/json'
+    )
+
+
+def api_witnesses(request, corpus_id=None, play_prefix=None):
+    wits = {}
+    if not corpus_id and hasattr(request, 'corpus_id'):
+        corpus_id = request.corpus_id
+
+    if play_prefix:
+        corpus = get_corpus(corpus_id)
+        if corpus:
+            play = corpus.get_content('Play', {'prefix': play_prefix}, only=['id'], single_result=True)
+            if play:
+                witnesses, wit_counter, witness_centuries = get_nvs_witnesses(corpus, play)
+                wits = {
+                    'witness_count': wit_counter,
+                    'witnesses': witnesses,
+                    'witness_centuries': witness_centuries
+                }
+
+    return HttpResponse(
+        json.dumps(wits),
         content_type='application/json'
     )
 
