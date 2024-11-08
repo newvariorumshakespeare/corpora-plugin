@@ -86,9 +86,6 @@ class CommentaryViewer {
     }
 
     buildSkeleton() {
-        // build infrastructure (topDiv, upDiv, focusDiv, downDiv, botDiv)
-        this.commFrame.classList.add('w-100')
-
         this.commFrame.innerHTML = `
             <div class="d-flex flex-column w-100">
                 <div class="d-flex flex-row align-items-start"><div id="commFrameTop" class="d-flex flex-column w-100"></div></div>

@@ -26,19 +26,23 @@ class PlayViewer {
         this.lastLineWindow = null
         this.lowestLineNo = null
         this.highestLineNo = 0
+        this.actScenes = []
+        this.isFiltered = false
         this.fullyRegistered = false
         this.commViewer = null
         this.searchManager = null
         this.initializeLineObserver()
 
-        // data structures for managing notes
+        // data structures for managing notes and commentary
         this.notes = {}
         this.lastCenturyBuffer = 20
+        this.highlightCommLemmas = true
 
         // initial viewer init
         this.viewer = getEl(viewer_id)
         this.scrollTimer = null
         this.idleTimer = null
+        this.placementTimer = null
         this.lastRendered = null
         this.currentBreakpoint = null
         this.resizeTimer = null
@@ -46,97 +50,183 @@ class PlayViewer {
         // set up endpoints
         this.lineEndpoint = `${this.host}/api/corpus/${this.corpusID}/PlayLine/`
         this.noteEndpoint = `${this.host}/api/corpus/${this.corpusID}/TextualNote/`
-        this.witnessesEndpoint = `${this.host}/api/corpus/${this.corpusID}/nvs-witnesses/${this.play}/`
-        this.witnessMeterEndpoint = `${this.host}/nvs/witness-meter/`
+        this.witnessesEndpoint = `${this.witnessesEndpointHost}api/corpus/${this.corpusID}/nvs-witnesses/${this.play}/`
 
         this.buildSkeleton()
     }
 
-    rigUpEvents() {
-        // click on commentary notes or headers
-        document.body.onclick = (e) => {
-            let searchForTargets = true
-            let clickedElements = document.elementsFromPoint(e.clientX, e.clientY)
-            clickedElements.forEach(el => {
-                if (el.classList.contains('ref-modal')) {
-                    searchForTargets = false
+    rigUpEvents(all=false) {
+        // the events inside this "all" block are intended to only be set up once.
+        // the "rigUpEvents" function will be called every time a swath of lines is
+        // placed, so we don't want to set these up repeatedly:
+        if (all) {
+            // click on commentary notes or headers
+            document.body.onclick = (e) => {
+                let searchForTargets = true
+                let clickedElements = document.elementsFromPoint(e.clientX, e.clientY)
+                clickedElements.forEach(el => {
+                    if (el.classList.contains('ref-modal')) {
+                        searchForTargets = false
+                    } else if (searchForTargets && el.tagName === 'COMSPAN' && this.highlightCommLemmas) {
+                        let commInfo = el.className
+                        let commID = commInfo
+                            .replace('commentary-lemma-', '')
+                            .replace('highlight', '')
+                            .replace(' ', '')
+                        this.commViewer.navigateTo(commID)
+                        searchForTargets = false
+                    } else if (searchForTargets && el.classList.contains('comm-heading')) {
+                        let lineRow = getEl(`${el.dataset.first_line}-row`)
+                        if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
+                        searchForTargets = false
+                    }
+                })
+            }
+
+            // window resize
+            window.onresize = (e) => {
+                clearTimeout(this.resizeTimer)
+                this.resizeTimer = setTimeout(() => {
+                    this.viewerResize()
+                }, 1000)
+            }
+
+            // commentary highlight toggle
+            let commentaryHighlightToggler = getEl('show-commentary-referents')
+            commentaryHighlightToggler.onchange = (e) => {
+                if (commentaryHighlightToggler.checked) {
+                    this.highlightCommLemmas = true
+                    this.rigUpEvents()
+                } else {
+                    this.highlightCommLemmas = false
+                    forElsMatching('comspan.highlight', (el) => {
+                        el.removeEventListener('mouseenter', this.comspanHover)
+                        el.removeEventListener('mouseleave', this.comspanLeave)
+                        el.classList.remove('highlight')
+                    })
                 }
-                else if (searchForTargets && el.tagName === 'COMSPAN') {
-                    let commInfo = el.className
-                    let commID = commInfo.replace('commentary-lemma-', '')
-                    this.commViewer.navigateTo(commID)
-                    searchForTargets = false
-                } else if (searchForTargets && el.classList.contains('comm-heading')) {
-                    let lineRow = getEl(`${el.dataset.first_line}-row`)
-                    if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
-                    searchForTargets = false
-                }
-            })
+            }
+
+            // filter lines button
+            getEl('filter-lines-button').onclick = (e) => {
+                this.searchManager.filterLines()
+            }
         }
 
-        // window resize
-        window.onresize = (e) => {
-            clearTimeout(this.resizeTimer)
-            this.resizeTimer = setTimeout(() => {this.viewerResize()}, 1000)
-        }
+        // these events are to be set up repeatedly
+
+        // find all commspans and add the 'highlight' class if appropriate.
+        // also rig up hover events
+        forElsMatching('comspan:not(.highlight)', (el) => {
+            if (this.highlightCommLemmas) {
+                el.classList.add('highlight')
+
+                // add the hover events
+                el.addEventListener('mouseenter', this.comspanHover)
+                el.addEventListener('mouseleave', this.comspanLeave)
+            }
+        })
     }
 
     render() {
-        // get all visible lines plus a buffer before and after them
-        let currentLineWindow = this.getLineWindowNos()
+        // since we're looking at a filtered set of lines, we can't count on them
+        // being contiguous and we must only render visible lines
+        if (this.isFiltered) {
+            let lineChunkStart = null
+            let lineChunkEnd = null
+            let sender = this
 
-        // if this is our first render, however, force the loading of the first lines
-        if (this.lastLineWindow === null) {
-            currentLineWindow.clear()
-            for (let lineNo = this.lowestLineNo; lineNo <= (this.lineWindowSize + this.lineWindowBuffer); lineNo++)
-            {
-                if (lineNo <= this.highestLineNo) currentLineWindow.add(lineNo)
-            }
-        } else {
-            // since this is not our first render, determine what lines are no longer
-            // in the window and schedule them for retirement
-            this.lastLineWindow.forEach(lineNo => {
-                if (!currentLineWindow.has(lineNo) && this.placedLineNos.has(lineNo)) {
-                    let lineID = this.lineNoIDMap[lineNo]
-                    let lineRow = getEl(`${lineID}-row`)
-                    if (lineRow.offsetHeight === this.lineHeight) {
-                        this.lines[lineID].retirementTimer = setTimeout(() => {
-                            this.retireLine(lineRow, lineNo)
-                        }, 3000)
+            this.visibleLineNos.forEach(lineNo => {
+                if (!this.registeredLineNos.has(lineNo)) {
+                    if (lineChunkStart === null) lineChunkStart = lineChunkEnd = lineNo
+                    else if (lineNo - lineChunkEnd > 1) {
+                        this.fetchLines(lineChunkStart, lineChunkEnd, (lineResults, noteResults) => {
+                            sender.registerLines(lineResults.records, noteResults.records, true)
+                        })
+                        lineChunkStart = lineChunkEnd = lineNo
+                    } else {
+                        lineChunkEnd = lineNo
                     }
+                } else if (!this.placedLineNos.has(lineNo)) this.placeLine(lineNo)
+            })
+
+            if (lineChunkStart !== null) {
+                this.fetchLines(lineChunkStart, lineChunkEnd, (lineResults, noteResults) => {
+                    sender.registerLines(lineResults.records, noteResults.records, true)
+                })
+            }
+        }
+        // this is the normal strategy for rendering lines, which establishes a
+        // "window" of lines to render with buffers on either side of the first and last
+        // visible line
+        else {
+            // get all visible lines plus a buffer before and after them
+            let currentLineWindow = this.getLineWindowNos()
+
+            // if this is our first render, however, force the loading of the first lines
+            if (this.lastLineWindow === null) {
+                currentLineWindow.clear()
+                for (let lineNo = this.lowestLineNo; lineNo <= (this.lineWindowSize + this.lineWindowBuffer); lineNo++) {
+                    if (lineNo <= this.highestLineNo) currentLineWindow.add(lineNo)
+                }
+            } else {
+                // since this is not our first render, determine what lines are no longer
+                // in the window and schedule them for retirement
+                this.lastLineWindow.forEach(lineNo => {
+                    if (!currentLineWindow.has(lineNo) && this.placedLineNos.has(lineNo)) {
+                        let lineID = this.lineNoIDMap[lineNo]
+                        let lineRow = getEl(`${lineID}-row`)
+                        if (lineRow.offsetHeight === this.lineHeight) {
+                            this.lines[lineID].retirementTimer = setTimeout(() => {
+                                this.retireLine(lineRow, lineNo)
+                            }, 3000)
+                        }
+                    }
+                })
+            }
+
+            // iterate over line window and either place the line
+            // or establish a range of lines that need to be registered
+            let lowestLineNoToRegister = null
+            let highestLineNoToRegister = null
+            currentLineWindow.forEach(lineNo => {
+                if (this.registeredLineNos.has(lineNo)) {
+                    this.placeLine(lineNo)
+                } else {
+                    if (lowestLineNoToRegister === null || lineNo < lowestLineNoToRegister)
+                        lowestLineNoToRegister = lineNo
+
+                    if (highestLineNoToRegister === null || lineNo > highestLineNoToRegister)
+                        highestLineNoToRegister = lineNo
                 }
             })
-        }
 
-        // iterate over line window and either place the line
-        // or establish a range of lines that need to be registered
-        let lowestLineNoToRegister = null
-        let highestLineNoToRegister = null
-        currentLineWindow.forEach(lineNo => {
-            if (this.registeredLineNos.has(lineNo)) {
-                this.placeLine(lineNo)
-            } else {
-                if (lowestLineNoToRegister === null || lineNo < lowestLineNoToRegister)
-                    lowestLineNoToRegister = lineNo
-
-                if (highestLineNoToRegister === null || lineNo > highestLineNoToRegister)
-                    highestLineNoToRegister = lineNo
+            // go ahead and register + place unregistered lines
+            if (lowestLineNoToRegister !== null && lowestLineNoToRegister <= highestLineNoToRegister) {
+                let sender = this
+                this.fetchLines(lowestLineNoToRegister, highestLineNoToRegister, (lineResults, noteResults) => {
+                    sender.registerLines(lineResults.records, noteResults.records, true)
+                })
             }
-        })
 
-        // go ahead and register + place unregistered lines
-        if (lowestLineNoToRegister !== null && lowestLineNoToRegister <= highestLineNoToRegister) {
-            let sender = this
-            this.fetchLines(lowestLineNoToRegister, highestLineNoToRegister, (lineResults, noteResults) => {
-                sender.registerLines(lineResults.records, noteResults.records, true)
-            })
+            this.lastLineWindow = currentLineWindow
         }
 
-        this.lastLineWindow = currentLineWindow
+        // set active actsene indicator
+        let lowestVisibleLineNo = Math.min(...this.visibleLineNos)
+        if (lowestVisibleLineNo < this.highestLineNo) lowestVisibleLineNo++
+        let actScene = getElWithQuery(`.play-row[data-line_number="${lowestVisibleLineNo}"]`).dataset.actscene
+        let currentActiveIndicator = getElWithQuery('.actscene-indicator.active')
+        if (currentActiveIndicator.dataset.actscene !== actScene) {
+            currentActiveIndicator.classList.remove('active')
+            getElWithQuery(`.actscene-indicator[data-actscene="${actScene}"]`).classList.add('active')
+        }
+
         this.lastRendered = new Date().getTime()
     }
 
     placeLine(lineNo, lineID=null) {
+        clearTimeout(this.placementTimer)
         if (lineID === null && (lineNo in this.lineNoIDMap)) lineID = this.lineNoIDMap[lineNo]
         if (lineID in this.lines) {
             this.cancelRetirement(lineID)
@@ -165,16 +255,16 @@ class PlayViewer {
                 
                 lineRow.innerHTML = `
                     <div class="row gx-0 flex-grow-1">
-                        <div id="${line.xml_id}-witness-col" class="d-none d-sm-flex col-sm-4 m-0 p-0 witness-meter${hasVariants ? ' clickable' : ''}">
-                            <img id="${line.xml_id}-witness-meter" height="30" width="100%" src="/static/img/blank-meter.png" loading="lazy" />
+                        <div id="${line.xml_id}-witness-col" class="d-none d-md-flex col-md-4 m-0 p-0 witness-meter${hasVariants ? ' clickable' : ''}">
+                            <img id="${line.xml_id}-witness-meter" height="30" width="100%" src="/static/img/blank-meter.png" loading="lazy" data-witness_indicators="${line.witness_meter}" />
                         </div>
-                        <div id="${line.xml_id}-text-col" class="col-11 col-sm-7 m-0 p-0 play-words${hasVariants ? '' : ' no-variants'}">
+                        <div id="${line.xml_id}-text-col" class="col-11 col-md-7 m-0 p-0 play-words${hasVariants ? '' : ' no-variants'}">
                             ${disclosureTriangle}
                             <div class="w-100 play-html">${line.rendered_html}</div>
                         </div>
-                        <div id="${line.xml_id}-number-col" class="col-1 col-sm-1 m-0 p-0">
+                        <div id="${line.xml_id}-number-col" class="col-1 m-0 p-0">
                             <div class="row gx-0 h-100 bg-nvs">
-                                <div class="col-12 col-sm-8 offset-sm-4 play-label d-flex justify-content-center align-items-center">
+                                <div class="col-12 col-md-8 offset-md-4 play-label d-flex justify-content-center align-items-center">
                                     ${line.line_label}
                                 </div>
                             </div>
@@ -210,6 +300,8 @@ class PlayViewer {
                 this.placeNotes(line.xml_id)
             }
         }
+        let sender = this
+        this.placementTimer = setTimeout(() => {sender.rigUpEvents()}, 500)
     }
 
     placeNotes(lineID) {
@@ -256,18 +348,6 @@ class PlayViewer {
                     })
 
                     line_variant_div.innerHTML = line_varients_html
-
-                    /*
-                    let variant_col_width = getEl(`${lineID}-witness-col`).offsetWidth
-                    note.variants.forEach(variant => {
-                        this.drawWitnessMeter(
-                            variant.witness_meter,
-                            getEl(`${lineID}-${variant.id}-witness-meter`),
-                            variant_col_width,
-                            25,
-                            "#FFFFFF"
-                        )
-                    })*/
                 }
             })
         } catch(error) {
@@ -289,6 +369,11 @@ class PlayViewer {
             })
             if (!sender.fullyRegistered && sender.doIdleLoading) sender.startIdleTimer()
         })
+    }
+
+    drawWitnessMeter(witness_meter, img_element, width, height, inactive_color="#CFCFCF") {
+        if (!['xs', 'sm'].includes(this.currentBreakpoint))
+            img_element.src = `${this.witnessMeterEndpoint}${witness_meter}/${Math.floor(height)}/${Math.floor(width)}/${inactive_color.replace('#', '')}/0/`
     }
 
     retireLine(lineRow, lineNo) {
@@ -319,22 +404,82 @@ class PlayViewer {
     }
 
     viewerResize() {
+        let lastBreakpoint = this.currentBreakpoint
         this.currentBreakpoint = getBreakpoint()
+
         let headerRow = getEl('playviewer-header-row')
+        let controlsRow = getEl('playtext-controls-row')
+        let actSceneFrameHolder = getEl('act-scene-frame-holder')
+        let actSceneFrame = getEl('act-scene-frame')
         let commFrame = getEl('commentary-frame')
+        let playtextCol = getEl('playtext-col')
         console.log(this.currentBreakpoint)
 
         if (['xs', 'sm'].includes(this.currentBreakpoint)) {
+            console.log('doing small')
+            // clear out medium style specs
+            actSceneFrameHolder.removeAttribute('style')
+            actSceneFrame.removeAttribute('style')
+            commFrame.removeAttribute('style')
+
             headerRow.style.position = 'sticky'
             headerRow.style.top = '0'
             setCssVar('--nvs-playtext-viewport-size', 'calc(100vh - 200px)')
+            this.disableMiniMap()
             commFrame.style.maxHeight = '200px'
-            setTimeout(() => {headerRow.scrollIntoView()}, 1000)
-            this.viewer.classList.add('mobile')
+            actSceneFrame.style.maxHeight = '200px'
+            actSceneFrame.style.overflowY = 'scroll'
+            setTimeout(() => {
+                headerRow.scrollIntoView()
+            }, 1000)
+
+        } else if (this.currentBreakpoint === 'md') {
+            // clear out small style specs
+            headerRow.style.removeProperty('position')
+            headerRow.style.removeProperty('top')
+            commFrame.style.removeProperty('max-height')
+            document.body.classList.add('mobile')
+
+            setCssVar('--nvs-playtext-viewport-size', 'calc(100vh - 90px)')
+            this.disableMiniMap()
+            setTimeout(() => {
+                actSceneFrameHolder.style.height = '100%'
+                commFrame.style.position = 'absolute'
+                commFrame.style.top = `${document.body.clientHeight - 200}px`
+                commFrame.style.left = '0'
+                commFrame.style.width = `${controlsRow.clientWidth + controlsRow.getBoundingClientRect().left}px`
+                commFrame.style.maxHeight = '200px'
+                playtextCol.style.paddingBottom = '200px'
+            }, 500)
+
         } else {
+            actSceneFrameHolder.removeAttribute('style')
+            actSceneFrame.removeAttribute('style')
+            commFrame.removeAttribute('style')
             headerRow.style.removeProperty('position')
             headerRow.style.removeProperty('top')
             setCssVar('--nvs-playtext-viewport-size', 'calc(100vh - 90px)')
+            this.renderMiniMap()
+            commFrame.style.removeProperty('max-height')
+            document.body.classList.remove('mobile')
+        }
+
+        if (lastBreakpoint != null && !['xs', 'sm'].includes(this.currentBreakpoint)) {
+            console.log('redrawing meters')
+            this.placedLineNos.forEach(lineNo => {
+                let lineID = this.lineNoIDMap[lineNo]
+                let witnessMeterImg = getEl(`${lineID}-witness-meter`)
+                let witnessMeterCol = witnessMeterImg.parentElement
+
+                this.drawWitnessMeter(
+                    witnessMeterImg.dataset.witness_indicators,
+                    witnessMeterImg,
+                    witnessMeterCol.clientWidth,
+                    witnessMeterCol.clientHeight - 8
+                )
+            })
+
+            this.drawWitnessHeaderAndBackground()
         }
     }
 
@@ -410,7 +555,7 @@ class PlayViewer {
 
             // make sure lines are displayed right away
             let params = this.getEndpointParams({
-                only: 'xml_id,line_number,line_label',
+                only: 'xml_id,line_number,line_label,act,scene',
                 'page-size': 10000
             })
             let url = `${this.lineEndpoint}?${params.toString()}`
@@ -424,11 +569,19 @@ class PlayViewer {
                 let skelHTML = ''
 
                 lines.forEach(line => {
+                    let actScene = makeActScene(line.act, line.scene)
+                    if (!sender.actScenes.includes(actScene)) {
+                        sender.actScenes.push(actScene)
+                    }
+
                     skelHTML += `<div id="${line.xml_id}-row"
                         class="play-row d-flex flex-column"
                         data-line_id="${line.xml_id}"
                         data-line_number="${line.line_number}"
                         data-line_label="${line.line_label}"
+                        data-act="${line.act}"
+                        data-scene="${line.scene}"
+                        data-actscene="${actScene}"
                         style="min-height: ${this.lineHeight}px; box-sizing: border-box;"></div>`
 
                     if (sender.lowestLineNo === null) sender.lowestLineNo = line.line_number
@@ -437,9 +590,12 @@ class PlayViewer {
 
                 sender.viewer.innerHTML = skelHTML
                 forElsMatching('.play-row', (playRow) => sender.lineObserver.observe(playRow))
+
+                sender.renderActSceneNav()
                 sender.renderMiniMap()
                 setTimeout(() => {
                     sender.viewerScroll()
+                    sender.viewerResize()
                     hideLoadingModal()
                 }, 500)
             })
@@ -452,7 +608,7 @@ class PlayViewer {
             })
 
             // rig up search manager
-            sender.searchManager = new SearchManager({
+            sender.searchManager = new SearchManager(sender,{
                 play: sender.play,
                 host: sender.host,
                 corpusID: sender.corpusID,
@@ -462,8 +618,7 @@ class PlayViewer {
             })
 
             // rig up events
-            sender.rigUpEvents()
-            sender.viewerResize()
+            sender.rigUpEvents(true)
 
             // now fetch all the witness info
             fetch(sender.witnessesEndpoint).then(witResults => witResults.json()).then(witResults => {
@@ -476,10 +631,38 @@ class PlayViewer {
         })
     }
 
-    renderMiniMap() {
+    renderActSceneNav() {
+        let actSceneFrame = getEl('act-scene-frame')
+        let actSceneHTML = ''
+
+        this.actScenes.forEach((actScene) => {
+            if (getElWithQuery(`.play-row[data-actscene="${actScene}"]:not(.d-none)`)) {
+                actSceneHTML += `
+                    <div class="actscene-indicator${actSceneHTML.length === 0 ? ' active' : ''}" data-actscene="${actScene}">
+                        ${actScene}
+                    </div>
+                `
+            }
+        })
+
+        actSceneFrame.innerHTML = actSceneHTML
+        forElsMatching('.actscene-indicator', (el) => {
+            el.onclick = (e) => {
+                getElWithQuery(`.play-row[data-actscene="${el.dataset.actscene}"]`).scrollIntoView({behavior: 'smooth'})
+            }
+        })
+    }
+
+    renderMiniMap(noCache=false) {
         let height = getEl('playtext-col').offsetHeight
-        let miniMapURL = `${this.host}/corpus/${this.corpusID}/play-minimap/${this.play}/?width=40&height=${parseInt(height)}`
+        let miniMapURL = `${this.miniMapEndpoint}corpus/${this.corpusID}/play-minimap/${this.play}/`
+        miniMapURL += `?width=40&height=${parseInt(height)}`
+        if (noCache) miniMapURL += `&no-cache=${Math.floor(Date.now() / 1000)}`
         setCssVar('--scrollbarURL', `url(${miniMapURL})`)
+    }
+    
+    disableMiniMap() {
+        setCssVar('--scrollbarURL', 'none')
     }
 
     drawWitnessHeaderAndBackground() {
@@ -578,11 +761,22 @@ class PlayViewer {
         }
     }
 
-    drawWitnessMeter(witness_meter, img_element, width, height, inactive_color="#CFCFCF") {
-        if (!['xs', 'sm'].includes(this.currentBreakpoint)) {
-            let imgSrc = `${this.witnessMeterEndpoint}${witness_meter}/${Math.floor(height)}/${Math.floor(width)}/${inactive_color.replace('#', '')}/0/`
-            img_element.src = imgSrc
-        }
+    comspanHover(e){
+        e.target.classList.forEach(commClass => {
+            if (commClass !== 'highlight') {
+                forElsMatching(`.${commClass}`, hovered => {
+                    hovered.style.borderBottom = 'solid 1px var(--nvs-primary-orange) !important'
+                })
+            }
+        })
+    }
+
+    comspanLeave(e) {
+        e.target.classList.forEach(commClass => {
+            if (commClass !== 'highlight') {
+                forElsMatching(`.${commClass}`, hovered => hovered.removeAttribute('style'))
+            }
+        })
     }
 
     getLineWindowNos() {

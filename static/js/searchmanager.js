@@ -1,5 +1,5 @@
 class SearchManager {
-    constructor(config) {
+    constructor(playViewer, config) {
         // register configuration
         this.configure('play', 'wt', config)
         this.configure('host', 'corpora.dh.tamu.edu', config)
@@ -8,9 +8,14 @@ class SearchManager {
         this.configure('playViewer', null, config)
         this.configure('commViewer', null, config)
 
+        this.playViewer = playViewer
         this.searchEndpoint = `${this.host}/api/corpus/${this.corpusID}/nvs-search/${this.play}/`
-        this.searchMarker = null
+        this.speechEndpoint = `${this.host}/api/corpus/${this.corpusID}/Speech/`
         this.nvsSearch = null
+        this.characters = []
+        this.lineSpeakers = {}
+        this.selectedScenes = new Set()
+        this.selectedCharacters = new Set()
         this.rigUpEvents()
     }
 
@@ -133,16 +138,11 @@ class SearchManager {
         }
         if (searchWidget) searchWidget.classList.add('d-none')
 
-        /*corpora.make_request(
-            search_endpoint,
-            'GET',
-            {
-                clear: true
-            },
-            function() {
-                $(":root").css("--scrollbarURL", `url(${minimap_url}?width=40&height=${parseInt(getEl('playtext-col").height())}&no-cache=${Math.floor(Date.now() / 1000)})`);
-            }
-        )*/
+        let sender = this
+        fetch(`${sender.searchEndpoint}?clear=true`)
+            .then(() => {
+                sender.playViewer.renderMiniMap(true)
+            })
     }
 
     processSearchResults(searchResults) {
@@ -181,8 +181,7 @@ class SearchManager {
         }
 
         searchWidget.classList.remove('d-none');
-
-        //document.documentElement.style.setProperty("--scrollbarURL", `url(${minimap_url}?width=40&height=${parseInt(getEl('playtext-col').height())}&no-cache=${Math.floor(Date.now() / 1000)})`)
+        this.playViewer.renderMiniMap(true)
         if (this.nvsSearch) {
             forElsMatching('mark', (el) => el.remove())
         }
@@ -292,6 +291,182 @@ class SearchManager {
         }
 
 
+    }
+
+    async filterLines() {
+        let filterWidget = getEl('filter-widget')
+
+        // if the filter widget doesn't exist yet, we need to grab the
+        // template, add it to the DOM, and rig up some events
+        if (!filterWidget) {
+            let sender = this
+            fetch(`${this.templatesPath}/filter-widget.html`)
+                .then(html => html.text())
+                .then(html => {
+                    appendToEl(document.body, html)
+                    filterWidget = getEl('filter-widget')
+
+                    // filter apply button click
+                    getEl('filter-apply-button').onclick = (e) => {
+                        let sceneFiltered = this.selectedScenes.size !== this.playViewer.actScenes.length
+                        let charFiltered = this.selectedCharacters.size !== this.characters.length
+
+                        forElsMatching('.play-row', (el) => {
+                            let meetsSceneCriteria = false
+                            let meetsCharCriteria = false
+
+                            if (sceneFiltered) meetsSceneCriteria = this.selectedScenes.has(el.dataset.actscene)
+                            else meetsSceneCriteria = true
+
+                            if (charFiltered) {
+                                let lineChars = this.lineSpeakers[parseInt(el.dataset.line_number)]
+                                meetsCharCriteria = lineChars && lineChars.isSubsetOf(this.selectedCharacters)
+                            } else meetsCharCriteria = true
+
+                            if (meetsSceneCriteria && meetsCharCriteria) {
+                                el.classList.remove('d-none')
+                            } else {
+                                el.classList.add('d-none')
+                            }
+
+                        })
+
+                        if (sceneFiltered || charFiltered) {
+                            this.playViewer.disableMiniMap()
+                            this.playViewer.isFiltered = true
+                        }
+                        else {
+                            this.playViewer.renderMiniMap()
+                            this.playViewer.isFiltered = false
+                        }
+                        filterWidget.classList.add('d-none')
+                        setTimeout(() => {
+                            this.playViewer.render()
+                            console.log(this.playViewer.visibleLineNos)
+                            this.playViewer.renderActSceneNav()
+                        }, 500)
+                    }
+
+                    // filter close button
+                    getEl('filter-widget-close-button').onclick = (e) => {filterWidget.classList.add('d-none')}
+
+                    // handle the "ALL" checkbox for characters/scenes
+                    getEl('line-filter-all-chars').onchange = (e) => {
+                        forElsMatching('.filter-char-checkbox', (el) => {
+                            if (e.target.checked) {
+                                el.checked = true
+                                this.selectedCharacters.add(el.dataset.xml_id)
+                            } else {
+                                el.checked = false
+                                this.selectedCharacters.delete(el.dataset.xml_id)
+                            }
+                        })
+                        getEl('filter-apply-button').classList.remove('d-none')
+                    }
+                    getEl('line-filter-all-scenes').onchange = (e) => {
+                        forElsMatching('.filter-scene-checkbox', (el) => {
+                            if (e.target.checked) {
+                                el.checked = true
+                                this.selectedScenes.add(el.dataset.scene)
+                            } else {
+                                el.checked = false
+                                this.selectedScenes.delete(el.dataset.scene)
+                            }
+                        })
+                        getEl('filter-apply-button').classList.remove('d-none')
+                    }
+
+                    // since all of this adding HTML to the DOM and rigging up events takes place inside an
+                    // asynchronous "fetch," let's just recursively call filterLines once it's done to continue
+                    sender.filterLines()
+                })
+
+            return
+        }
+
+        // now that we have the HTML and initial events rigged up, let's make sure we have the data we
+        // need to be able to filter characters and lines
+
+        // get  character data, rig up HTML and events if necessary
+        if (this.characters.length === 0) {
+            let charQuery = `${this.speechEndpoint}?a_terms_speakers=speaking.name,speaking.xml_id&f_play.prefix=${this.play}&only=speaking.xml_id,lines.line_number&page-size=5000`
+
+            const response = await fetch(charQuery)
+            let speechData = await response.json()
+
+            if (hasProp(speechData, 'meta.aggregations.speakers')) {
+                this.characters = Object.keys(speechData.meta.aggregations.speakers).sort().map(nameIDs => {
+                    let [name, xml_id] = nameIDs.split('|||')
+                    return {
+                        'name': name,
+                        'xml_id': xml_id,
+                        'speeches': speechData.meta.aggregations.speakers[nameIDs]
+                    }
+                })
+                speechData.records.forEach(speech => {
+                    let lineNos = speech.lines.map(l => l.line_number)
+                    let speakers = speech.speaking.map(s => s.xml_id)
+
+                    lineNos.forEach(lineNo => {
+                        if (!(lineNo in this.lineSpeakers)) this.lineSpeakers[lineNo] = new Set()
+                        speakers.forEach(speaker => this.lineSpeakers[lineNo].add(speaker))
+                    })
+                })
+            }
+            let charHTML = ''
+            this.characters.forEach(char => {
+                this.selectedCharacters.add(char.xml_id)
+                charHTML += `
+                    <div class="row">
+                        <div class="col-sm-8 form-check">
+                            <input id="line-filter-char-${char.xml_id}" type="checkbox" class="form-check-input filter-char-checkbox" data-xml_id="${char.xml_id}" checked>
+                            <label for="line-filter-char-${char.xml_id}" class="form-check-label checkbox-white">${char.name}</label>
+                        </div>
+                        <div class="col-sm-4">${char.speeches}</div>
+                    </div>
+                `
+            })
+            appendToEl(getEl('filter-widget-characters'), charHTML)
+            forElsMatching('.filter-char-checkbox', (el) => {
+                el.onchange = (e) => {
+                    if (e.target.checked) this.selectedCharacters.add(e.target.dataset.xml_id)
+                    else {
+                        getEl('line-filter-all-chars').checked = false
+                        this.selectedCharacters.delete(e.target.dataset.xml_id)
+                    }
+
+                    getEl('filter-apply-button').classList.remove('d-none')
+                }
+            })
+
+            let actSceneHTML = ''
+            this.playViewer.actScenes.forEach(actScene => {
+                this.selectedScenes.add(actScene)
+                actSceneHTML += `
+                    <div class="row">
+                        <div class="col-sm-12 form-check">
+                            <input id="line-filter-scene-${actScene}" type="checkbox" class="form-check-input filter-scene-checkbox" data-scene="${actScene}" checked>
+                            <label for="line-filter-scene-${actScene}" class="form-check-label checkbox-white">${actScene}</label>
+                        </div>
+                    </div>
+                `
+            })
+            appendToEl(getEl('filter-widget-actscenes'), actSceneHTML)
+            forElsMatching('.filter-scene-checkbox', (el) => {
+                el.onchange = (e) => {
+                    if (e.target.checked) this.selectedScenes.add(e.target.dataset.scene)
+                    else {
+                        getEl('line-filter-all-scenes').checked = false
+                        this.selectedScenes.delete(e.target.dataset.scene)
+                    }
+
+                    getEl('filter-apply-button').classList.remove('d-none')
+                }
+            })
+        }
+        getEl('filter-apply-button').classList.add('d-none')
+
+        filterWidget.classList.remove('d-none')
     }
 
     configure(setting, default_value, config) {

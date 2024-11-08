@@ -179,6 +179,28 @@ def prototype(request, corpus_id=None, play_prefix=None):
 
     corpus = get_corpus(corpus_id)
     play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+    nvs_session = get_nvs_session(request, play_prefix, reset='reset' in request.GET)
+    act_scene = request.GET.get('scene', nvs_session['filter']['act_scene'])
+    character = request.GET.get('character', nvs_session['filter']['character'])
+
+    session_changed = False
+
+    if 'play_id' not in nvs_session or nvs_session['play_id'] != str(play.id):
+        nvs_session['play_id'] = str(play.id)
+        session_changed = True
+    if nvs_session['filter']['character'] != character:
+        nvs_session['filter']['character'] = character
+        nvs_session['filter']['character_lines'] = []
+        session_changed = True
+    if nvs_session['filter']['act_scene'] != act_scene:
+        nvs_session['filter']['act_scene'] = act_scene
+        session_changed = True
+
+    if session_changed:
+        nvs_session['is_filtered'] = character != 'all' or act_scene != 'all'
+        nvs_session['filter']['no_results'] = False
+        filter_session_lines_by_character(corpus, play, nvs_session)
+        set_nvs_session(request, nvs_session, play_prefix)
 
     return render(
         request,
@@ -186,12 +208,11 @@ def prototype(request, corpus_id=None, play_prefix=None):
         {
             'corpora_host': corpora_url,
             'corpus_id': corpus_id,
-            'play_prefix': play_prefix,
             'play': play,
             'editors': editors[play_prefix],
-
         }
     )
+
 
 def get_session_lines(corpus, session, only_ids=False):
     if session['filter']['no_results']:
@@ -222,6 +243,13 @@ def get_session_lines(corpus, session, only_ids=False):
         lines = lines.only('id', 'xml_id')
     return lines
 
+
+def get_lines_by_range(corpus, play_id, high, low):
+    return corpus.get_content('PlayLine', {
+        'play': play_id,
+        'line_number__gte': low,
+        'line_number__lte': high
+    }).exclude('play', 'witness_locations').order_by('line_number')
 
 def paratext(request, corpus_id=None, play_prefix=None, section=None):
     corpora_url = 'https://' if settings.USE_SSL else 'http://'
@@ -389,7 +417,17 @@ def play_minimap(request, corpus_id=None, play_prefix=None):
     corpus = get_corpus(corpus_id)
     play = corpus.get_content('Play', {'prefix': play_prefix})[0]
     nvs_session = get_nvs_session(request, play_prefix)
-    lines = get_session_lines(corpus, nvs_session)
+
+    if _contains(request.GET, ['lowest-line-no', 'highest-line-no']):
+        lines = get_lines_by_range(
+            corpus,
+            nvs_session['play_id'],
+            int(request.GET['highest-line-no']),
+            int(request.GET['lowest-line-no'])
+        )
+    else:
+        lines = get_session_lines(corpus, nvs_session)
+
     highlight_lines = []
     if 'results' in nvs_session['search']:
         highlight_lines = [l['xml_id'] for l in nvs_session['search']['results']['lines']]

@@ -205,3 +205,16 @@ function getCssVar(variableName) {
 function setCssVar(variableName, value) {
     document.documentElement.style.setProperty(variableName, value)
 }
+function hasProp(obj, path) {
+    return path.split(".").every(function(x) {
+        if(typeof obj != "object" || obj === null || ! x in obj)
+            return false
+        obj = obj[x]
+        return true
+    })
+}
+function makeActScene(act, scene) {
+    if (act === 'Dramatis Personae') return 'DP'
+    else if (act === 'Trailer') return 'TR'
+    else return `${act}.${scene}`
+}

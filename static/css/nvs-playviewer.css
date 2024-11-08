@@ -1,4 +1,4 @@
-
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Roboto+Condensed:wght@400;700&display=swap');
 /* -----------------------------
 || MAIN CSS VARIABLES
 || -------------------------- */
@@ -79,6 +79,14 @@
 || -------------------------- */
 body {
     background-color: #FFFFFF;
+}
+
+#main-header {
+    margin-left: 220px;
+}
+
+body.mobile #main-header {
+    margin-left: 0px;
 }
 
 canvas {
@@ -204,7 +212,7 @@ span.beta {
     text-transform: uppercase;
     font-weight: bolder;
     font-size: 25px;
-    padding-left: 1rem;
+    padding-left: 5px;
     line-height: 1;
 }
 
@@ -467,18 +475,19 @@ input[type=checkbox]:checked + label.checkbox-white {
     background-color: rgba(42, 105, 161, .5);
 }
 
-#playtext-col.mobile::-webkit-scrollbar, #playtext-header-col::-webkit-scrollbar {
+body.mobile #playtext-col::-webkit-scrollbar, body.mobile #playtext-header-col::-webkit-scrollbar {
     width: unset;
 }
 
-#playtext-col.mobile ::-webkit-scrollbar-track {
+
+body.mobile #playtext-col ::-webkit-scrollbar-track {
     background-color: unset;
     background-image: unset;
     background-size: unset;
     background-repeat: unset;
 }
 
-#playtext-col.mobile::-webkit-scrollbar-thumb {
+body.mobile #playtext-col::-webkit-scrollbar-thumb {
     background-color: unset;
 }
 
@@ -492,6 +501,10 @@ input[type=checkbox]:checked + label.checkbox-white {
 
 #playtext-col, #playtext-header-col, #act-scene-header-col, #act-scene-frame {
     border-right: solid 1px var(--nvs-lighter-gray);
+}
+
+.act-scene-col {
+    width: 40px;
 }
 
 #act-scene-frame {
@@ -527,7 +540,7 @@ input[type=checkbox]:checked + label.checkbox-white {
     font-size: 12px;
 }
 
-.mobile .play-label {
+body.mobile .play-label {
     border-left: unset;
     border-right: unset;
 }
@@ -558,9 +571,11 @@ input[type=checkbox]:checked + label.checkbox-white {
 || -------------------------- */
 comspan {
     display: inline;
+}
+comspan.highlight {
     background-color: rgba(249, 240, 175, .52);
-        border-bottom: solid 1px var(--nvs-dark-yellow);
-        cursor: pointer;
+    border-bottom: solid 1px var(--nvs-dark-yellow);
+    cursor: pointer;
 }
 
 span.castlist:not(:empty) {
@@ -866,6 +881,10 @@ mark {
 .ref-modal {
     position: absolute;
     max-width: calc(40vw);
+}
+
+.ref-modal .tab-pane {
+    padding: 10px;
 }
 
 .arrow-right, .arrow-left, .arrow-top, .arrow-none {

@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Roboto+Condensed:wght@400;700&display=swap');
 
 /* Variables -------------------------- */
-:root {
+:root,:host {
     /*Colours*/
     --black: #373737;
     --white: white;
