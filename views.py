@@ -173,8 +173,13 @@ def playviewer(request, corpus_id=None, play_prefix=None):
 def prototype(request, corpus_id=None, play_prefix=None):
     corpora_url = 'https://' if settings.USE_SSL else 'http://'
     corpora_url += settings.ALLOWED_HOSTS[0]
+    playviewer_url = f"/corpus/{corpus_id}/play-viewer/{play_prefix}/"
+    paratext_prefix = f"/corpus/{corpus_id}/paratext-viewer/{play_prefix}/"
+
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
+        playviewer_url = f"/edition/{play_prefix}/"
+        paratext_prefix = ""
         site_request = True
 
     corpus = get_corpus(corpus_id)
@@ -207,6 +212,8 @@ def prototype(request, corpus_id=None, play_prefix=None):
         'prototype.html',
         {
             'corpora_host': corpora_url,
+            'playviewer_url': playviewer_url,
+            'paratext_prefix': paratext_prefix,
             'corpus_id': corpus_id,
             'play': play,
             'editors': editors[play_prefix],

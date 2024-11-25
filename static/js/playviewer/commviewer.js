@@ -1,15 +1,9 @@
-class CommentaryViewer {
-    constructor(commFrameID, config) {
+export class CommentaryViewer {
+    constructor(commFrameID) {
         this.commFrame = getEl(commFrameID)
-        // register configuration
-        this.configure('play', 'wt', config)
-        this.configure('host', 'corpora.dh.tamu.edu', config)
-        this.configure('corpusID', '5f3d7c81cfcceb0074aa7f55', config)
-        this.configure('swathSize', 10, config)
-
         this.commObserver = null
         this.commsLoaded = new Set()
-        this.commEndpoint = `${this.host}/api/corpus/${this.corpusID}/Commentary/`
+        this.swathSize = 10
         this.swathCursors = {}
         this.navigating = false
         this.setupCommObserver()
@@ -67,7 +61,7 @@ class CommentaryViewer {
         sender.clearFrame('Up')
         sender.clearFrame('Down')
 
-        return fetch(`${this.commEndpoint}?f_play.prefix=${this.play}&f_xml_id=${commID}`)
+        return fetch(`${window.nvs.endpoints.commentary}?f_play.prefix=${window.nvs.play}&f_xml_id=${commID}`)
             .then(response => response.json())
             .then(commInfo => {
                 if (commInfo.records && commInfo.records.length === 1) {
@@ -140,7 +134,7 @@ class CommentaryViewer {
 
         let sender = this
 
-        let url = `${this.commEndpoint}?${this.getEndpointParams(params).toString()}`
+        let url = `${window.nvs.endpoints.commentary}?${this.getEndpointParams(params).toString()}`
         return fetch(url).then(swath => swath.json()).then(swath => {
             let html = ''
             let records = swath.records
@@ -171,14 +165,9 @@ class CommentaryViewer {
         clearEl(this['commFrame' + area])
     }
 
-    configure(setting, default_value, config) {
-        if (setting in config) this[setting] = config[setting]
-        else this[setting] = default_value
-    }
-
     getEndpointParams(params) {
         let endpointParams = new URLSearchParams()
-        endpointParams.set('f_play.prefix', this.play)
+        endpointParams.set('f_play.prefix', window.nvs.play)
         endpointParams.set('s_sequence', 'asc')
         Object.keys(params).forEach(key => endpointParams.set(key, params[key]))
         return endpointParams

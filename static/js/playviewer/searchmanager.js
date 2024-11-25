@@ -1,16 +1,6 @@
-class SearchManager {
-    constructor(playViewer, config) {
-        // register configuration
-        this.configure('play', 'wt', config)
-        this.configure('host', 'corpora.dh.tamu.edu', config)
-        this.configure('corpusID', '5f3d7c81cfcceb0074aa7f55', config)
-        this.configure('templatesPath', '/static/templates', config)
-        this.configure('playViewer', null, config)
-        this.configure('commViewer', null, config)
-
-        this.playViewer = playViewer
-        this.searchEndpoint = `${this.host}/api/corpus/${this.corpusID}/nvs-search/${this.play}/`
-        this.speechEndpoint = `${this.host}/api/corpus/${this.corpusID}/Speech/`
+export class SearchManager {
+    constructor() {
+        this.templatesPath = window.nvs.staticPath + '/templates'
         this.nvsSearch = null
         this.characters = []
         this.lineSpeakers = {}
@@ -58,7 +48,7 @@ class SearchManager {
                 searchParams.append('search_contents', searchContents)
 
                 let sender = this
-                fetch(`${this.searchEndpoint}?${searchParams.toString()}`)
+                fetch(`${window.nvs.endpoints.search}?${searchParams.toString()}`)
                     .then(resp => resp.json())
                     .then(searchResults => sender.processSearchResults(searchResults))
 
@@ -139,9 +129,9 @@ class SearchManager {
         if (searchWidget) searchWidget.classList.add('d-none')
 
         let sender = this
-        fetch(`${sender.searchEndpoint}?clear=true`)
+        fetch(`${window.nvs.endpoints.search}?clear=true`)
             .then(() => {
-                sender.playViewer.renderMiniMap(true)
+                window.nvs.playViewer.renderMiniMap(true)
             })
     }
 
@@ -181,7 +171,7 @@ class SearchManager {
         }
 
         searchWidget.classList.remove('d-none');
-        this.playViewer.renderMiniMap(true)
+        window.nvs.playViewer.renderMiniMap(true)
         if (this.nvsSearch) {
             forElsMatching('mark', (el) => el.remove())
         }
@@ -262,12 +252,12 @@ class SearchManager {
         }
 
         if (type === 'line') {
-            this.playViewer.navigateTo(result.xml_id, false, () => {
+            window.nvs.playViewer.navigateTo(result.xml_id, false, () => {
                 markUp(`#${result.xml_id}-text-col`, result.matches)
                 adjustUI()
             })
         } else if (type === 'variant') {
-            this.playViewer.navigateTo(result.xml_id, true, () => {
+            window.nvs.playViewer.navigateTo(result.xml_id, true, () => {
                 markUp(
                     `#${result.xml_id}-variant-div .variant-words`,
                     result.matches
@@ -308,7 +298,7 @@ class SearchManager {
 
                     // filter apply button click
                     getEl('filter-apply-button').onclick = (e) => {
-                        let sceneFiltered = this.selectedScenes.size !== this.playViewer.actScenes.length
+                        let sceneFiltered = this.selectedScenes.size !== window.nvs.playViewer.actScenes.length
                         let charFiltered = this.selectedCharacters.size !== this.characters.length
 
                         forElsMatching('.play-row', (el) => {
@@ -332,18 +322,17 @@ class SearchManager {
                         })
 
                         if (sceneFiltered || charFiltered) {
-                            this.playViewer.disableMiniMap()
-                            this.playViewer.isFiltered = true
+                            window.nvs.playViewer.disableMiniMap()
+                            window.nvs.playViewer.isFiltered = true
                         }
                         else {
-                            this.playViewer.renderMiniMap()
-                            this.playViewer.isFiltered = false
+                            window.nvs.playViewer.renderMiniMap()
+                            window.nvs.playViewer.isFiltered = false
                         }
                         filterWidget.classList.add('d-none')
                         setTimeout(() => {
-                            this.playViewer.render()
-                            console.log(this.playViewer.visibleLineNos)
-                            this.playViewer.renderActSceneNav()
+                            window.nvs.playViewer.renderActSceneNav()
+                            window.nvs.playViewer.render()
                         }, 500)
                     }
 
@@ -389,7 +378,7 @@ class SearchManager {
 
         // get  character data, rig up HTML and events if necessary
         if (this.characters.length === 0) {
-            let charQuery = `${this.speechEndpoint}?a_terms_speakers=speaking.name,speaking.xml_id&f_play.prefix=${this.play}&only=speaking.xml_id,lines.line_number&page-size=5000`
+            let charQuery = `${window.nvs.endpoints.speech}?a_terms_speakers=speaking.name,speaking.xml_id&f_play.prefix=${window.nvs.play}&only=speaking.xml_id,lines.line_number&page-size=5000`
 
             const response = await fetch(charQuery)
             let speechData = await response.json()
@@ -440,7 +429,7 @@ class SearchManager {
             })
 
             let actSceneHTML = ''
-            this.playViewer.actScenes.forEach(actScene => {
+            window.nvs.playViewer.actScenes.forEach(actScene => {
                 this.selectedScenes.add(actScene)
                 actSceneHTML += `
                     <div class="row">
@@ -467,10 +456,5 @@ class SearchManager {
         getEl('filter-apply-button').classList.add('d-none')
 
         filterWidget.classList.remove('d-none')
-    }
-
-    configure(setting, default_value, config) {
-        if (setting in config) this[setting] = config[setting]
-        else this[setting] = default_value
     }
 }

@@ -5,7 +5,8 @@
 :root {
     --scrollbarURL: none;
     --nvs-form-control-height: 35px;
-    --nvs-play-row-min-height: 39px;
+    --nvs-play-row-min-height: 40px;
+    --nvs-header-row-height: 40px;
     --nvs-form-control-font-size: 12px;
     --nvs-playtext-viewport-size: calc(100vh - 90px);
     --nvs-background-color: #FFFFFF;
@@ -404,7 +405,7 @@ input[type=checkbox]:checked + label.checkbox-white {
 || -------------------------- */
 
 .header-block {
-    min-height: var(--nvs-play-row-min-height);
+    min-height: var(--nvs-header-row-height);
     flex-grow: 1;
 }
 
@@ -526,6 +527,7 @@ body.mobile #playtext-col::-webkit-scrollbar-thumb {
 .play-row {
     border-top: solid 1px var(--nvs-light-blue);
     min-height: var(--nvs-play-row-min-height);
+    box-sizing: border-box;
     /*content-visibility: auto;
     contain-intrinsic-size: 1px 5000px;*/
 }

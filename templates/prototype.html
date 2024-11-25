@@ -46,20 +46,38 @@
         <script src="/static/js/bootstrap5.min.js" type="application/javascript"></script>
         <script src="/static/js/mark.min.js" type="application/javascript"></script>
         <script src="/static/js/utilities.js" type="application/javascript"></script>
-        <script src="/static/js/commviewer.js" type="application/javascript"></script>
-        <script src="/static/js/searchmanager.js" type="application/javascript"></script>
-        <script src="/static/js/playviewer.js" type="application/javascript"></script>
-        <script type="application/javascript">
-            let playViewer = null
+        <script type="module">
+            import { PlayViewer } from '/static/js/playviewer/playviewer.js'
+
+
+            window.nvs = {
+                host: '{{ corpora_host }}',
+                corpusID: '{{ corpus_id }}',
+                play: '{{ play.prefix }}',
+                playViewer: null,
+                playViewerURL: '{{ playviewer_url }}',
+                paratextPrefix: '{{ paratext_prefix }}',
+                staticPath: '/static',
+                witnesses: null,
+                witnessCount: null,
+                witnessCenturies: null
+            }
+            window.nvs.endpoints = {
+                line: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/PlayLine/`,
+                lineRange: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/nvs-lines/${window.nvs.play}/`,
+                commentary: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/Commentary/`,
+                note: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/TextualNote/`,
+                search: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/nvs-search/${window.nvs.play}/`,
+                speech: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/Speech/`,
+                witness: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/nvs-witnesses/${window.nvs.play}/`,
+                witnessMeter: `${window.nvs.host}/nvs/witness-meter/`,
+                minimap: `${window.nvs.host}/corpus/${window.nvs.corpusID}/play-minimap/${window.nvs.play}/`
+            }
 
             document.addEventListener('DOMContentLoaded', function () {
-                playViewer = new PlayViewer('playviewer-container', {
-                    play: '{{ play.prefix }}',
-                    host: '{{ corpora_host }}',
-                    corpusID: '{{ corpus_id }}',
-                    templatePath: '/static/templates',
+                window.nvs.playViewer = new PlayViewer('playviewer-container', {
                     doIdleLoading: false,
-                    lineHeight: 40,
+                    minLineHeight: 40,
                     viewerHeight: '90vh',
                     initialLineCount: 100
                 })

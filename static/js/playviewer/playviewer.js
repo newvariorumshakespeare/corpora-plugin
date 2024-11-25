@@ -1,19 +1,15 @@
-class PlayViewer {
+import { NoteManager } from "./notemanager.js"
+import { CommentaryViewer } from "./commviewer.js"
+import { SearchManager } from "./searchmanager.js"
+
+
+export class PlayViewer {
     constructor(viewer_id, config) {
         showLoadingModal()
 
-        // register configuration
-        this.configure('play', 'wt', config)
-        this.configure('host', 'corpora.dh.tamu.edu', config)
-        this.configure('corpusID', '5f3d7c81cfcceb0074aa7f55', config)
-        this.configure('templatesPath', '/static/templates', config)
-        this.configure('witnessMeterEndpoint', 'https://newvariorumshakespeare.org/witnessmeter/', config)
-        this.configure('witnessesEndpointHost', 'http://localhost/', config)
-        this.configure('miniMapEndpoint', 'http://localhost/', config)
-        this.configure('lineHeight', 20, config)
-        this.configure('viewerHeight', '90vh', config)
-        this.configure('initialLineCount', 100, config)
-        this.configure('doIdleLoading', true, config)
+        // configurable options
+        this.minLineHeight = 'minLineHeight' in config ? config.minLineHeight : 40
+        this.doIdleLoading = 'doIdleLoading' in config? config.doIdleLoading : true
 
         // data structures for managing lines
         this.lines = {}
@@ -21,21 +17,19 @@ class PlayViewer {
         this.registeredLineNos = new Set()
         this.placedLineNos = new Set()
         this.visibleLineNos = new Set()
-        this.lineWindowSize = Math.round(window.innerHeight / this.lineHeight)
+        this.lineWindowSize = Math.round(window.innerHeight / this.minLineHeight)
         this.lineWindowBuffer = this.lineWindowSize * 5
         this.lastLineWindow = null
         this.lowestLineNo = null
         this.highestLineNo = 0
+        this.observedLineHeight = this.minLineHeight
         this.actScenes = []
         this.isFiltered = false
         this.fullyRegistered = false
+        this.noteManager = null
         this.commViewer = null
         this.searchManager = null
         this.initializeLineObserver()
-
-        // data structures for managing notes and commentary
-        this.notes = {}
-        this.lastCenturyBuffer = 20
         this.highlightCommLemmas = true
 
         // initial viewer init
@@ -46,11 +40,6 @@ class PlayViewer {
         this.lastRendered = null
         this.currentBreakpoint = null
         this.resizeTimer = null
-
-        // set up endpoints
-        this.lineEndpoint = `${this.host}/api/corpus/${this.corpusID}/PlayLine/`
-        this.noteEndpoint = `${this.host}/api/corpus/${this.corpusID}/TextualNote/`
-        this.witnessesEndpoint = `${this.witnessesEndpointHost}api/corpus/${this.corpusID}/nvs-witnesses/${this.play}/`
 
         this.buildSkeleton()
     }
@@ -111,6 +100,36 @@ class PlayViewer {
             getEl('filter-lines-button').onclick = (e) => {
                 this.searchManager.filterLines()
             }
+
+            // set up "go to line #" box
+            let lineNoGoBox = getEl('hdr-line-no-box')
+            lineNoGoBox.onkeyup = (e) => {
+                if (e.key === 'Enter') {
+                    let lineNo = lineNoGoBox.value
+                    lineNoGoBox.value = ''
+                    lineNoGoBox.blur()
+
+                    let lineRow = getEl(`tln_${lineNo}-row`)
+                    if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
+                    else {
+                        while (lineNo.length < 4) {
+                            lineNo = '0' + lineNo
+                        }
+                        lineRow = getEl(`tln_${lineNo}-row`)
+                        if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
+                        else {
+                            fetch(`${window.nvs.endpoints.line}?f_alt_xml_ids=tln_${lineNo}&page-size=1&only=xml_id`)
+                                .then(res => res.json())
+                                .then(lineInfo => {
+                                    if (lineInfo.records && lineInfo.records.length === 1) {
+                                        let lineID = lineInfo.records[0].xml_id
+                                        getEl(`${lineID}-row`).scrollIntoView({behavior: 'smooth'})
+                                    }
+                                })
+                        }
+                    }
+                }
+            }
         }
 
         // these events are to be set up repeatedly
@@ -136,7 +155,7 @@ class PlayViewer {
             let lineChunkEnd = null
             let sender = this
 
-            this.visibleLineNos.forEach(lineNo => {
+            this.getLineWindowNos().forEach(lineNo => {
                 if (!this.registeredLineNos.has(lineNo)) {
                     if (lineChunkStart === null) lineChunkStart = lineChunkEnd = lineNo
                     else if (lineNo - lineChunkEnd > 1) {
@@ -176,11 +195,12 @@ class PlayViewer {
                     if (!currentLineWindow.has(lineNo) && this.placedLineNos.has(lineNo)) {
                         let lineID = this.lineNoIDMap[lineNo]
                         let lineRow = getEl(`${lineID}-row`)
-                        if (lineRow.offsetHeight === this.lineHeight) {
+                        if (lineRow.offsetHeight == this.observedLineHeight) {
                             this.lines[lineID].retirementTimer = setTimeout(() => {
                                 this.retireLine(lineRow, lineNo)
                             }, 3000)
                         }
+
                     }
                 })
             }
@@ -240,7 +260,7 @@ class PlayViewer {
                 
                 let hasVariants = parseInt(line.witness_meter) > 0
                 let disclosureTriangle = ''
-                if (parseInt(line.witness_meter)) {
+                if (hasVariants) {
                     disclosureTriangle = `
                         <a id="${line.xml_id}-variant-toggler"
                                class="variant-toggler"
@@ -272,87 +292,27 @@ class PlayViewer {
                     </div>
                     ${hasVariants ? `<div class="collapse" id="${line.xml_id}-variant-div"></div>` : '' }
                 `
-                let witnessMeterCol = getEl(`${line.xml_id}-witness-col`)
-                let witnessMeterImg = getEl(`${line.xml_id}-witness-meter`)
-                this.drawWitnessMeter(
-                    line.witness_meter,
-                    witnessMeterImg,
-                    witnessMeterCol.clientWidth,
-                    witnessMeterCol.clientHeight - 8
-                )
+                if (this.currentBreakpoint != null) this.noteManager.drawWitnessMeter(getEl(`${line.xml_id}-witness-meter`))
 
                 if (hasVariants) {
                     getEl(`${line.xml_id}-variant-div`).addEventListener('show.bs.collapse', (e) => {
                         forElsMatching(`#${e.target.id} .variant-witness-meter img`, (img) => {
-                            console.log('drawing variant meter')
-                            this.drawWitnessMeter(
-                                img.dataset.witness_indicators,
-                                img,
-                                witnessMeterCol.offsetWidth,
-                                25,
-                                "#FFFFFF"
-                            )
+                            this.noteManager.drawWitnessMeter(img, true)
+                            this.noteManager.rigUpNoteEvents(line.xml_id)
                         })
                     })
                 }
 
                 this.placedLineNos.add(line.line_number)
-                this.placeNotes(line.xml_id)
+                this.noteManager.placeNotes(line.xml_id)
             }
         }
         let sender = this
-        this.placementTimer = setTimeout(() => {sender.rigUpEvents()}, 500)
-    }
-
-    placeNotes(lineID) {
-        let line = this.lines[lineID]
-        let line_variant_div = getEl(`${lineID}-variant-div`)
-        let line_varients_html = ''
-
-        // make note/variant elements
-        try {
-            line.notes.forEach(note_id => {
-                let note = this.notes[note_id]
-                let description_displayed = false
-
-                if (note.variants) {
-                    note.variants.forEach(variant => {
-                        let variant_words = variant.variant;
-                        if (!variant_words) {
-                            if (variant.description === null) {
-                                variant_words = `<span class="variant-note">Due to the site being in beta, an error occurred when parsing this variant.</span>`
-                            } else {
-                                description_displayed = true
-                                variant_words = `<span class="variant-note">${variant.description}</span>`
-                            }
-                        }
-                        variant_words = note.line_range + variant_words
-
-                        line_varients_html += `
-                        <div class="row gx-0 variant-row">
-                            <div class="col-sm-4 p-0 m-0">
-                                <div class="row gx-0">
-                                    <div id="variant-${variant.id}" class="col-sm-12 p-0 m-0 variant-witness-meter clickable">
-                                        <img id="${lineID}-${variant.id}-witness-meter" height="15" width="100%" src="/static/img/blank-meter.png" data-witness_indicators="${variant.witness_meter}" />
-                                    </div>
-                                </div>
-                                <div class="row gx-0">
-                                    <div class="col-sm-12 witness-formula" data-line-id="${lineID}" data-variant-id="${variant.id}">
-                                        ${variant.witness_formula}${variant.description && !description_displayed ? ' ' + variant.description : ''}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-sm-8 p-0 m-0 variant-words align-self-center">${variant_words}</div>
-                        </div>
-                        `
-                    })
-
-                    line_variant_div.innerHTML = line_varients_html
-                }
-            })
-        } catch(error) {
-            console.log(`Error placing lines for ${lineID}`)
-        }
+        this.placementTimer = setTimeout(() => {
+            sender.rigUpEvents()
+            if (this.currentBreakpoint == null) sender.viewerResize()
+            else sender.calculateObservedLineHeight()
+        }, 500)
     }
 
     initializeLineObserver() {
@@ -369,11 +329,6 @@ class PlayViewer {
             })
             if (!sender.fullyRegistered && sender.doIdleLoading) sender.startIdleTimer()
         })
-    }
-
-    drawWitnessMeter(witness_meter, img_element, width, height, inactive_color="#CFCFCF") {
-        if (!['xs', 'sm'].includes(this.currentBreakpoint))
-            img_element.src = `${this.witnessMeterEndpoint}${witness_meter}/${Math.floor(height)}/${Math.floor(width)}/${inactive_color.replace('#', '')}/0/`
     }
 
     retireLine(lineRow, lineNo) {
@@ -406,81 +361,120 @@ class PlayViewer {
     viewerResize() {
         let lastBreakpoint = this.currentBreakpoint
         this.currentBreakpoint = getBreakpoint()
+        this.noteManager.witnessMeterWidth = getEl('witness-header').clientWidth
 
         let headerRow = getEl('playviewer-header-row')
         let controlsRow = getEl('playtext-controls-row')
         let actSceneFrameHolder = getEl('act-scene-frame-holder')
-        let actSceneFrame = getEl('act-scene-frame')
         let commFrame = getEl('commentary-frame')
         let playtextCol = getEl('playtext-col')
+        let playtextHeaderLabel = getEl('playtext-header-label')
         console.log(this.currentBreakpoint)
 
         if (['xs', 'sm'].includes(this.currentBreakpoint)) {
-            console.log('doing small')
             // clear out medium style specs
-            actSceneFrameHolder.removeAttribute('style')
-            actSceneFrame.removeAttribute('style')
-            commFrame.removeAttribute('style')
+            if (lastBreakpoint != null) {
+                actSceneFrameHolder.removeAttribute('style')
+                commFrame.removeAttribute('style')
+                playtextCol.style.removeProperty('padding-bottom')
+            }
 
+            document.body.classList.add('mobile')
             headerRow.style.position = 'sticky'
             headerRow.style.top = '0'
             setCssVar('--nvs-playtext-viewport-size', 'calc(100vh - 200px)')
             this.disableMiniMap()
+            playtextCol.style.removeProperty('background-image')
+            playtextCol.style.scrollPaddingTop = `${this.observedLineHeight}px`
+            forElsMatching('.variant-witness-meter', (el) => el.classList.add('d-none'))
             commFrame.style.maxHeight = '200px'
-            actSceneFrame.style.maxHeight = '200px'
-            actSceneFrame.style.overflowY = 'scroll'
-            setTimeout(() => {
-                headerRow.scrollIntoView()
-            }, 1000)
+            actSceneFrameHolder.classList.add('d-none')
+            playtextHeaderLabel.style.removeProperty('padding-left')
 
         } else if (this.currentBreakpoint === 'md') {
             // clear out small style specs
-            headerRow.style.removeProperty('position')
-            headerRow.style.removeProperty('top')
-            commFrame.style.removeProperty('max-height')
-            document.body.classList.add('mobile')
+            if (lastBreakpoint != null) {
+                headerRow.style.removeProperty('position')
+                headerRow.style.removeProperty('top')
+                playtextCol.style.removeProperty('scroll-padding-top')
+                commFrame.removeAttribute('style')
+                actSceneFrameHolder.classList.remove('d-none')
+                playtextHeaderLabel.style.paddingLeft = `200px`
+            }
 
+            document.body.classList.add('mobile')
             setCssVar('--nvs-playtext-viewport-size', 'calc(100vh - 90px)')
             this.disableMiniMap()
-            setTimeout(() => {
-                actSceneFrameHolder.style.height = '100%'
-                commFrame.style.position = 'absolute'
-                commFrame.style.top = `${document.body.clientHeight - 200}px`
-                commFrame.style.left = '0'
-                commFrame.style.width = `${controlsRow.clientWidth + controlsRow.getBoundingClientRect().left}px`
-                commFrame.style.maxHeight = '200px'
-                playtextCol.style.paddingBottom = '200px'
-            }, 500)
+            actSceneFrameHolder.style.height = '100%'
+            commFrame.style.position = 'absolute'
+            commFrame.style.top = `${document.body.clientHeight - 200}px`
+            commFrame.style.left = '0'
+            commFrame.style.width = `${controlsRow.clientWidth + controlsRow.getBoundingClientRect().left}px`
+            commFrame.style.maxHeight = '200px'
+            playtextCol.style.paddingBottom = '200px'
 
-        } else {
-            actSceneFrameHolder.removeAttribute('style')
-            actSceneFrame.removeAttribute('style')
-            commFrame.removeAttribute('style')
+        } else if (lastBreakpoint != null) {
+            // clear out styling from small size
+            document.body.classList.remove('mobile')
             headerRow.style.removeProperty('position')
             headerRow.style.removeProperty('top')
             setCssVar('--nvs-playtext-viewport-size', 'calc(100vh - 90px)')
             this.renderMiniMap()
-            commFrame.style.removeProperty('max-height')
-            document.body.classList.remove('mobile')
+            playtextCol.style.removeProperty('scroll-padding-top')
+            commFrame.removeAttribute('style')
+            actSceneFrameHolder.classList.remove('d-none')
+            playtextHeaderLabel.style.paddingLeft = `200px`
+
+            // clear out styling from medium size
+            actSceneFrameHolder.removeAttribute('style')
+            commFrame.removeAttribute('style')
+            playtextCol.style.removeProperty('padding-bottom')
         }
 
-        if (lastBreakpoint != null && !['xs', 'sm'].includes(this.currentBreakpoint)) {
-            console.log('redrawing meters')
-            this.placedLineNos.forEach(lineNo => {
-                let lineID = this.lineNoIDMap[lineNo]
-                let witnessMeterImg = getEl(`${lineID}-witness-meter`)
-                let witnessMeterCol = witnessMeterImg.parentElement
+        // since the window has resized, it's possible that the most frequent
+        // line height has changed. as such, we need to reset the min height
+        // for playline rows and recalculate what it should be now
+        setCssVar('--nvs-play-row-min-height', `${this.minLineHeight}px`)
+        setTimeout(() => {
+            let heightChanged = this.calculateObservedLineHeight()
 
-                this.drawWitnessMeter(
-                    witnessMeterImg.dataset.witness_indicators,
-                    witnessMeterImg,
-                    witnessMeterCol.clientWidth,
-                    witnessMeterCol.clientHeight - 8
-                )
-            })
+            setTimeout(() => {
+                // since witness meters are drawn on the fly based on dimensions, we
+                // need to a) make sure any meters that got hidden due to resizing are
+                // restored, b) redraw any variant meters that are visible, and c)
+                // redraw all visible line-level meters
+                if ((lastBreakpoint != null || heightChanged) && !['xs', 'sm'].includes(this.currentBreakpoint)) {
+                    this.noteManager.redrawMeters()
+                }
+            }, 500)
+        }, 500)
+    }
 
-            this.drawWitnessHeaderAndBackground()
+    calculateObservedLineHeight() {
+        let heightCounts = {}
+        this.placedLineNos.forEach(lineNo => {
+            let lineRow = getEl(`${this.lineNoIDMap[lineNo]}-row`)
+            let lineHeight = lineRow.offsetHeight
+
+            if (lineHeight in heightCounts) heightCounts[lineHeight] += 1
+            else heightCounts[lineHeight] = 1
+        })
+        let highestCount = 0
+        let mostFrequentHeight = 0
+        Object.keys(heightCounts).forEach(lineHeight => {
+            if (heightCounts[lineHeight] > highestCount) {
+                highestCount = heightCounts[lineHeight]
+                mostFrequentHeight = lineHeight
+            }
+        })
+        if (this.observedLineHeight !== mostFrequentHeight) {
+            if (mostFrequentHeight >= this.minLineHeight) this.observedLineHeight = mostFrequentHeight
+            else this.observedLineHeight = this.minLineHeight
+
+            setCssVar('--nvs-play-row-min-height', `${this.observedLineHeight}px`)
+            return true
         }
+        return false
     }
 
     async navigateTo(lineID, openVariants=false, callback=null) {
@@ -514,27 +508,11 @@ class PlayViewer {
                 this.lines[line.xml_id] = line
                 this.lines[line.xml_id]['notes'] = []
                 this.lines[line.xml_id]['retirementTimer'] = null
-                this.lineNoIDMap[line.line_number] = line.xml_id
                 linesToMarkAsRegistered.push({line_number: line.line_number, xml_id: line.xml_id})
             }
         })
 
-        notes.forEach(note => {
-            note.lines.forEach(line => {
-                if (line.xml_id in this.lines) {
-                    this.lines[line.xml_id].notes.push(note.xml_id)
-                }
-            })
-
-            note.line_range = ''
-            if (note.lines.length > 1) {
-                let startLineEl = getEl(`${note.lines[0].xml_id}-row`)
-                let endLineEl = getEl(`${note.lines[note.lines.length - 1].xml_id}-row`)
-                note.line_range = `<span class='text-muted'>${startLineEl.dataset.line_label}-${endLineEl.dataset.line_label}: </span>`;
-            }
-            delete note.lines
-            this.notes[note.xml_id] = note
-        })
+        this.noteManager.registerNotes(notes)
 
         linesToMarkAsRegistered.forEach(line => {
             this.registeredLineNos.add(line.line_number)
@@ -548,22 +526,22 @@ class PlayViewer {
 
     buildSkeleton() {
         // load the playviewer template
-        fetch(`${this.templatesPath}/playviewer.html`).then(html => html.text()).then(html => {
+        fetch(`${window.nvs.staticPath}/templates/playviewer.html`).then(html => html.text()).then(html => {
             this.viewer.innerHTML = html
             this.viewer = getEl('playtext-col')
             this.viewer.onscroll = (event) => this.viewerScroll(event)
+            setCssVar('--nvs-play-row-min-height', `${this.minLineHeight}px`)
 
             // make sure lines are displayed right away
             let params = this.getEndpointParams({
                 only: 'xml_id,line_number,line_label,act,scene',
                 'page-size': 10000
             })
-            let url = `${this.lineEndpoint}?${params.toString()}`
+            let url = `${window.nvs.endpoints.line}?${params.toString()}`
 
             let sender = this
             fetch(url).then(lineResults => lineResults.json()).then(lineResults => {
                 sender.totalLines = lineResults.meta.total
-                sender.viewerHeight = sender.totalLines * sender.lineHeight
 
                 let lines = lineResults.records
                 let skelHTML = ''
@@ -581,9 +559,10 @@ class PlayViewer {
                         data-line_label="${line.line_label}"
                         data-act="${line.act}"
                         data-scene="${line.scene}"
-                        data-actscene="${actScene}"
-                        style="min-height: ${this.lineHeight}px; box-sizing: border-box;"></div>`
+                        data-actscene="${actScene}">
+                        </div>`
 
+                    sender.lineNoIDMap[line.line_number] = line.xml_id
                     if (sender.lowestLineNo === null) sender.lowestLineNo = line.line_number
                     sender.highestLineNo = line.line_number
                 })
@@ -595,39 +574,21 @@ class PlayViewer {
                 sender.renderMiniMap()
                 setTimeout(() => {
                     sender.viewerScroll()
-                    sender.viewerResize()
                     hideLoadingModal()
                 }, 500)
             })
 
             // rig up commentary viewer
-            sender.commViewer = new CommentaryViewer('commentary-frame', {
-                play: sender.play,
-                host: sender.host,
-                corpusID: sender.corpusID
-            })
+            sender.commViewer = new CommentaryViewer('commentary-frame')
+
+            // rig up note manager
+            sender.noteManager = new NoteManager()
 
             // rig up search manager
-            sender.searchManager = new SearchManager(sender,{
-                play: sender.play,
-                host: sender.host,
-                corpusID: sender.corpusID,
-                templatesPath: sender.templatesPath,
-                playViewer: sender,
-                commViewer: sender.commViewer
-            })
+            sender.searchManager = new SearchManager(sender.commViewer)
 
             // rig up events
             sender.rigUpEvents(true)
-
-            // now fetch all the witness info
-            fetch(sender.witnessesEndpoint).then(witResults => witResults.json()).then(witResults => {
-                sender.witnessCount = witResults.witness_count
-                sender.witnesses = witResults.witnesses
-                sender.witnessCenturies = witResults.witness_centuries
-
-                sender.drawWitnessHeaderAndBackground()
-            })
         })
     }
 
@@ -655,110 +616,13 @@ class PlayViewer {
 
     renderMiniMap(noCache=false) {
         let height = getEl('playtext-col').offsetHeight
-        let miniMapURL = `${this.miniMapEndpoint}corpus/${this.corpusID}/play-minimap/${this.play}/`
-        miniMapURL += `?width=40&height=${parseInt(height)}`
+        let miniMapURL = `${window.nvs.endpoints.minimap}?width=40&height=${parseInt(height)}`
         if (noCache) miniMapURL += `&no-cache=${Math.floor(Date.now() / 1000)}`
         setCssVar('--scrollbarURL', `url(${miniMapURL})`)
     }
     
     disableMiniMap() {
         setCssVar('--scrollbarURL', 'none')
-    }
-
-    drawWitnessHeaderAndBackground() {
-        if (!['xs', 'sm'].includes(this.currentBreakpoint)) {
-            let witHeader = getEl('witness-header')
-            let witHeaderCol = getEl('playtext-header-col')
-            let width = witHeader.offsetWidth
-            let selectivelyQuotedWidth = 20
-            let witnessWidth = (width - selectivelyQuotedWidth) / this.witnessCount
-            let centuries = Object.keys(this.witnessCenturies)
-            let lastCentury = centuries[centuries.length - 1]
-
-            if (this.witnessCenturies[lastCentury] * witnessWidth < 20) {
-                this.lastCenturyBuffer = 20 - this.witnessCenturies[lastCentury] * witnessWidth
-                witnessWidth = (width - (this.lastCenturyBuffer + selectivelyQuotedWidth)) / this.witnessCount
-            }
-
-            let headerHeight = witHeader.offsetHeight
-            let headerCanvas = document.createElement('canvas')
-            let headerContext = headerCanvas.getContext('2d')
-
-            let fontColor = getCssVar('nvs-mid-gray')
-            let lightOrange = getCssVar('nvs-light-orange')
-            let delimiterColor = getCssVar('nvs-background-color')
-            let fontSize = 12
-            headerContext.font = `${fontSize}px Roboto Condensed`
-            headerContext.textAlign = "left"
-            headerContext.textBaseline = "bottom"
-
-            let playtextCol = getEl('playtext-col')
-            let backgroundCanvas = document.createElement('canvas')
-            backgroundCanvas.height = playtextCol.clientHeight
-            backgroundCanvas.width = width
-            let backgroundContext = backgroundCanvas.getContext('2d')
-
-            // DRAW LIGHT ORANGE BACKGROUND ON BOTH CANVASES
-            headerContext.beginPath()
-            headerContext.fillStyle = lightOrange
-            headerContext.fillRect(0, 0, width, headerHeight)
-
-            backgroundContext.beginPath()
-            backgroundContext.fillStyle = lightOrange
-            backgroundContext.fillRect(0, 0, width, playtextCol.clientHeight)
-
-            let centuryCursor = 0
-            let widthCursor = 0
-            let delimiterWidth = 2
-            let centuryWidth = 0
-            for (let century in this.witnessCenturies) {
-                centuryWidth = this.witnessCenturies[century] * witnessWidth
-
-                headerContext.beginPath()
-                headerContext.fillStyle = delimiterColor
-                headerContext.fillRect(widthCursor, 0, delimiterWidth, headerHeight)
-
-                backgroundContext.beginPath()
-                backgroundContext.fillStyle = delimiterColor
-                backgroundContext.fillRect(widthCursor, 0, delimiterWidth, playtextCol.clientHeight)
-
-                headerContext.save()
-                headerContext.fillStyle = fontColor
-                headerContext.translate(widthCursor + 5, headerHeight - 5)
-                headerContext.rotate(-Math.PI / 2)
-                headerContext.fillText(century, 0, fontSize)
-                headerContext.restore()
-
-                centuryCursor += 1
-                widthCursor += centuryWidth
-            }
-
-            if (centuryWidth < 20) {
-                widthCursor += 20 - centuryWidth
-            }
-
-            headerContext.beginPath()
-            headerContext.fillStyle = delimiterColor
-            headerContext.fillRect(widthCursor, 0, delimiterWidth, headerHeight)
-
-            backgroundContext.beginPath()
-            backgroundContext.fillStyle = delimiterColor
-            backgroundContext.fillRect(widthCursor, 0, delimiterWidth, playtextCol.clientHeight)
-
-            headerContext.save()
-            headerContext.fillStyle = fontColor
-            headerContext.translate(widthCursor + 5, headerHeight - 5)
-            headerContext.rotate(-Math.PI / 2)
-            headerContext.fillText("OCC.", 0, fontSize)
-            headerContext.restore()
-
-            witHeaderCol.style.backgroundImage = `url(${headerCanvas.toDataURL()})`
-            witHeaderCol.style.backgroundPosition = `${witHeader.offsetLeft + 6}px 5px`
-
-            playtextCol.style.backgroundImage = `url(${backgroundCanvas.toDataURL()})`
-            playtextCol.style.backgroundPosition = `${witHeader.offsetLeft + 6}px 0px`
-            playtextCol.style.backgroundColor = lightOrange
-        }
     }
 
     comspanHover(e){
@@ -781,22 +645,49 @@ class PlayViewer {
 
     getLineWindowNos() {
         let lineCursor = Math.min(...this.visibleLineNos) - this.lineWindowBuffer
-        if (lineCursor < this.lowestLineNo) lineCursor = this.lowestLineNo
-
-        let maxLineNo = Math.max(...this.visibleLineNos) + this.lineWindowBuffer
         let windowNos = new Set()
-        while (lineCursor <= maxLineNo) {
-            if (lineCursor >= this.lowestLineNo && lineCursor <= this.highestLineNo)
-                windowNos.add(lineCursor)
 
-            lineCursor += 1
+        if (!this.isFiltered) {
+            if (lineCursor < this.lowestLineNo) lineCursor = this.lowestLineNo
+
+            let maxLineNo = Math.max(...this.visibleLineNos) + this.lineWindowBuffer
+
+            while (lineCursor <= maxLineNo) {
+                if (lineCursor >= this.lowestLineNo && lineCursor <= this.highestLineNo)
+                    windowNos.add(lineCursor)
+
+                lineCursor += 1
+            }
+        } else {
+            let sortableNos = []
+            const getVisibleSibling = (el, dir) => {
+                let sibling = null
+                if (dir === 'next') sibling = el.nextElementSibling
+                else sibling = el.previousElementSibling
+                if (sibling) {
+                    if (sibling.classList.contains('d-none')) return getVisibleSibling(sibling, dir)
+                    else return sibling
+                }
+                return null
+            }
+
+            let rowCursor = getEl(`${this.lineNoIDMap[lineCursor]}-row`)
+            sortableNos.push(parseInt(rowCursor.dataset.line_number))
+            for (let noCursor = 0; noCursor < this.lineWindowBuffer; noCursor++) {
+                rowCursor = getVisibleSibling(rowCursor, 'previous')
+                if (rowCursor) sortableNos.push(parseInt(rowCursor.dataset.line_number))
+                else break
+            }
+            rowCursor = getEl(`${this.lineNoIDMap[lineCursor]}-row`)
+            for (let noCursor = 0; noCursor < this.lineWindowBuffer * 2; noCursor++) {
+                rowCursor = getVisibleSibling(rowCursor, 'next')
+                if (rowCursor) sortableNos.push(parseInt(rowCursor.dataset.line_number))
+                else break
+            }
+            sortableNos.sort().forEach(lineNo => windowNos.add(lineNo))
         }
-        return windowNos
-    }
 
-    configure(setting, default_value, config) {
-        if (setting in config) this[setting] = config[setting]
-        else this[setting] = default_value
+        return windowNos
     }
 
     startIdleTimer() {
@@ -820,7 +711,7 @@ class PlayViewer {
 
     getEndpointParams(params, forEndpoint='line') {
         let endpointParams = new URLSearchParams()
-        endpointParams.set('f_play.prefix', this.play)
+        endpointParams.set('f_play.prefix', window.nvs.play)
 
         if (forEndpoint === 'line') endpointParams.set('s_line_number', 'asc')
         else if (forEndpoint === 'note') endpointParams.set('s_lines.line_number', 'asc')
@@ -842,8 +733,8 @@ class PlayViewer {
             'page-size': 1000
         }, 'note')
 
-        let lineURL = `${this.lineEndpoint}?${lineParams.toString()}`
-        let noteURL = `${this.noteEndpoint}?${noteParams.toString()}`
+        let lineURL = `${window.nvs.endpoints.line}?${lineParams.toString()}`
+        let noteURL = `${window.nvs.endpoints.note}?${noteParams.toString()}`
 
         const responses = await Promise.all([fetch(lineURL), fetch(noteURL)])
         let [lineResults, noteResults] = await Promise.all(responses.map(response => response.json()))
