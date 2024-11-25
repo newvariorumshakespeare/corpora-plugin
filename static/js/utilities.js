@@ -476,9 +476,9 @@ function displayNavModal(title, content, link, controls='', arrowSide='right') {
             modalEl.style.left = `${linkRect.right + 20}px`
         }
 
-        getEl(`${modalID}-close-button`).onclick = (e) => {
+        getEl(`${modalID}-close-button`).addEventListener('click', (e) => {
             getEl(e.target.dataset.modal_id).remove()
-        }
+        })
 
         makeDraggable(modalEl)
     }
