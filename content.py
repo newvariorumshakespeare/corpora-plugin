@@ -1930,6 +1930,25 @@ REGISTRY = [
                 "unique_with": [],
                 "stats": {},
                 "inherited": False
+            },
+            {
+                "name": "media",
+                "label": "Media",
+                "indexed": False,
+                "unique": False,
+                "multiple": True,
+                "in_lists": True,
+                "type": "file",
+                "choices": [],
+                "cross_reference_type": "",
+                "has_intensity": False,
+                "language": None,
+                "autocomplete": False,
+                "synonym_file": None,
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
             }
         ],
         "show_in_nav": True,
