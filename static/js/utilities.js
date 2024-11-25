@@ -370,72 +370,6 @@ function populateNavContents(navType, ids, contents=[], firstXMLid=null, link=nu
         // end fetch
     }
 }
-function delayedScroll(anchor, smooth=true, parent=null) {
-    let scrollOpts = {behavior: 'smooth'}
-    if (!smooth) scrollOpts = null
-
-    let idSelectedEl = getElWithQuery(`${parent ? '#' + parent + ' ' : ''}#${anchor}`)
-    if (idSelectedEl) idSelectedEl.scrollIntoView(scrollOpts)
-    else {
-        let anchorSelectedEl = getElWithQuery(`${parent ? '#' + parent + ' ' : ''}a[name=${anchor}]`)
-        if (anchorSelectedEl) anchorSelectedEl.scrollIntoView(scrollOpts)
-    }
-}
-function makeDraggable(el, handle) {
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    if (handle) {
-        // if present, the header is where you move the DIV from:
-        handle.onmousedown = dragMouseDown;
-        handle.ontouchstart = dragMouseDown;
-    } else {
-        // otherwise, move the DIV from anywhere inside the DIV:
-        el.onmousedown = dragMouseDown;
-        el.ontouchstart = dragMouseDown;
-    }
-
-    function dragMouseDown(e) {
-        e = e || window.event;
-        e.preventDefault();
-
-        // get the mouse cursor position at startup:
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        document.ontouchend = closeDragElement;
-        // call a function whenever the cursor moves:
-        document.onmousemove = elementDrag;
-        document.ontouchmove = elementDrag;
-    }
-
-    function elementDrag(e) {
-        e = e || window.event;
-        if (e.type === "touchmove") {
-            pos1 = pos3 - e.touches[0].clientX;
-            pos2 = pos4 - e.touches[0].clientY;
-            pos3 = e.touches[0].clientX;
-            pos4 = e.touches[0].clientY;
-        } else {
-            e.preventDefault();
-            // calculate the new cursor position:
-            pos1 = pos3 - e.clientX;
-            pos2 = pos4 - e.clientY;
-            pos3 = e.clientX;
-            pos4 = e.clientY;
-        }
-
-        // set the element's new position:
-        el.style.top = (el.offsetTop - pos2) + "px";
-        el.style.left = (el.offsetLeft - pos1) + "px";
-    }
-
-    function closeDragElement() {
-        // stop moving when mouse button is released:
-        document.onmouseup = null;
-        document.onmousemove = null;
-        document.ontouchend = null;
-        document.ontouchmove = null;
-    }
-}
 function displayNavModal(title, content, link, controls='', arrowSide='right') {
     let modalID = ''
     let modalEl = null
@@ -476,11 +410,12 @@ function displayNavModal(title, content, link, controls='', arrowSide='right') {
             modalEl.style.left = `${linkRect.right + 20}px`
         }
 
-        getEl(`${modalID}-close-button`).addEventListener('click', (e) => {
-            getEl(e.target.dataset.modal_id).remove()
-        })
+        let closeButton = getEl(`${modalID}-close-button`)
+        let closeFunc = (e) => getEl(e.target.dataset.modal_id).remove()
+        closeButton.addEventListener('click', closeFunc)
+        closeButton.addEventListener('touchstart', closeFunc)
 
-        makeDraggable(modalEl)
+        makeDraggable(modalEl, getElWithQuery(`#${modalID} .ref-modal-header`))
     }
     else {
         if (!getEl('nav-modal')) prependToEl(document.body, `
@@ -504,4 +439,70 @@ function displayNavModal(title, content, link, controls='', arrowSide='right') {
     }
 
     return modalID
+}
+function makeDraggable(el, handle) {
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0
+    if (handle) {
+        // if present, the header is where you move the DIV from:
+        handle.onmousedown = dragMouseDown
+        handle.ontouchstart = dragMouseDown
+    } else {
+        // otherwise, move the DIV from anywhere inside the DIV:
+        el.onmousedown = dragMouseDown
+        el.ontouchstart = dragMouseDown
+    }
+
+    function dragMouseDown(e) {
+        e = e || window.event
+        e.preventDefault()
+
+        // get the mouse cursor position at startup:
+        pos3 = e.clientX
+        pos4 = e.clientY
+        document.onmouseup = closeDragElement
+        document.ontouchend = closeDragElement
+        // call a function whenever the cursor moves:
+        document.onmousemove = elementDrag
+        document.ontouchmove = elementDrag
+    }
+
+    function elementDrag(e) {
+        e = e || window.event
+        if (e.type === "touchmove") {
+            pos1 = pos3 - e.touches[0].clientX
+            pos2 = pos4 - e.touches[0].clientY
+            pos3 = e.touches[0].clientX
+            pos4 = e.touches[0].clientY
+        } else {
+            e.preventDefault();
+            // calculate the new cursor position:
+            pos1 = pos3 - e.clientX
+            pos2 = pos4 - e.clientY
+            pos3 = e.clientX
+            pos4 = e.clientY
+        }
+
+        // set the element's new position:
+        el.style.top = (el.offsetTop - pos2) + "px"
+        el.style.left = (el.offsetLeft - pos1) + "px"
+    }
+
+    function closeDragElement() {
+        // stop moving when mouse button is released:
+        document.onmouseup = null
+        document.onmousemove = null
+        document.ontouchend = null
+        document.ontouchmove = null
+    }
+}
+function delayedScroll(anchor, smooth=true, parent=null) {
+    let scrollOpts = {behavior: 'smooth'}
+    if (!smooth) scrollOpts = null
+
+    let idSelectedEl = getElWithQuery(`${parent ? '#' + parent + ' ' : ''}#${anchor}`)
+    if (idSelectedEl) idSelectedEl.scrollIntoView(scrollOpts)
+    else {
+        let anchorSelectedEl = getElWithQuery(`${parent ? '#' + parent + ' ' : ''}a[name=${anchor}]`)
+        if (anchorSelectedEl) anchorSelectedEl.scrollIntoView(scrollOpts)
+    }
 }
