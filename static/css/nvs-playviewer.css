@@ -663,6 +663,7 @@ span.pipe-marker::after {
     width: 33px;
     height: 38px;
     cursor: pointer;
+    background-repeat: no-repeat;
 }
 
 .variant-toggler[aria-expanded=false] {

@@ -238,7 +238,7 @@ export class NoteManager {
                         siglum = `${siglum}_${window.nvs.playViewer.play}`
 
                     if (siglum in window.nvs.witnesses) {
-                        this.witnesses[siglum].slots.map(slot => {
+                        window.nvs.witnesses[siglum].slots.map(slot => {
                             witIndicators = witIndicators.substring(0, slot) + 'x' + witIndicators.substring(slot + 1)
                         })
                     } else {

@@ -85,7 +85,7 @@ function showLoadingModal() {
     if (!loadingModal) {
         prependToEl(document.body, `
             <div id="loading-overlay" class="d-flex align-items-center justify-content-center">
-                <div id="loading-modal" class="w-25 h-25">
+                <div id="loading-modal" class="w-25 h-25" style="min-width: 140px;">
                     <div class="row gx-0">
                         <div class="col-sm-12">
                             LOADING...
