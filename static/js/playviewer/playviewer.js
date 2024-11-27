@@ -386,7 +386,7 @@ export class PlayViewer {
             this.disableMiniMap()
             playtextCol.style.removeProperty('background-image')
             playtextCol.style.scrollPaddingTop = `${this.observedLineHeight}px`
-            forElsMatching('.variant-witness-meter', (el) => el.classList.add('d-none'))
+            forElsMatching('.variant-witness-meter img', (el) => el.classList.add('d-none'))
             commFrame.style.maxHeight = '200px'
             actSceneFrameHolder.classList.add('d-none')
             playtextHeaderLabel.style.removeProperty('padding-left')
@@ -400,6 +400,7 @@ export class PlayViewer {
                 commFrame.removeAttribute('style')
                 actSceneFrameHolder.classList.remove('d-none')
                 playtextHeaderLabel.style.paddingLeft = `200px`
+                forElsMatching('.variant-witness-meter img', (el) => el.classList.remove('d-none'))
             }
 
             document.body.classList.add('mobile')
@@ -423,6 +424,7 @@ export class PlayViewer {
             playtextCol.style.removeProperty('scroll-padding-top')
             commFrame.removeAttribute('style')
             actSceneFrameHolder.classList.remove('d-none')
+            forElsMatching('.variant-witness-meter img', (el) => el.classList.remove('d-none'))
             playtextHeaderLabel.style.paddingLeft = `200px`
 
             // clear out styling from medium size

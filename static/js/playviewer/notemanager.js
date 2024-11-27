@@ -64,6 +64,7 @@ export class NoteManager {
             if (isVariantMeter) {
                 height = 15
                 inactive_color = "FFFFFF"
+                img.classList.remove('d-none')
             } else {
                 height = img.parentElement.parentElement.offsetHeight - 8
                 if (height < 15) height = 15
@@ -73,6 +74,7 @@ export class NoteManager {
             img.setAttribute('height', height)
             img.src = `${window.nvs.endpoints.witnessMeter}${img.dataset.witness_indicators}/${Math.floor(height)}/${Math.floor(width)}/${inactive_color}/0/`
         }
+        else if (isVariantMeter) img.classList.add('d-none')
         if (!img.dataset.events_rigged) {
             img.onclick = (e) => this.displayVariantEditions(e.target)
             img.dataset.events_rigged = 'true'
