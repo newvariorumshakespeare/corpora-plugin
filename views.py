@@ -965,6 +965,11 @@ def api_search(request, corpus_id=None, play_prefix=None):
     search_type = request.GET.get('search_type', None)
     search_contents = request.GET.get('search_contents', None)
 
+    if request.method == 'POST':
+        quick_search = request.POST.get('quick_search', None)
+        search_type = request.POST.get('search_type', None)
+        search_contents = request.POST.get('search_contents', None)
+
     if 'clear' in request.GET:
         nvs_session['search'] = {}
         set_nvs_session(request, nvs_session, play_prefix)
