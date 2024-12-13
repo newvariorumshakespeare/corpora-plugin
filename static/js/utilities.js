@@ -270,7 +270,7 @@ function navigateTo(navType, xmlID, link=null) {
         let endpointParams = new URLSearchParams()
         Object.keys(searchParams).forEach(key => endpointParams.set(key, searchParams[key]))
 
-        fetch(`${window.nvs.host}/api/corpus/${window.nvs.corpusID}/${contentType}/?${endpointParams.toString()}`)
+        fetch(`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/${contentType}/?${endpointParams.toString()}`)
             .then(resp => resp.json())
             .then(searchData => {
                 if (searchData.records && searchData.records.length) {
@@ -285,7 +285,7 @@ function navigateTo(navType, xmlID, link=null) {
 function populateNavContents(navType, ids, contents=[], firstXMLid=null, link=null) {
     if (ids.length > 0) {
         let contentType = navMap[navType]['content_type']
-        fetch(`${window.nvs.host}/api/corpus/${window.nvs.corpusID}/${contentType}/${ids[0]}/`)
+        fetch(`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/${contentType}/${ids[0]}/`)
             .then(resp => resp.json())
             .then(contentData => {
                 contents.push(contentData)

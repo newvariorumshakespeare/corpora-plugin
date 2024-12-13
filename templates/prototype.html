@@ -51,27 +51,27 @@
 
 
             window.nvs = {
-                host: '{{ corpora_host }}',
+                corporaHost: '{{ corpora_host }}',
                 corpusID: '{{ corpus_id }}',
                 play: '{{ play.prefix }}',
                 playViewer: null,
-                playViewerURL: '{{ playviewer_url }}',
-                paratextPrefix: '{{ paratext_prefix }}',
+                playViewerURL: {% if site_request %}`/edition/{{ play.prefix }}/`{% else %}`/corpus/{{ corpus_id }}/play-viewer/{{ play.prefix }}/`{% endif %},
+                paratextPrefix: {% if site_request %}''{% else %}`/corpus/{{ corpus_id }}/paratext-viewer/{{ play.prefix }}/`{% endif %},
                 staticPath: '/static',
                 witnesses: null,
                 witnessCount: null,
                 witnessCenturies: null
             }
             window.nvs.endpoints = {
-                line: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/PlayLine/`,
-                lineRange: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/nvs-lines/${window.nvs.play}/`,
-                commentary: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/Commentary/`,
-                note: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/TextualNote/`,
-                search: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/nvs-search/${window.nvs.play}/`,
-                speech: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/Speech/`,
-                witness: `${window.nvs.host}/api/corpus/${window.nvs.corpusID}/nvs-witnesses/${window.nvs.play}/`,
-                witnessMeter: `${window.nvs.host}/nvs/witness-meter/`,
-                minimap: `${window.nvs.host}/corpus/${window.nvs.corpusID}/play-minimap/${window.nvs.play}/`
+                line: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/PlayLine/`,
+                lineRange: {% if site_request %}`${window.location.protocol}//${window.location.host}/lines/${window.nvs.play}/`{% else %}`/api/corpus/${window.nvs.corpusID}/nvs-lines/${window.nvs.play}/`{% endif %},
+                commentary: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/Commentary/`,
+                note: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/TextualNote/`,
+                search: {% if site_request %}`${window.location.protocol}//${window.location.host}/search/${window.nvs.play}/`{% else %}`/api/corpus/${window.nvs.corpusID}/nvs-search/${window.nvs.play}/`{% endif %},
+                speech: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/Speech/`,
+                witness: {% if site_request %}`${window.location.protocol}//${window.location.host}/witnesses/${window.nvs.play}/`{% else %}`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/nvs-witnesses/${window.nvs.play}/`{% endif %},
+                witnessMeter: {% if site_request %}`/witnessmeter/`{% else %}`/nvs/witness-meter/`{% endif %},
+                minimap: {% if site_request %}`/minimap/${window.nvs.play}/`{% else %}`/corpus/${window.nvs.corpusID}/play-minimap/${window.nvs.play}/`{% endif %}
             }
 
             document.addEventListener('DOMContentLoaded', function () {

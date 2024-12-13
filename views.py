@@ -171,6 +171,7 @@ def legacy_playviewer(request, corpus_id=None, play_prefix=None):
 '''
 
 def playviewer(request, corpus_id=None, play_prefix=None):
+    site_request = False
     corpora_url = 'https://' if settings.USE_SSL else 'http://'
     corpora_url += settings.ALLOWED_HOSTS[0]
     playviewer_url = f"/corpus/{corpus_id}/play-viewer/{play_prefix}/"
@@ -211,6 +212,7 @@ def playviewer(request, corpus_id=None, play_prefix=None):
         request,
         'prototype.html',
         {
+            'site_request': site_request,
             'corpora_host': corpora_url,
             'playviewer_url': playviewer_url,
             'paratext_prefix': paratext_prefix,
