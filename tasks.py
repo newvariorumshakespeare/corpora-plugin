@@ -1050,7 +1050,7 @@ def handle_playtext_tag(corpus, play, tag, line_info):
 
             if playtag:
                 playtag.end_location = make_text_location(line_info['line_number'], len(line_info['text']))
-                playtag.save()
+                playtag.save(do_indexing=False, do_linking=False)
 
                 if line_info['current_speech'] and 'speech' in playtag.classes:
                     line_info['current_speech_ended'] = True
@@ -2232,7 +2232,7 @@ def mark_commentary_lemma(corpus, play, note):
             lemma_span.classes = "commentary-lemma-{0}".format(slugify(note.xml_id))
             lemma_span.start_location = starting_location
             lemma_span.end_location = ending_location
-            lemma_span.save()
+            lemma_span.save(do_indexing=False, do_linking=False)
 
         else:
             report += "-----------------------------------------------\n"

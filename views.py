@@ -515,7 +515,6 @@ def play_minimap(request, corpus_id=None, play_prefix=None):
 
 def home(request, corpus_id=None):
     nvs_page = "home"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
@@ -523,9 +522,7 @@ def home(request, corpus_id=None):
         site_request = True
 
     corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'nvs_home'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
+    plays = corpus.get_content('Play', all=True).order_by('+display_order')
 
     return render(
         request,
@@ -533,7 +530,7 @@ def home(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
+            'plays': plays,
             'nvs_page': nvs_page
         }
     )
@@ -567,7 +564,6 @@ def info_about(request, corpus_id=None):
 
 def info_contributors(request, corpus_id=None):
     nvs_page = "info-contributors"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
@@ -575,9 +571,19 @@ def info_contributors(request, corpus_id=None):
         site_request = True
 
     corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_contributors'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
+    contributors = {}
+    people = corpus.get_content('Contributor', all=True).order_by('+category', '+display_order')
+    for person in people:
+        cat = person.category.replace(' ', '').replace('&', '')
+        if person.bio_teaser:
+            person.bio_teaser = person.bio_teaser.replace('<p>', '').replace('</p>', '')
+        if person.bio_remainder:
+            person.bio_remainder = person.bio_remainder.replace('<p>', '').replace('</p>', '')
+        if cat not in contributors:
+            contributors[cat] = []
+        contributors[cat].append(person)
+
+    print(contributors.keys())
 
     return render(
         request,
@@ -585,7 +591,7 @@ def info_contributors(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
+            'contributors': contributors,
             'nvs_page': nvs_page
         }
     )
