@@ -2215,7 +2215,7 @@ REGISTRY = [
         "proxy_field": "",
         "templates": {
             "Label": {
-                "template": "Contributor {{ Contributor.id }}",
+                "template": "{{ Contributor.first_name }} {{ Contributor.last_name }} ({{ Contributor.category }})",
                 "mime_type": "text/html"
             }
         },
