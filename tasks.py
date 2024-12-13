@@ -487,8 +487,6 @@ def delete_play_data(corpus, play_prefix, ingestion_scope):
                 content.delete(track_deletions=False)
             report += '{0} {1}(s) deleted.\n'.format(count, nvs_ct)
 
-        if ingestion_scope in ['Full', 'Playtext Only']:
-            play.delete()
     return report
 
 
