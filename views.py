@@ -31,8 +31,8 @@ def splash(request):
         {}
     )
 
-
-def playviewer(request, corpus_id=None, play_prefix=None):
+'''
+def legacy_playviewer(request, corpus_id=None, play_prefix=None):
     start_time = time.time()
 
     nvs_page = "variorum-viewer"
@@ -168,9 +168,9 @@ def playviewer(request, corpus_id=None, play_prefix=None):
             'nvs_page': nvs_page
         }
     )
+'''
 
-
-def prototype(request, corpus_id=None, play_prefix=None):
+def playviewer(request, corpus_id=None, play_prefix=None):
     corpora_url = 'https://' if settings.USE_SSL else 'http://'
     corpora_url += settings.ALLOWED_HOSTS[0]
     playviewer_url = f"/corpus/{corpus_id}/play-viewer/{play_prefix}/"

@@ -24,5 +24,5 @@ urlpatterns = [
     path('api/corpus/<str:corpus_id>/nvs-edition-lines/<str:play_prefix>/<str:siglum>/', nvs_views.api_edition_lines),
     path('api/corpus/<str:corpus_id>/nvs-witnesses/<str:play_prefix>/', nvs_views.api_witnesses),
 
-    path('corpus/<str:corpus_id>/prototype/<str:play_prefix>/', nvs_views.prototype),
+    #path('corpus/<str:corpus_id>/prototype/<str:play_prefix>/', nvs_views.prototype),
 ]
