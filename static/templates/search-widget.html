@@ -1,0 +1,39 @@
+<div id="search-widget" class="d-none ref-modal">
+    <div id="search-results-div" class="arrow-top">
+        <div class="ref-modal-header d-flex justify-content-between">
+            <span id="search-widget-header">
+                SEARCH RESULTS
+            </span>
+            <span style="white-space: nowrap;">
+                <i id="search-widget-close-button" class="ref-modal-control close"></i>
+            </span>
+        </div>
+        <div class="ref-modal-content d-flex">
+            <div id="search-widget-tabs" class="nav flex-column nav-pills" role="tablist" aria-orientation="vertical">
+                <a class="nav-link active search-widget-tab" id="search-widget-line-tab" data-search_type="line" data-bs-toggle="pill" data-bs-target="#search-widget-lines" role="tab" aria-controls="search-widget-lines" aria-selected="true">Lines (<span class="search-line-total">0</span>)</a>
+                <a class="nav-link search-widget-tab" id="search-widget-variant-tab" data-search_type="variant" data-bs-toggle="pill" data-bs-target="#search-widget-variants" role="tab" aria-controls="explore" aria-selected="false">Variants (<span class="search-variant-total">0</span>)</a>
+                <a class="nav-link search-widget-tab" id="search-widget-commentary-tab" data-search_type="commentary" data-bs-toggle="pill" data-bs-target="#search-widget-commentary" role="tab" aria-controls="search-widget-commentary" aria-selected="false">Commentary (<span class="search-commentary-total">0</span>)</a>
+            </div>
+            <div class="tab-content pl-3 bg-nvs">
+                <div class="tab-pane fade show active" id="search-widget-lines" role="tabpanel" aria-labelledby="search-widget-line-tab">
+                    <a id="search-line-prev" href="#"><i class="fas fa-chevron-left"></i></a>
+                    <span id="search-line-current">0</span> out of
+                    <span class="search-line-total">0</span>
+                    <a id="search-line-next" href="#"><i class="fas fa-chevron-right"></i></a>
+                </div>
+                <div class="tab-pane fade" id="search-widget-variants" role="tabpanel" aria-labelledby="search-widget-variant-tab">
+                    <a id="search-variant-prev" href="#"><i class="fas fa-chevron-left"></i></a>
+                    <span id="search-variant-current">0</span> out of
+                    <span class="search-variant-total">0</span>
+                    <a id="search-variant-next" href="#"><i class="fas fa-chevron-right"></i></a>
+                </div>
+                <div class="tab-pane fade" id="search-widget-commentary" role="tabpanel" aria-labelledby="search-widget-commentary-tab">
+                    <a id="search-commentary-prev" href="#"><i class="fas fa-chevron-left"></i></a>
+                    <span id="search-commentary-current">0</span> out of
+                    <span class="search-commentary-total">0</span>
+                    <a id="search-commentary-next" href="#"><i class="fas fa-chevron-right"></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

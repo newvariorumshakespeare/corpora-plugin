@@ -1379,7 +1379,6 @@
                                      data-scene="{{ line.scene }}"
                                      data-line_number="{{ line.line_number }}"
                                      data-line_label="{{ line.line_label }}"
-                                     data-text="{{ line.text }}"
                                      data-text-length="{{ line.text|length }}"
                                      data-witness_indicators="{{ line.witness_meter }}"
                                      {% if line.alt_xml_ids %}data-alt_xml_ids="{{ line.alt_xml_ids|join:"," }}"{% endif %}
@@ -1398,7 +1397,7 @@
                                                    aria-controls="{{ line.xml_id }}-variant-div">
                                             </a>
                                         {% endif %}
-                                        <div class="w-100">{{ line.rendered_html|safe }}</div>
+                                        <div class="w-100 play-html">{{ line.rendered_html|safe }}</div>
                                     </div>
                                     <div id="{{ line.xml_id }}-number-col" class="col-sm-1 m-0 p-0">
                                         <div class="row no-gutters h-100 bg-nvs">
@@ -1585,6 +1584,7 @@
 
     let characters = {{ characters|safe }};
     let lines = {};
+    let visible_lines = new Set()
     let line_alt_ids = {};
     let line_observer = null;
     let commentary_observer = null;
@@ -2619,7 +2619,7 @@
                 let line_template = () =>
                     `<div class="row no-gutters ref-row">
                         <div class="col-sm-10 m-0 p-0 play-words">
-                            ${line_row.data('text')}
+                            ${line_row.find('div.play-words').text().trim()}
                         </div>
                         <div class="col-sm-1 m-0 p-1 play-label d-flex justify-content-center">
                             ${line_row.data('line_label')}
@@ -2923,8 +2923,9 @@
         let actscene_frame = $('#act-scene-frame');
         const line_observer = new IntersectionObserver(function(entries) {
             entries.map((entry, index) => {
+                let line_id = entry.target.id.replace('-row', '');
                 if (entry.isIntersecting) {
-                    let line_id = entry.target.id.replace('-row', '');
+                    visible_lines.add(line_id)
                     populate_line(line_id);
 
                     if (index === entries.length - 1) {
@@ -2938,7 +2939,7 @@
                             current_act_scene = act_scene;
                         }
                     }
-                }
+                } else { visible_lines.delete(line_id) }
             })
         }, { threshold: [0] });
 
@@ -2997,14 +2998,18 @@
 
     function populate_line(line_id) {
         if (!lines[line_id].populated) {
-            show_notes(line_id);
+            setTimeout(() => {
+                if (visible_lines.has(line_id)) {
+                    show_notes(line_id);
 
-            draw_witness_meter(
-                lines[line_id].witness_indicators,
-                lines[line_id].witness_meter,
-                lines[line_id].witness_column.clientWidth,
-                lines[line_id].witness_column.clientHeight - 8
-            );
+                    draw_witness_meter(
+                        lines[line_id].witness_indicators,
+                        lines[line_id].witness_meter,
+                        lines[line_id].witness_column.clientWidth,
+                        lines[line_id].witness_column.clientHeight - 8
+                    );
+                }
+            }, 500)
         }
     }
 

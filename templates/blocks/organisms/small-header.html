@@ -1,10 +1,25 @@
+{% if shadow_dom %}
+class SmallHeader extends HTMLElement {
+    constructor() {
+        super();
+        this.attachShadow({mode: 'open'})
+    }
+
+    connectedCallback() {
+        this.shadowRoot.innerHTML = `
+<link rel="stylesheet" href="/static/css/nvs.css">
+{% endif %}
 <style>
     .small-header--holder {
+        {% if position_static %}
+        position: static;
+        {% else %}
         position: fixed;
         top: 0;
         left: 0;
-        width: 100%;
         z-index: 10;
+        {% endif %}
+        width: 100%;
         background-color: var(--white);
     }
     @media ( min-width: 992px ) {
@@ -103,7 +118,41 @@
     {% include 'blocks/atoms/navigation.html' %}
   </div>
 </div>
+{% if shadow_dom %}
+        `
+        let holder = this.shadowRoot.querySelector('.small-header--holder')
+        this.shadowRoot.querySelector('button.menu').addEventListener("click", () => {
+            holder.classList.toggle("active")
+        })
 
+        let holders = this.shadowRoot.querySelectorAll('.navigation--holder')
+        holders.forEach(holder => {
+            let dropDowns = holder.querySelectorAll('.navigation--dropdown')
+            dropDowns.forEach(dropDown => {
+                let button = dropDown.firstElementChild;
+                button.addEventListener('click', () => {
+                    if (dropDown.classList.contains('active')) {
+                        dropDown.classList.remove('active')
+                    } else {
+                        let previouslyActive;
+                        if (dropDown.classList.contains('nested')) {
+                            previouslyActive = holder.querySelector('.navigation--dropdown.active.nested')
+                        } else {
+                            previouslyActive = holder.querySelector('.navigation--dropdown.active.parent')
+                        }
+
+                        if (previouslyActive) {
+                            previouslyActive.classList.remove('active')
+                        }
+                        dropDown.classList.add('active')
+                    }
+                })
+            })
+        })
+    }
+}
+customElements.define('small-header', SmallHeader)
+{% else %}
 <script type="text/javascript">
   document.addEventListener('DOMContentLoaded', () => {
     let holder = document.querySelector('.small-header--holder');
@@ -112,3 +161,4 @@
     })
   })
 </script>
+{% endif %}

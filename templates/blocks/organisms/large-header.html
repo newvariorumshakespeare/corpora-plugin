@@ -1,3 +1,14 @@
+{% if shadow_dom %}
+class LargeHeader extends HTMLElement {
+    constructor() {
+        super();
+        this.attachShadow({mode: 'open'})
+    }
+
+    connectedCallback() {
+        this.shadowRoot.innerHTML = `
+<link rel="stylesheet" href="/static/css/nvs.css">
+{% endif %}
 <style>
   .large-header--holder {
     display: none;
@@ -5,9 +16,13 @@
   @media ( min-width: 992px ) {
     .large-header--holder {
       display: block;
+      {% if position_static %}
+      position: static;
+      {% else %}
       position: fixed;
       top: 0;
       left: 0;
+      {% endif %}
       width: 100%;
       z-index: 20;
       background-color: var(--white);
@@ -105,3 +120,33 @@
     </div>
   </div>
 </div>
+{% if shadow_dom %}
+        `
+        let holders = this.shadowRoot.querySelectorAll('.navigation--holder')
+        holders.forEach(holder => {
+            let dropDowns = holder.querySelectorAll('.navigation--dropdown')
+            dropDowns.forEach(dropDown => {
+                let button = dropDown.firstElementChild;
+                button.addEventListener('click', () => {
+                    if (dropDown.classList.contains('active')) {
+                        dropDown.classList.remove('active')
+                    } else {
+                        let previouslyActive;
+                        if (dropDown.classList.contains('nested')) {
+                            previouslyActive = holder.querySelector('.navigation--dropdown.active.nested')
+                        } else {
+                            previouslyActive = holder.querySelector('.navigation--dropdown.active.parent')
+                        }
+
+                        if (previouslyActive) {
+                            previouslyActive.classList.remove('active')
+                        }
+                        dropDown.classList.add('active')
+                    }
+                })
+            })
+        })
+    }
+}
+customElements.define('large-header', LargeHeader)
+{% endif %}

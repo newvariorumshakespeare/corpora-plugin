@@ -487,8 +487,6 @@ def delete_play_data(corpus, play_prefix, ingestion_scope):
                 content.delete(track_deletions=False)
             report += '{0} {1}(s) deleted.\n'.format(count, nvs_ct)
 
-        if ingestion_scope in ['Full', 'Playtext Only']:
-            play.delete()
     return report
 
 
@@ -1050,7 +1048,7 @@ def handle_playtext_tag(corpus, play, tag, line_info):
 
             if playtag:
                 playtag.end_location = make_text_location(line_info['line_number'], len(line_info['text']))
-                playtag.save()
+                playtag.save(do_indexing=False, do_linking=False)
 
                 if line_info['current_speech'] and 'speech' in playtag.classes:
                     line_info['current_speech_ended'] = True
@@ -1931,11 +1929,14 @@ COMMENTARY NOTE INGESTION
 
         primary_witnesses = corpus.get_content("Reference", {'play': play.id, 'ref_type': 'primary_witness'}).order_by('+id')
         pw_sigla = [pw.document.siglum for pw in primary_witnesses]
+        note_sequence = 0
 
         for note_tag in note_tags:
             note = corpus.get_content('Commentary')
             note.play = play.id
             note.xml_id = note_tag['xml:id']
+            note.sequence = note_sequence
+            note_sequence += 1
 
             note.lines, line_err_msg = get_line_ids(
                 note_tag['target'],
@@ -2229,7 +2230,7 @@ def mark_commentary_lemma(corpus, play, note):
             lemma_span.classes = "commentary-lemma-{0}".format(slugify(note.xml_id))
             lemma_span.start_location = starting_location
             lemma_span.end_location = ending_location
-            lemma_span.save()
+            lemma_span.save(do_indexing=False, do_linking=False)
 
         else:
             report += "-----------------------------------------------\n"
