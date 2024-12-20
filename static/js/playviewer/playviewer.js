@@ -447,7 +447,8 @@ export class PlayViewer {
                 // redraw all visible line-level meters
                 if ((lastBreakpoint != null || heightChanged) && !['xs', 'sm'].includes(this.currentBreakpoint)) {
                     this.noteManager.redrawMeters()
-                }
+                    this.render()
+                } else this.render()
             }, 500)
         }, 500)
     }
