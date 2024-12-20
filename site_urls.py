@@ -25,4 +25,5 @@ urlpatterns = [
     path('lines/<str:play_prefix>/<str:starting_line_id>/', nvs_views.api_lines),
     path('lines/<str:play_prefix>/<str:starting_line_id>/<str:ending_line_id>/', nvs_views.api_lines),
     path('edition-lines/<str:play_prefix>/<str:siglum>/', nvs_views.api_edition_lines),
+    path('witnesses/<str:play_prefix>/', nvs_views.api_witnesses),
 ]

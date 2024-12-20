@@ -107,147 +107,23 @@
           <h2>NVS Board</h2>
           <ul class="contributors--grid">
 
+            {% for contrib in contributors.NVSBoard %}
             <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Lena.jpg' %}" alt="Lena Cowen Orlin"/>
-              <h3 class="type-size-0">Lena Cowen Orlin, Chair of the NVS Board</h3>
-              <p class="type-size--1">Lena Cowen Orlin, Chair of the New Variorum Shakespeare Board, is the author of
-                <em>The Private Life of William Shakespeare</em> (2021), <em>Locating Privacy in Tudor London</em> (2009), and <em>Private
-                  Matters and Public Culture in Post-Reformation England</em> (1994). She has edited or co-edited twelve other
-                volumes, including <em>The Bedford Shakespeare</em> (with Russ McDonald, 2014), and is a general editor of the
-                Oxford Shakespeare Topics series, the Arden Shakespeare State of Play series, and the Bloomsbury Early
-                Modern Material Culture series.
+              {% if contrib.profile_pic_url %}<img src="{{ contrib.profile_pic_url }}" alt="{{ contrib.first_name }} {{ contrib.last_name }}"/>{% endif %}
+              <h3 class="type-size-0">{{ contrib.first_name }} {{ contrib.last_name }}, {{ contrib.title|safe }}</h3>
+              {% if contrib.bio_teaser %}
+              <p class="type-size--1">
+                {{ contrib.bio_teaser|safe }}
+                {% if contrib.bio_remainder %}
                 <span class="contributors--more-section">
-                  <span class="contributors--more-content">Currently a Fellow of the Hagler Institute for Advanced Study at Texas
-                  A&M University and Professor Emeritus at Georgetown University, she has also served as Executive
-                  Director of the Shakespeare Association of America (1996-2018) and Executive Director of the Folger
-                  Institute at the Folger Shakespeare Library (1982-1996). She is Vice-Chair of the Board of Trustees of
-                  the Shakespeare Birthplace Trust and a Fellow of the Royal Historical Society (both UK). Her scholarship
-                  has received support from the John Simon Guggenheim Memorial Foundation, the National Humanities Center,
-                  the National Endowment for the Humanities, the Yale Center for British Art, the Center for Advanced
-                  Study in the Visual Arts at the National Gallery of Art, the Bellagio Study Center, and the Bogliasco
-                  Foundation.</span>
+                  <span class="contributors--more-content">{{ contrib.bio_remainder|safe }}</span>
                   <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
                 </span>
+                {% endif %}
               </p>
+              {% endif %}
             </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Heidi_Craig.jpg' %}" alt="Heidi Craig"/>
-              <h3 class="type-size-0">Heidi Craig, NVS Board</h3>
-              <p class="type-size--1">Heidi Craig is Assistant Professor of English (CLTA) at the University of Toronto.
-                She's the author of <em>Theatre Closure and the Paradoxical Rise of English Renaissance Drama in the
-                Civil Wars</em> (Cambridge University Press, 2023), as well as several articles and chapters on dramatic culture
-                during the theatrical prohibition of 1642-1660. She has also begun another book project on rags and
-                rag-pickers in early modern textual culture. With Sonia Massai, she is the co-creator and co-editor of
-                <a href="https://paratexts.folger.edu" target="_blank"><em>Early Modern Dramatic Paratexts</em></a>.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Julia_Flanders.jpg' %}" alt="Julia Flanders"/>
-              <h3 class="type-size-0">Julia Flanders, NVS Board and Consultant</h3>
-              <p class="type-size--1">Julia Flanders is a professor of the practice in English and the director of the
-                Digital Scholarship Group in the Northeastern University Library. She also directs the Women Writers
-                Project and serves as editor in chief of <em>Digital Humanities Quarterly</em>, an open-access,
-                peer-reviewed online journal of digital humanities. She has served as chair of the TEI Consortium and as
-                President of the Association for Computers and the Humanities. Her research interests focus on data
-                modeling, textual scholarship, and humanities data curation.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Alan_Galey.jpg' %}" alt="Alan Galey"/>
-              <h3 class="type-size-0">Alan Galey, NVS Board</h3>
-              <p class="type-size--1">Alan Galey is Associate Professor in the Faculty of Information at the University
-                of Toronto, cross-appointed to the Department of English, and Director of the collaborative program in
-                Book History and Print Culture. His research and teaching are located at the intersection of media
-                studies, the history of books and reading, and digital textual scholarship. His current research focuses
-                on methods for the bibliographical study of digital texts and artifacts, from ebooks to videogames to
-                digital recordings of musical performances. <span class="contributors--more-section">
-                  <span class="contributors--more-content">His first monograph book, <em>The Shakespearean Archive:
-                  Experiments in New Media from the Renaissance to Postmodernity</em>, was published in 2014 by
-                Cambridge
-                University Press. He has published articles in journals including <em>Book History, Shakespeare
-                  Quarterly,
-                  the
-                  Canadian Journal of Communication, Literary and Linguistic Computing, Archivaria, and Archival
-                  Science</em>. He
-                has also contributed chapters to several scholarly edited collections, and co-edited <em>Shakespeare,
-                  the
-                  Bible</em>, and <em>the Form of the Book: Contested Scriptures</em> (with Travis DeCook; Routledge,
-                2011).
-              </span>
-                  <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Laura_Mandell.jpg' %}" alt="Laura Mandell"/>
-              <h3 class="type-size-0">Laura Mandell, NVS Board</h3>
-              <p class="type-size--1">Laura Mandell is the author of <em>Breaking the Book: Print Humanities in the
-                Digital Age</em> (2015), <em>Misogynous Economies: The Business of Literature in Eighteenth-Century
-                Britain</em> (1999), and, recently, “Gendering Digital Literary History: What Counts for Digital
-                Humanities,” in the <em>New Companion to Digital Humanities</em> (Blackwell 2016).
-                <span class="contributors--more-section">
-                  <span class="contributors--more-content">She is Project
-                Director of the <em>Poetess Archive</em>, an online scholarly edition and database of women poets,
-                1750-1900 (http://www.poetessarchive.org), Acquisitions Editor of 18thConnect
-                (http://www.18thConnect.org), and Director of ARC (http://www.ar-c.org), the Advanced Research
-                Consortium overseeing NINES, 18thConnect, and MESA. She spearheaded the Early Modern
-                OCR
-                project or “eMOP” (http://emop.tamu.edu), a project concerned with improving OCR for early modern and
-                18th-c. texts via high performance and cluster computing, and is currently at work on a text-mining
-                project to discover emergent genders in essays and novels comprising the Feminist Controversy debates in
-                England, 1788-1810.
-                </span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Sarah_Neville.jpg' %}" alt="Sarah Neville"/>
-              <h3 class="type-size-0">Sarah Neville, NVS Board</h3>
-              <p class="type-size--1">is Associate Professor in the departments of English and Theatre, Film, and
-                Media Arts at the Ohio State University. She is the author of <em>Early Modern Herbals and the Book
-                Trade: English Stationers and the Commodification of Botany</em> (Cambridge, 2022). She has published articles on early modern English
-                literature, bibliography, theories of textuality, and performance, chiefly examining the ways that
-                authority is negotiated in print, digital, and live media.
-                <span class="contributors--more-section">
-                  <span class="contributors--more-content">
-                She is an assistant editor of the <em>New
-                Oxford Shakespeare</em> (2016-17), for which she edited five plays, associate coordinating editor of the
-                <em>Digital Renaissance Editions</em>, and the creative director of Lord Denney’s Players, an academic
-                theatre company that enables audiences to see how technologies of textual transmission have shaped the
-                reception of Shakespeare’s plays. She is currently at work on an edition of <em>2 Henry VI</em> for Arden
-                Shakespeare Fourth Series.
-                </span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
-
-            <li class="contributors--person-tile">
-                <img src="{% static 'img/contribs/Valerie_Wayne.jpg' %}" alt="Valerie Wayne"/>
-                <h3 class="type-size-0">Valerie Wayne, NVS Board</h3>
-                <p class="type-size--1">Valerie Wayne is Professor Emerita of English at the University of Hawai‘i at
-                    Mānoa. She is the editor of <em>Cymbeline</em> for the Arden Shakespeare Third Series (Bloomsbury,
-                    2017), <em>A Trick to Catch the Old One in Thomas Middleton: The Collected Works</em> (Oxford UP, 2007),
-                    for which she served as Associate General Editor, and Edmund Tilney’s <em>The Flower of Friendship</em>
-                    (Cornell UP, 1992).
-                    <span class="contributors--more-section">
-                  <span class="contributors--more-content">
-                      She has also
-                      edited the essay collections <em>Women’s Labour and the History of the Book in Early Modern England</em>
-                      (Bloomsbury, 2020), <em>Staging Early Modern Romance</em> (Routledge, 2009, with Mary Ellen Lamb), and
-                      <em>The Matter of Difference: Materialist Feminist Criticism of Shakespeare</em> (1991).
-                      Her research has been supported by the Folger Shakespeare Library, the National Endowment of Humanities, and the Bogliasco Foundation. From 2008-12 she served on the MLA Committee on the NVS and from 2017-19 on the NVS Working Group.
-                      She has been a trustee of the Shakespeare Association of America and in 2000 was President of the Society for the Study of Early
-                      Modern Women.
-                  </span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-              </span>
-                </p>
-            </li>
+            {% endfor %}
 
           </ul>
         </div>
@@ -255,28 +131,23 @@
           <h2>General Editors</h2>
           <ul class="contributors--grid">
 
-
+            {% for contrib in contributors.GeneralEditors %}
             <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Paul_Werstine.jpg' %}" alt="Paul Werstine"/>
-              <h3 class="type-size-0">Paul Werstine, General Editor and Editor of the New Variorum Edition of <em>Romeo and Juliet</em></h3>
-              <p class="type-size--1">Paul Werstine is Distinguished University Professor of English at King’s
-                University College, University of Western Ontario, Canada. He has spent his career there teaching
-                Shakespeare and Medieval and Renaissance English Literature. He is co-editor of the Folger Library
-                Edition of Shakespeare’s plays and poems (1992-2010). He is also co-general editor, along with Eric
-                Rasmussen, of the New Variorum Shakespeare Edition.
+              {% if contrib.profile_pic_url %}<img src="{{ contrib.profile_pic_url }}" alt="{{ contrib.first_name }} {{ contrib.last_name }}"/>{% endif %}
+              <h3 class="type-size-0">{{ contrib.first_name }} {{ contrib.last_name }}, {{ contrib.title|safe }}</h3>
+              {% if contrib.bio_teaser %}
+              <p class="type-size--1">
+                {{ contrib.bio_teaser|safe }}
+                {% if contrib.bio_remainder %}
+                <span class="contributors--more-section">
+                  <span class="contributors--more-content">{{ contrib.bio_remainder|safe }}</span>
+                  <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
+                </span>
+                {% endif %}
               </p>
+              {% endif %}
             </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Eric_Rasmussen.jpg' %}" alt="Eric Rasmussen"/>
-              <h3 class="type-size-0">Eric Rasmussen, General Editor and Editor of the New Variorum Edition of <em>Hamlet</em></h3>
-              <p class="type-size--1">Eric Rasmussen is Regents Teaching Professor and Foundation Professor of English
-                at the University of Nevada. He is co-editor with Sir Jonathan Bate of the Royal Shakespeare Company's
-                edition of the <em>Complete Works of William Shakespeare</em>. He is general editor, along with Paul
-                Werstine, of the New Variorum Shakespeare Series and he is a general editor of <em>The Stanford Global
-                  Shakespeare Encyclopedia</em>. He has served on the Board of Trustees of the Shakespeare Association
-                of America and on the Council of the Malone Society.</p>
-            </li>
+            {% endfor %}
 
           </ul>
         </div>
@@ -284,220 +155,23 @@
           <h2>Volume Editors</h2>
           <ul class="contributors--grid">
 
+            {% for contrib in contributors.VolumeEditors %}
             <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/IDJ.jpg' %}" alt="Ian De Jong"/>
-              <h3 class="type-size-0">Ian De Jong, Editor of the New Variorum Edition of <em>The Tempest</em></h3>
-              <p class="type-size--1">Dr. Ian De Jong is an Instructor in the Department of English at the Davidson
-                Academy of Nevada. He is a co-editor of the forthcoming second edition of the <em>RSC Shakespeare:
-                  Complete Works</em>. His work, single-authored and co-authored, has appeared in <em>Shakespeare
-                  Quarterly, ANQ: American Notes and Queries, the British Library’s Discovering Literature: Shakespeare
-                  portal</em>, and <em>The Arden Companion to Shakespeare and Textual Studies</em>. He lives in Reno,
-                Nevada.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/No_Photo.png' %}" alt="Mark Farnsworth"/>
-              <h3 class="type-size-0">Mark Farnsworth, Co-Editor of the New Variorum Edition of <em>Richard The Third</em></h3>
-              <p class="type-size--1">Mark Farnsworth is an English Faculty Member at Brigham Young University-Idaho
-                where he teaches Literature and Composition. He received his PhD in English Literature from the
-                University of Nevada, Reno with a dissertation entitled “John Bale and the National Identity and Church
-                of Tudor England.” Publications to which he has contributed include to <em>The Shakespeare First Folios:
-                  A Descriptive Catalogue</em> and <em>Studying Shakespeare’s Contemporaries</em>.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Lara_Hansen.jpg' %}" alt="Lara Hansen"/>
-              <h3 class="type-size-0">Lara Hansen, Co-Editor of the New Variorum Edition of <em>Richard The Third</em></h3>
-              <p class="type-size--1">Lara Hansen earned her BS, MA, and PhD from the University of Nevada, Reno. Her
-                research primarily focuses on Textual Studies of the Early Modern period. She learned the art of
-                letterpress printing and Book Arts while working in UNR’s Black Rock Press. She has also collated
-                several editions for the New Variorum Hamlet. Lara’s doctoral thesis traced the patterns of First Folio
-                watermarks and presence of uncorrected page states to posit practices of the Jaggards’ print house.
-
+              {% if contrib.profile_pic_url %}<img src="{{ contrib.profile_pic_url }}" alt="{{ contrib.first_name }} {{ contrib.last_name }}"/>{% endif %}
+              <h3 class="type-size-0">{{ contrib.first_name }} {{ contrib.last_name }}, {{ contrib.title|safe }}</h3>
+              {% if contrib.bio_teaser %}
+              <p class="type-size--1">
+                {{ contrib.bio_teaser|safe }}
+                {% if contrib.bio_remainder %}
                 <span class="contributors--more-section">
-                  <span class="contributors--more-content">She has since
-                continued her textual work by taking courses in descriptive bibliography and book collecting from the
-                California Rare Book School and delivering papers for the Shakespeare Association of America and the
-                World
-                Shakespeare Congress. In addition to Lara’s academic preparation, she has twenty years’ experience in
-                computer support. Lara is currently co-editing the New Variorum Edition of <em>Richard the Third</em>
-                with
-                Dr. Mark
-                Farnsworth.
-                </span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Kennedy.jpg' %}" alt="Judith Kennedy"/>
-              <h3 class="type-size-0">Judith Kennedy, Editor of the New Variorum Edition of <em>A Midsummer Night's Dream</em></h3>
-              <p class="type-size--1">Judith M. Kennedy (M.A., BLitt., Oxon.) is a professor emeritus of English at St.
-                Thomas University, Fredericton, NB, Canada. She pursued undergraduate and graduate studies at Somerville
-                College, Oxford. Besides STU, she has taught at Goucher College, Maryland and St. Thomas More College,
-                Saskatoon, Sask., Canada. With her NVS co-editor Richard F. Kennedy, she has published the volume on
-                <em>A Midsummer Night’s Dream</em> in the series <em>Shakespeare: The Critical Tradition</em>. She has
-                also edited or published articles on works of Edmund Spenser, George of Montemayor, Barnabe Googe, and
-                John Ford.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Richard_Kennedy_gray.jpg' %}" alt="Richard Kennedy"/>
-              <h3 class="type-size-0">Richard F. Kennedy, Editor of the New Variorum Edition of <em>A Midsummer Night's Dream</em></h3>
-              <p class="type-size--1">Richard F. Kennedy (B.A. Windsor, M.A. Western, B.Litt. St. Catherine’s College,
-                  Oxford) (1933-2018) was a professor emeritus of English at St. Thomas University, Fredericton, NB
-                  Canada. Besides STU, he taught in France and at St. Thomas More College, Saskatoon, Sask. Canada. He
-                  was co-editor of the volume on <em>A Midsummer Night’s Dream</em> in the series <em>Shakespeare: The Critical
-                  Tradition</em>. His other interests included Seventeenth C. literature, classical epic, and myth in art
-                  and literature.</p>
-              </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/SHMay.jpg' %}" alt="Susan May"/>
-              <h3 class="type-size-0">Susan May, Associate Editor of the New Variorum Edition of <em>A Midsummer Night's
-                Dream</em></h3>
-              <p class="type-size--1">Susan H. May is a professor emeritus of English at Longwood University in
-                Farmville, Virginia. She earned degrees in English from Wellesley College--B.A., the University of
-                Delaware--M.A., and the University of Pennsylvania--Ph.D. Before coming to Longwood she taught at Hood
-                College in Frederick, Maryland.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Dave_Nichols.jpg' %}" alt="David Nichol"/>
-              <h3 class="type-size-0">David Nicol, Assistant Editor of the New Variorum Edition of <em>A Midsummer
-                Night's Dream</em></h3>
-              <p class="type-size--1">David Nicol is an Associate Professor at the Fountain School of Performing Arts,
-                Dalhousie University. He is the author of <em>Middleton and Rowley: Forms of Collaboration in the
-                  Jacobean Playhouse</em> (2012), and has published articles on the plays of William Rowley in <em>Cahiers
-                  Élisabéthains, Comparative Drama, Early Theatre, Medieval and Renaissance Drama in England, Notes and
-                  Queries, Shakespeare Bulletin</em> and <em>Studies in English Literature</em>. He is currently
-                creating an edition of Rowley's <em>All's Lost by Lust</em> for Digital Renaissance Editions.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/J_Schiffer.jpg' %}" alt="James Schiffer"/>
-              <h3 class="type-size-0">James Schiffer, Editor of the New Variorum Edition of <em>Twelfth Night</em></h3>
-              <p class="type-size--1">James Schiffer is Professor Emeritus of English at the State University of New
-                York at New Paltz, where he also served as Dean of the College of Liberal Arts and Sciences from
-                2008-13.  He has published essays on various poems and plays by Shakespeare and has edited collections
-                of essays on <em>Shakespeare's Sonnets</em> (Garland, 1999; Routledge, 2000) and <em>Twelfth Night</em> (Routledge, 2011).
-                <span class="contributors--more-section">
-                  <span class="contributors--more-content">In addition to serving as editor of the NVS <em>Twelfth Night</em>,
-                he is currently editing the forthcoming <em>Twelfth Night:
-                Shakespeare: The Critical Tradition</em> (Bloomsbury/Arden Shakespeare Series, 2024). In 1999, he created
-                and directed a show based on selected Sonnets by Shakespeare, <em>Sonnet Variations</em>, which a cast of
-                students and faculty performed at Hampden-Sydney College in Virginia and other colleges in Virginia and
-                Georgia and at the Edinburgh Fringe Festival in Scotland; he later directed a film version of the show
-                distributed by Films for the Humanities and Sciences (2000).  In addition, Schiffer is author of a
-                monograph on contemporary novelist Richard Stern (Twayne/Macmillan, 1993) and co-author (with Susan
-                Schiffer) of <em>Foul Deeds</em>, an academic mystery novel (St. Martin’s, 1989). Working with James Schiffer on
-                the NVS <em>Twelfth Night</em> are Professor Emerita Gayle Gaskill, Professor Emeritus Walter Cannon,
-                Professor Emeritus Duncan Salkeld, and independent scholar Dorothy Boerner.
-                  </span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/ML_Stapleton.jpg' %}" alt="Michael Stapleton"/>
-              <h3 class="type-size-0">M.L. Stapleton, Editor of the New Variorum Edition of <em>Julius Caesar</em></h3>
-              <p class="type-size--1">M.L. Stapleton is Chapman Distinguished Professor of English at Purdue University,
-                Fort Wayne, a position he has held since 2004. He has been editor of the New Variorum <em>Julius
-                  Caesar</em> since 2005.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Steppat.jpg' %}" alt="Michael Steppat"/>
-              <h3 class="type-size-0">Michael Steppat, Editor of the New Variorum Edition of <em>The Merry Wives of Windsor</em>
-              </h3>
-              <p class="type-size--1">(Dr. phil.) has been serving as Chair of Literature in English at the University
-                of Bayreuth, Germany. He holds an additional Professorial position of honor in Moscow from the Russian
-                Federation’s Ministry of Higher Education and Science, and has been appointed regular international
-                faculty member at Shanghai International Studies University. <span class="contributors--more-section">
-                  <span class="contributors--more-content">He has been awarded recurrent Fellowships
-                at
-                Folger Shakespeare Library, also periodic scholar-in-residence positions at John W. Kluge Center,
-                Library
-                of Congress. He is a project director in the national Excellence Strategy research cluster <em>Africa
-                  Multiple</em>
-                since 2019, the cluster focus being “Travelling Knowledge and Trans*textuality.” Steppat has co-edited
-                the
-                New Variorum <em>Antony and Cleopatra</em> and edited <em>The Merry Wives of Windsor</em>. His other
-                book
-                publications
-                include <em>Literature and Interculturality (3 vols.); Honor, Face and Violence: Cross-Cultural Literary
-                  Representations of Honor Cultures and Face Cultures; Chances of Mischief: Variations of Fortune in
-                  Spenser; The Critical Reception of Shakespeare’s Antony and Cleopatra</em>; editions of several
-                Renaissance
-                Latin dramas; and a monograph on the early work of St. Augustine of Hippo.
-                </span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
-
-            <li class="contributors--person-tile">
-                <img src="{% static 'img/contribs/No_Photo.png' %}" alt="Margaret Jane Kidnie"/>
-                <h3 class="type-size-0">Margaret Jane Kidnie, Editor of the New Variorum Edition of <em>Henry V</em>
-                </h3>
-                <p class="type-size--1">Margaret Jane Kidnie is Professor of English at the University of Western Ontario.
-                    She has written articles on early modern manuscripts, textual studies, and editorial practices, and she
-                    is author of <em>Shakespeare and the Problem of Adaptation</em> and co-editor of <em>Textual Performances: The Modern
-                        Reproduction of Shakespeare’s Drama</em> and <em>Shakespeare and Textual Studies</em>.<span class="contributors--more-section">
-                  <span class="contributors--more-content"> Her edition of <em>Philip Stubbes:
-                      The Anatomie of Abuses</em> won Honorable Mention from the MLA’s Committee on Scholarly Editions, and she
-                      has also edited Jonson for Oxford University Press and Heywood’s <em>A Woman Killed with Kindness</em> for
-                    Arden Early Modern Drama. She is currently editing Hamlet for Arden 4 and co-General Editing (with
-                    Sonia Massai and Gillian Woods) the Cambridge Shakespeare Editions.
-                  </span>
+                  <span class="contributors--more-content">{{ contrib.bio_remainder|safe }}</span>
                   <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                  </span>
-                </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Hardin_Aasand.jpg' %}" alt="Hardin Aasand"/>
-              <h3 class="type-size-0">Hardin Aasand, Editor of the New Variorum Edition of <em>Hamlet</em>
-              </h3>
-              <p class="type-size--1">Hardin Aasand is Professor of English and Chair of the Department of English and
-                Linguistics at Purdue University-Fort Wayne. He has edited a collection of essays titled <em>Stage Directions
-                in Hamlet</em> (2003), an edition of <em>The Winter’s Tale</em> for Broadview Press (2014), and the forthcoming
-                <em>Hamlet: The Critical Tradition</em>, volume 1 from Bloomsbury Press (Arden Shakespeare series).<span class="contributors--more-section">
-                <span class="contributors--more-content"> In addition,
-                he is also one of the co-editors of the <em>New Variorum Hamlet</em> for the <em>New Variorum Shakespeare</em>. He has
-                published essays on a variety of Shakespeare drama, the court masques of Ben Jonson, and Jacobean court
-                entertainments in a number of publications. Currently, he is examining the presence of divine
-                singularities in Donne, Herbert, and Shakespeare and editing <em>The Two Noble Kinsmen</em> for the Internet
-                Shakespeare Editions.</span>
-                  <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                  </span>
+                </span>
+                {% endif %}
               </p>
+              {% endif %}
             </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Nick_Clary.jpg' %}" alt="Nick Clary"/>
-              <h3 class="type-size-0">Nick Clary, Editor of the New Variorum Edition of <em>Hamlet</em>
-              </h3>
-              <p class="type-size--1">Nick Clary (PhD. University of Notre Dame) is a Professor Emeritus of English at Saint Michael’s College,
-                Vermont.  He is co-editor of the Hamletworks.org website and has served on the Board of Directors for
-                the Vermont Shakespeare Festival and on the Advisory Board for SHAKSPER.  Scholarship and research
-                includes essays, book chapters, reviews, and conference presentations that focus mainly on Shakespeare
-                and on <em>Hamlet</em>, in particular.
-              </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Gabriel_Egan.jpg' %}" alt="Gabriel Egan"/>
-              <h3 class="type-size-0">Gabriel Egan, Editor of the New Variorum Edition of <em>The Two Gentlemen of Verona</em>
-              </h3>
-              <p class="type-size--1">Gabriel Egan is Professor of Shakespeare Studies and Director of the Centre for
-                Textual Studies at De Montfort University in Leicester, England. He is a General Editor of the New
-                Oxford Shakespeare (in six volumes, 2016-) and a co-editor of the journal "Theatre Notebook." He teaches
-                letterpress printing and the use of computational methods in literary and historical studies.
-              </p>
-            </li>
+            {% endfor %}
 
           </ul>
         </div>
@@ -506,50 +180,23 @@
           <h2>Digital Editors</h2>
           <ul class="contributors--grid">
 
+            {% for contrib in contributors.DigitalEditors %}
             <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Katayoun_Torabi.jpg' %}" alt="Katayoun Torabi"/>
-              <h3 class="type-size-0">Katayoun Torabi, Digital Editor</h3>
+              {% if contrib.profile_pic_url %}<img src="{{ contrib.profile_pic_url }}" alt="{{ contrib.first_name }} {{ contrib.last_name }}"/>{% endif %}
+              <h3 class="type-size-0">{{ contrib.first_name }} {{ contrib.last_name }}, {{ contrib.title|safe }}</h3>
+              {% if contrib.bio_teaser %}
               <p class="type-size--1">
-                Katayoun Torabi is the Digital Editor of the <em>New Variorum Shakespeare</em> and an Instructional Associate
-                Professor of English at Texas A&M University. She specializes in Old and Middle English Literature,
-                with research and teaching interests in the Digital Humanities.
+                {{ contrib.bio_teaser|safe }}
+                {% if contrib.bio_remainder %}
                 <span class="contributors--more-section">
-                  <span class="contributors--more-content">Her most recent publications include “Modeling a Factoid
-                    Prosopography with TEI and Linked Data,” co-authored with Daniel Schwartz and Nathan Gibson in the
-                    <em>Journal of the Text Encoding Initiative</em>; “Asceticism in Old English and Syriac Soul and Body
-                    Narratives” in <em>Humanities</em>; and “if (not “Quantize, Click, and Conclude”)
-                    {DigitalMethodsInMedievalStudies();},” in <em>Meeting the Medieval in a Digital World</em> (Arc Humanities
-                    Press, 2018). Her current project centers on connections between purgatory and prison in medieval
-                    literature.</span>
+                  <span class="contributors--more-content">{{ contrib.bio_remainder|safe }}</span>
                   <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
                 </span>
+                {% endif %}
               </p>
+              {% endif %}
             </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Kris_May.jpg' %}" alt="Kris May"/>
-              <h3 class="type-size-0">Kris L. May, Associate Digital Editor</h3>
-              <p class="type-size--1">
-                Kris L. May is Associate Digital Editor of <em>The New Variorum Shakespeare</em>. He is former
-                Associate Editor of the World Shakespeare Bibliography and holds a Ph.D. in English.
-              </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Dorothy_Todd.jpg' %}" alt="Dorothy Todd"/>
-              <h3 class="type-size-0">Dorothy Todd, Associate Digital Editor</h3>
-              <p class="type-size--1">
-                Dorothy Todd is an Instructional Assistant Professor of English at Texas A&M University. She
-                specializes in early modern English drama, with research and teaching interests in Shakespeare,
-                material culture, and adaptation and appropriation.<span class="contributors--more-section">
-                  <span class="contributors--more-content">She is currently editing Thomas Heywood’s <em>Londini Status
-                    Pacatus: or, London’s Peaceable Estate</em> (1639 text) for <em>The Map of Early Modern London</em>. Her book
-                    project focuses on how Shakespeare’s plays foreground changing understandings of time and
-                    temporality in the late sixteenth and early seventeenth centuries.</span>
-                  <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
+            {% endfor %}
 
           </ul>
         </div>
@@ -558,56 +205,23 @@
           <h2>Research & Design</h2>
           <ul class="contributors--grid">
 
-
-
+            {% for contrib in contributors.ResearchDesign %}
             <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Bryan_Tarpley.jpg' %}" alt="Bryan Tarpley"/>
-              <h3 class="type-size-0">Bryan Tarpley, Technical Editor</h3>
-              <p class="type-size--1">is Associate Research Scientist for Critical Infrastructure Studies at the Center
-                of Digital Humanities Research at Texas A&M University. His work in the digital humanities involves
-                building data management tools that cater to humanities research. He holds a B.A. in Computer Science
-                and a Ph.D. in English, where his scholarship focuses on affect theory in contemporary literature.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Scott_Kleinman.jpg' %}" alt="Scott Kleinman"/>
-              <h3 class="type-size-0">Scott Kleinman, Associate Technical Editor</h3>
-              <p class="type-size--1">Scott Kleinman is a Professor of English and Director of the Center for Digital
-                Humanities at California State University, Northridge. His research interests are in medieval literature
-                and the history of the English language, and more generally in the application of digital technologies
-                in the study of text.<span class="contributors--more-section">
-                  <span class="contributors--more-content">He was recently co-director of the WhatEvery1Says Project
-                  (https://we1s.ucsb.edu/), which studies media discourse about the Humanities. Currently, he is the lead
-                  designer/developer of the Lexos text analysis software (http://lexos.wheatoncollege.edu/), which lowers
-                  the barriers to entry for Humanities students and scholars new to computational techniques or who wish
-                  to use these techniques for the study of early languages and literatures.</span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
+              {% if contrib.profile_pic_url %}<img src="{{ contrib.profile_pic_url }}" alt="{{ contrib.first_name }} {{ contrib.last_name }}"/>{% endif %}
+              <h3 class="type-size-0">{{ contrib.first_name }} {{ contrib.last_name }}, {{ contrib.title|safe }}</h3>
+              {% if contrib.bio_teaser %}
+              <p class="type-size--1">
+                {{ contrib.bio_teaser|safe }}
+                {% if contrib.bio_remainder %}
+                <span class="contributors--more-section">
+                  <span class="contributors--more-content">{{ contrib.bio_remainder|safe }}</span>
+                  <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
                 </span>
+                {% endif %}
               </p>
+              {% endif %}
             </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Kayley_Hart.jpg' %}" alt="Kayley Hart"/>
-              <h3 class="type-size-0">Kayley Hart, Program Coordinator for CoDHR, Designer</h3>
-              <p class="type-size--1">Kayley Hart is the Program Coordinator for the Center of Digital Humanities Research. She holds an MA in English from Texas A&M University.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Lindsey_Jones.jpg' %}" alt="Hardin Aasand"/>
-              <h3 class="type-size-0">Lindsey Jones, PhD Candidate and Hagler Institute for Advanced Study Research Fellow</h3>
-              <p class="type-size--1">Lindsey Jones is a PhD candidate in the department of English at Texas A&M University.
-                Her scholarly interests include early modern English drama, the history of the book, materiality,
-                canonicity, and the digital humanities. <span class="contributors--more-section">
-                  <span class="contributors--more-content">Her dissertation, tentatively titled “‘With the losers let it
-                sympathize’: Shakespeare in Collection and the Formation of the Canon,” focuses on the relationship
-                between seventeenth-century printed collections of Shakespeare’s works and the creation of the early
-                modern dramatic canon. She has been a doctoral fellow with the World Shakespeare Bibliography Online
-                and with the Early Modern Dramatic Paratexts digital resource and is currently serving as a graduate
-                research fellow working for Texas A&M’s Hagler Institute for Advanced Study.</span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
-                </span>
-              </p>
-            </li>
+            {% endfor %}
 
           </ul>
         </div>
@@ -616,20 +230,23 @@
           <h2>Student Research Assistants</h2>
           <ul class="contributors--grid">
 
+            {% for contrib in contributors.StudentResearchAssistants %}
             <li class="contributors--person-tile">
-              <h3 class="type-size-0">Andrew Hoyt</h3>
-              <p class="type-size--1">Undergraduate Student, Applied Mathematics with a Computer Science emphasis</p>
+              {% if contrib.profile_pic_url %}<img src="{{ contrib.profile_pic_url }}" alt="{{ contrib.first_name }} {{ contrib.last_name }}"/>{% endif %}
+              <h3 class="type-size-0">{{ contrib.first_name }} {{ contrib.last_name }}, {{ contrib.title|safe }}</h3>
+              {% if contrib.bio_teaser %}
+              <p class="type-size--1">
+                {{ contrib.bio_teaser|safe }}
+                {% if contrib.bio_remainder %}
+                <span class="contributors--more-section">
+                  <span class="contributors--more-content">{{ contrib.bio_remainder|safe }}</span>
+                  <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
+                </span>
+                {% endif %}
+              </p>
+              {% endif %}
             </li>
-
-            <li class="contributors--person-tile">
-              <h3 class="type-size-0">Fernando Gonzalez Torres</h3>
-              <p class="type-size--1">Undergraduate Student, Industrial Engineering</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <h3 class="type-size-0">Grace Hoelescher</h3>
-              <p class="type-size--1">Undergraduate Professional and Research Experience Program (UPREP) Student Researcher, English</p>
-            </li>
+            {% endfor %}
 
           </ul>
         </div>
@@ -638,60 +255,23 @@
           <h2>Former Contributors</h2>
           <ul class="contributors--grid">
 
+            {% for contrib in contributors.FormerContributors %}
             <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Matt_Cohen.jpg' %}" alt="Matt Cohen"/>
-              <h3 class="type-size-0">Matt Cohen, NVS Board</h3>
-              <p class="type-size--1">Matt Cohen teaches in the Department of English at the University of
-                Nebraska-Lincoln and is a Fellow in the Center for Digital Research in the Humanities there. He is the
-                author of <em>The Networked Wilderness: Communicating in Early America,</em> and the co-editor, with
-                Jeffrey Glover, of <em>Colonial Mediascapes: Sensory Worlds of the Early Americas</em>. With Kenneth M.
-                Price and Ed Folsom, he co-directs the <em>Walt Whitman Archive</em> (http://www.whitmanarchive.org);
-                and with Price and Stephanie Browner, co-edits the <em>Charles W. Chesnutt Archive</em>
-                (http://www.chesnuttarchive.org). </p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Anne_Burdick.jpg' %}" alt="Anne Burdick"/>
-              <h3 class="type-size-0">Anne Burdick, Site Designer</h3>
-              <p class="type-size--1">Anne Burdick is a Research Professor in the School of Design at the University of
-                Technology Sydney where she is co-director of the Knowledge Design Lab. Her practice-based research
-                explores new forms of knowledge production through the design of media, visualisations, interfaces and
-                publications. <span class="contributors--more-section">
-                  <span class="contributors--more-content">She collaborated with the Commission for Non-Literary Text Types at the Austrian Academy
-                of
-                Sciences on the design of the <em>Austrian Academy Corpus</em>, the <em>Fackel Wörterbuch:
-                  Redensarten</em>, and the <em>Fackel
-                  Schimpfwörterbuch</em>, with N. Katherine Hayles on the design of Writing Machines. She was co-author,
-                with
-                Johanna Drucker, Peter Lunenfeld, Todd Presner, and Jeffrey Schnapp, of <em>Digital_Humanities</em> (MIT
-                Press,
-                2012) and was design editor of electronicbookreview.com for over twenty years.</span>
-                <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
+              {% if contrib.profile_pic_url %}<img src="{{ contrib.profile_pic_url }}" alt="{{ contrib.first_name }} {{ contrib.last_name }}"/>{% endif %}
+              <h3 class="type-size-0">{{ contrib.first_name }} {{ contrib.last_name }}, {{ contrib.title|safe }}</h3>
+              {% if contrib.bio_teaser %}
+              <p class="type-size--1">
+                {{ contrib.bio_teaser|safe }}
+                {% if contrib.bio_remainder %}
+                <span class="contributors--more-section">
+                  <span class="contributors--more-content">{{ contrib.bio_remainder|safe }}</span>
+                  <button class="contributors--more-btn">Read <span class="more">more</span><span class="less">less</span></button>
                 </span>
+                {% endif %}
               </p>
+              {% endif %}
             </li>
-
-            <li class="contributors--person-tile">
-              <img src="{% static 'img/contribs/Will_McLean.jpg' %}" alt="Will McLean"/>
-              <h3 class="type-size-0">Will McLean, Front-end Developer</h3>
-              <p class="type-size--1">Will McLean is a front-end developer and interaction designer who holds a
-                Bachelor's Degree in Design (Visual Communication) from University of Technology, Sydney.</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <h3 class="type-size-0">Jade Gooden, Student Research Assistant</h3>
-              <p class="type-size--1">Undergraduate Student, Anthropology</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <h3 class="type-size-0">Shyam Prasad Nagulavancha, Student Research Assistant</h3>
-              <p class="type-size--1">MS Student, Computer Science</p>
-            </li>
-
-            <li class="contributors--person-tile">
-              <h3 class="type-size-0">Mounika Balivada, Student Research Assistant</h3>
-              <p class="type-size--1">MS Student, Computer Science</p>
-            </li>
+            {% endfor %}
 
           </ul>
         </div>

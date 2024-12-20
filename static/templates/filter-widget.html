@@ -1,0 +1,46 @@
+<div id="filter-widget" class="d-none ref-modal">
+    <div id="filter-div" class="arrow-none">
+        <div class="ref-modal-header d-flex justify-content-between">
+            <span id="filter-widget-header">
+                FILTER LINES
+            </span>
+            <button class="btn d-none" id="filter-apply-button">Apply</button>
+            <span style="white-space: nowrap;">
+                <i id="filter-widget-close-button" class="ref-modal-control close"></i>
+            </span>
+        </div>
+        <div id="filter-widget-no-lines-alert" class="alert alert-danger alert-dismissable fade show mx-2 my-0 align-items-top d-none" role="alert">
+            There are no play lines matching your filter criteria. Please make different character or scene selections.
+            <button type="button" class="close d-flex align-items-top" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="ref-modal-content d-flex">
+            <div id="filter-widget-tabs" class="nav flex-column nav-pills" role="tablist" aria-orientation="vertical">
+                <a class="nav-link active" id="filter-widget-characters-tab" data-bs-toggle="pill" data-bs-target="#filter-widget-characters" role="tab" aria-controls="filter-widget-characters" aria-selected="true">By Character</a>
+                <a class="nav-link" id="filter-widget-actscenes-tab" data-bs-toggle="pill" data-bs-target="#filter-widget-actscenes" role="tab" aria-controls="filter-widget-actscenes" aria-selected="false">By Act / Scene</a>
+            </div>
+            <div id="filter-widget-content-div" class="tab-content pl-3 bg-nvs">
+                <div class="tab-pane fade show active" id="filter-widget-characters" role="tabpanel" aria-labelledby="filter-widget-characters-tab">
+                    <div class="row">
+                        <div class="col-sm-8 form-check">
+                            <input id="line-filter-all-chars" type="checkbox" class="form-check-input" style="color: #212529;" checked>
+                            <label for="line-filter-all-chars" class="form-check-label checkbox-white" style="color: #212529; font-weight: 400;">All</label>
+                        </div>
+                        <div class="col-sm-4">
+                            Speeches
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="filter-widget-actscenes" role="tabpanel" aria-labelledby="search-widget-variant-tab">
+                    <div class="row">
+                        <div class="col-sm-12 form-check">
+                            <input id="line-filter-all-scenes" type="checkbox" class="form-check-input" style="color: #212529;" checked>
+                            <label for="line-filter-all-scenes" class="form-check-label checkbox-white" style="color: #212529; font-weight: 400;">All</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

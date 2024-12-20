@@ -1,0 +1,92 @@
+{% load static %}
+{% load extras %}
+<!doctype html>
+<html lang="en">
+    <head>
+        <!-- Required meta tags -->
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="shortcut icon" type="image/png" href="{% static 'img/favicon.ico' %}"/>
+
+        <!-- CSS -->
+        <link href="{% static 'css/fontawesome.min.css' %}" rel="stylesheet">
+        <link href="{% static 'css/regular.min.css' %}" rel="stylesheet">
+        <link href="{% static 'css/solid.min.css' %}" rel="stylesheet">
+        <link href="{% static 'css/bootstrap5.min.css' %}" rel="stylesheet">
+        <link href="{% static 'css/nvs-playviewer.css' %}" rel="stylesheet">
+    </head>
+    <body>
+        <large-header></large-header>
+        <small-header></small-header>
+
+        <div id="main-container" class="container-fluid h-100">
+            <!-- MAIN HEADER -->
+            <div id="main-header" class="row">
+                <!-- NAV -->
+                <div class="col-sm-12">
+                    <div class="row no-gutters pt-3">
+                        <div class="col-sm-7 d-flex align-items-end">
+                            <div id="play-title">
+                              <a href="{% if site_request %}/{% else %}/corpus/{{ corpus_id }}/home/{% endif %}" style="color: #000000;">HOME</a> <img src="/static/svg/arrow.svg" class="right-chevron" /> {{ play.title }} <img src="/static/svg/arrow.svg" class="right-chevron" /> <span class="title-section" style="white-space: nowrap;">Variorum Reader</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-5 byline-div d-flex align-items-end">
+                            <div class="byline">
+                                EDITORS: {{ editors }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="playviewer-container"></div>
+
+        </div>
+
+        <script src="/static/js/bootstrap5.min.js" type="application/javascript"></script>
+        <script src="/static/js/mark.min.js" type="application/javascript"></script>
+        <script src="/static/js/utilities.js" type="application/javascript"></script>
+        <script type="module">
+            import { PlayViewer } from '/static/js/playviewer/playviewer.js'
+
+
+            window.nvs = {
+                corporaHost: '{{ corpora_host }}',
+                corpusID: '{{ corpus_id }}',
+                play: '{{ play.prefix }}',
+                playViewer: null,
+                playViewerURL: {% if site_request %}`/edition/{{ play.prefix }}/`{% else %}`/corpus/{{ corpus_id }}/play-viewer/{{ play.prefix }}/`{% endif %},
+                paratextPrefix: {% if site_request %}''{% else %}`/corpus/{{ corpus_id }}/paratext-viewer/{{ play.prefix }}/`{% endif %},
+                staticPath: '/static',
+                witnesses: null,
+                witnessCount: null,
+                witnessCenturies: null
+            }
+            window.nvs.endpoints = {
+                line: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/PlayLine/`,
+                lineRange: {% if site_request %}`${window.location.protocol}//${window.location.host}/lines/${window.nvs.play}/`{% else %}`/api/corpus/${window.nvs.corpusID}/nvs-lines/${window.nvs.play}/`{% endif %},
+                commentary: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/Commentary/`,
+                note: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/TextualNote/`,
+                search: {% if site_request %}`${window.location.protocol}//${window.location.host}/search/${window.nvs.play}/`{% else %}`/api/corpus/${window.nvs.corpusID}/nvs-search/${window.nvs.play}/`{% endif %},
+                speech: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/Speech/`,
+                witness: {% if site_request %}`${window.location.protocol}//${window.location.host}/witnesses/${window.nvs.play}/`{% else %}`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/nvs-witnesses/${window.nvs.play}/`{% endif %},
+                witnessMeter: {% if site_request %}`/witnessmeter/`{% else %}`/nvs/witness-meter/`{% endif %},
+                minimap: {% if site_request %}`/minimap/${window.nvs.play}/`{% else %}`/corpus/${window.nvs.corpusID}/play-minimap/${window.nvs.play}/`{% endif %}
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                window.nvs.playViewer = new PlayViewer('playviewer-container', {
+                    doIdleLoading: false,
+                    minLineHeight: 40,
+                    viewerHeight: '90vh',
+                    initialLineCount: 100
+                })
+            })
+
+            // The rest of the script is a couple of web components defined via shadow DOM.
+            // They're "included" as sub-templates
+            {% include 'blocks/organisms/large-header.html' with shadow_dom="True" position_static="True" %}
+            {% include 'blocks/organisms/small-header.html' with shadow_dom="True" position_static="True" %}
+        </script>
+    </body>
+</html>

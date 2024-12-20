@@ -1,6 +1,8 @@
 import time
 import re
+import asyncio
 from django.shortcuts import render, HttpResponse, redirect
+from asgiref.sync import sync_to_async
 from django.http import Http404
 from django.contrib.auth.decorators import login_required
 from django.utils.text import slugify
@@ -29,8 +31,8 @@ def splash(request):
         {}
     )
 
-
-def playviewer(request, corpus_id=None, play_prefix=None):
+'''
+def legacy_playviewer(request, corpus_id=None, play_prefix=None):
     start_time = time.time()
 
     nvs_page = "variorum-viewer"
@@ -91,7 +93,6 @@ def playviewer(request, corpus_id=None, play_prefix=None):
     )
     if note_results and 'records':
         for note in note_results['records']:
-            #notes[note['xml_id']] = note
             for line in note['lines']:
                 if line['xml_id'] not in line_note_map:
                     line_note_map[line['xml_id']] = [{
@@ -167,6 +168,59 @@ def playviewer(request, corpus_id=None, play_prefix=None):
             'nvs_page': nvs_page
         }
     )
+'''
+
+def playviewer(request, corpus_id=None, play_prefix=None):
+    site_request = False
+    corpora_url = 'https://' if settings.USE_SSL else 'http://'
+    corpora_url += settings.ALLOWED_HOSTS[0]
+    playviewer_url = f"/corpus/{corpus_id}/play-viewer/{play_prefix}/"
+    paratext_prefix = f"/corpus/{corpus_id}/paratext-viewer/{play_prefix}/"
+
+    if not corpus_id and hasattr(request, 'corpus_id'):
+        corpus_id = request.corpus_id
+        playviewer_url = f"/edition/{play_prefix}/"
+        paratext_prefix = ""
+        site_request = True
+
+    corpus = get_corpus(corpus_id)
+    play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+    nvs_session = get_nvs_session(request, play_prefix, reset='reset' in request.GET)
+    act_scene = request.GET.get('scene', nvs_session['filter']['act_scene'])
+    character = request.GET.get('character', nvs_session['filter']['character'])
+
+    session_changed = False
+
+    if 'play_id' not in nvs_session or nvs_session['play_id'] != str(play.id):
+        nvs_session['play_id'] = str(play.id)
+        session_changed = True
+    if nvs_session['filter']['character'] != character:
+        nvs_session['filter']['character'] = character
+        nvs_session['filter']['character_lines'] = []
+        session_changed = True
+    if nvs_session['filter']['act_scene'] != act_scene:
+        nvs_session['filter']['act_scene'] = act_scene
+        session_changed = True
+
+    if session_changed:
+        nvs_session['is_filtered'] = character != 'all' or act_scene != 'all'
+        nvs_session['filter']['no_results'] = False
+        filter_session_lines_by_character(corpus, play, nvs_session)
+        set_nvs_session(request, nvs_session, play_prefix)
+
+    return render(
+        request,
+        'prototype.html',
+        {
+            'site_request': site_request,
+            'corpora_host': corpora_url,
+            'playviewer_url': playviewer_url,
+            'paratext_prefix': paratext_prefix,
+            'corpus_id': corpus_id,
+            'play': play,
+            'editors': editors[play_prefix],
+        }
+    )
 
 
 def get_session_lines(corpus, session, only_ids=False):
@@ -180,7 +234,7 @@ def get_session_lines(corpus, session, only_ids=False):
     if session['filter']['character_lines']:
         line_criteria['id__in'] = session['filter']['character_lines']
 
-    lines = corpus.get_content('PlayLine', line_criteria).order_by('line_number')
+    lines = corpus.get_content('PlayLine', line_criteria).exclude('play', 'witness_locations').order_by('line_number')
 
     if session['filter']['act_scene'] != 'all':
         act_scenes = session['filter']['act_scene'].split(',')
@@ -198,6 +252,13 @@ def get_session_lines(corpus, session, only_ids=False):
         lines = lines.only('id', 'xml_id')
     return lines
 
+
+def get_lines_by_range(corpus, play_id, high, low):
+    return corpus.get_content('PlayLine', {
+        'play': play_id,
+        'line_number__gte': low,
+        'line_number__lte': high
+    }).exclude('play', 'witness_locations').order_by('line_number')
 
 def paratext(request, corpus_id=None, play_prefix=None, section=None):
     corpora_url = 'https://' if settings.USE_SSL else 'http://'
@@ -292,7 +353,7 @@ def paratext(request, corpus_id=None, play_prefix=None, section=None):
     )
 
 
-def witness_meter(request, witness_flags, height, width, inactive_color_hex, label_buffer):
+async def witness_meter(request, witness_flags, height, width, inactive_color_hex, label_buffer):
     if height.isdigit() and width.isdigit() and label_buffer.isdigit():
         height = int(height)
         width = int(width)
@@ -365,7 +426,17 @@ def play_minimap(request, corpus_id=None, play_prefix=None):
     corpus = get_corpus(corpus_id)
     play = corpus.get_content('Play', {'prefix': play_prefix})[0]
     nvs_session = get_nvs_session(request, play_prefix)
-    lines = get_session_lines(corpus, nvs_session)
+
+    if _contains(request.GET, ['lowest-line-no', 'highest-line-no']):
+        lines = get_lines_by_range(
+            corpus,
+            nvs_session['play_id'],
+            int(request.GET['highest-line-no']),
+            int(request.GET['lowest-line-no'])
+        )
+    else:
+        lines = get_session_lines(corpus, nvs_session)
+
     highlight_lines = []
     if 'results' in nvs_session['search']:
         highlight_lines = [l['xml_id'] for l in nvs_session['search']['results']['lines']]
@@ -446,7 +517,6 @@ def play_minimap(request, corpus_id=None, play_prefix=None):
 
 def home(request, corpus_id=None):
     nvs_page = "home"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
@@ -454,9 +524,7 @@ def home(request, corpus_id=None):
         site_request = True
 
     corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'nvs_home'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
+    plays = corpus.get_content('Play', all=True).order_by('+display_order')
 
     return render(
         request,
@@ -464,7 +532,7 @@ def home(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
+            'plays': plays,
             'nvs_page': nvs_page
         }
     )
@@ -498,7 +566,6 @@ def info_about(request, corpus_id=None):
 
 def info_contributors(request, corpus_id=None):
     nvs_page = "info-contributors"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
@@ -506,9 +573,19 @@ def info_contributors(request, corpus_id=None):
         site_request = True
 
     corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_contributors'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
+    contributors = {}
+    people = corpus.get_content('Contributor', all=True).order_by('+category', '+display_order')
+    for person in people:
+        cat = person.category.replace(' ', '').replace('&', '')
+        if person.bio_teaser:
+            person.bio_teaser = person.bio_teaser.replace('<p>', '').replace('</p>', '')
+        if person.bio_remainder:
+            person.bio_remainder = person.bio_remainder.replace('<p>', '').replace('</p>', '')
+        if cat not in contributors:
+            contributors[cat] = []
+        contributors[cat].append(person)
+
+    print(contributors.keys())
 
     return render(
         request,
@@ -516,7 +593,7 @@ def info_contributors(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
+            'contributors': contributors,
             'nvs_page': nvs_page
         }
     )
@@ -892,9 +969,14 @@ def api_search(request, corpus_id=None, play_prefix=None):
     nvs_session = get_nvs_session(request, play_prefix)
     results = {}
 
-    quick_search = request.POST.get('quick_search', None)
-    search_type = request.POST.get('search_type', None)
-    search_contents = request.POST.get('search_contents', None)
+    quick_search = request.GET.get('quick_search', None)
+    search_type = request.GET.get('search_type', None)
+    search_contents = request.GET.get('search_contents', None)
+
+    if request.method == 'POST':
+        quick_search = request.POST.get('quick_search', None)
+        search_type = request.POST.get('search_type', None)
+        search_contents = request.POST.get('search_contents', None)
 
     if 'clear' in request.GET:
         nvs_session['search'] = {}
@@ -1111,6 +1193,29 @@ def api_search(request, corpus_id=None, play_prefix=None):
 
     return HttpResponse(
         json.dumps(results),
+        content_type='application/json'
+    )
+
+
+def api_witnesses(request, corpus_id=None, play_prefix=None):
+    wits = {}
+    if not corpus_id and hasattr(request, 'corpus_id'):
+        corpus_id = request.corpus_id
+
+    if play_prefix:
+        corpus = get_corpus(corpus_id)
+        if corpus:
+            play = corpus.get_content('Play', {'prefix': play_prefix}, only=['id'], single_result=True)
+            if play:
+                witnesses, wit_counter, witness_centuries = get_nvs_witnesses(corpus, play)
+                wits = {
+                    'witness_count': wit_counter,
+                    'witnesses': witnesses,
+                    'witness_centuries': witness_centuries
+                }
+
+    return HttpResponse(
+        json.dumps(wits),
         content_type='application/json'
     )
 
