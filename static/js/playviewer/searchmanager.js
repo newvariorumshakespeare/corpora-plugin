@@ -266,7 +266,7 @@ export class SearchManager {
             })
         }
         if (type === 'commentary') {
-            this.commViewer.navigateTo(result.comm_id, () => {
+            window.nvs.playViewer.commViewer.navigateTo(result.comm_id, () => {
                 let result_num = this.nvsSearch.current_commentary_result - 1
                 console.log(`commentary-note-${result.comm_id}`)
                 markUp(
