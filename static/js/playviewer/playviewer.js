@@ -578,6 +578,11 @@ export class PlayViewer {
                 setTimeout(() => {
                     sender.viewerScroll()
                     hideLoadingModal()
+
+                    if (window.location.hash) {
+                        let lineID = window.location.hash.replace('#', '').replace('-row', '')
+                        sender.navigateTo(lineID, false)
+                    }
                 }, 500)
             })
 
