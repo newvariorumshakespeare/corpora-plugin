@@ -2937,11 +2937,11 @@ def render_lines_html(corpus, play, starting_line_no=None, ending_line_no=None):
     tags = corpus.get_content('PlayTag', {'play': play.id}, exclude=['play'])
 
     if not starting_line_no is None:
-        lines = lines.filter(Q(line_number__gte=starting_line_no) & Q(line_number__lte=ending_line_no))
+        lines = lines.filter(Q(line_number__gte=starting_line_no) & Q(line_number__lt=ending_line_no + 1))
         tags = tags.filter(
             (
-                (Q(start_location__gte=starting_line_no) & Q(start_location__lte=ending_line_no)) |
-                (Q(end_location__gte=starting_line_no) & Q(end_location__lte=ending_line_no))
+                (Q(start_location__gte=starting_line_no) & Q(start_location__lt=ending_line_no + 1)) |
+                (Q(end_location__gte=starting_line_no) & Q(end_location__lt=ending_line_no + 1))
             ) |
             (
                 Q(start_location__lt=starting_line_no) &
