@@ -12,6 +12,7 @@ from django.utils.html import strip_tags
 from django.utils.text import slugify
 from string import punctuation
 from random import randint
+from math import floor
 from mongoengine.queryset.visitor import Q
 
 
@@ -2231,6 +2232,51 @@ def mark_commentary_lemma(corpus, play, note):
             lemma_span.start_location = starting_location
             lemma_span.end_location = ending_location
             lemma_span.save(do_indexing=False, do_linking=False)
+
+            # the following bit of code is intended to address a situation that arises where
+            # commentary tags are inserted into a line such that it creates an overlap problem.
+
+            if floor(lemma_span.start_location) == floor(lemma_span.end_location):
+                fellow_tags = corpus.get_content('PlayTag', {
+                    'play': play.id,
+                    'start_location__gte': floor(starting_location),
+                    'end_location__lt': floor(ending_location) + 1
+                })
+
+                for fellow_tag in fellow_tags:
+                    if fellow_tag.start_location < starting_location and \
+                            fellow_tag.end_location > starting_location and \
+                            fellow_tag.end_location < ending_location:
+
+                        print('fixing overlapping tag')
+
+                        new_tag = corpus.get_content('PlayTag')
+                        new_tag.play = play.id
+                        new_tag.name = fellow_tag.name
+                        new_tag.classes = fellow_tag.classes
+                        new_tag.start_location = fellow_tag.start_location
+                        new_tag.end_location = starting_location
+                        new_tag.save(do_indexing=False, do_linking=False)
+
+                        fellow_tag.start_location = starting_location
+                        fellow_tag.save(do_indexing=False, do_linking=False)
+
+                    elif fellow_tag.start_location > starting_location and \
+                            fellow_tag.start_location < ending_location and \
+                            fellow_tag.end_location > ending_location:
+
+                        print('fixing overlapping tag')
+
+                        new_tag = corpus.get_content('PlayTag')
+                        new_tag.play = play.id
+                        new_tag.name = fellow_tag.name
+                        new_tag.classes = fellow_tag.classes
+                        new_tag.start_location = fellow_tag.start_location
+                        new_tag.end_location = ending_location
+                        new_tag.save(do_indexing=False, do_linking=False)
+
+                        fellow_tag.start_location = ending_location
+                        fellow_tag.save(do_indexing=False, do_linking=False)
 
         else:
             report += "-----------------------------------------------\n"
