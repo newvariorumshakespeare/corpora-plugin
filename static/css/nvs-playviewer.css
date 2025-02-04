@@ -580,7 +580,7 @@ comspan.highlight {
     cursor: pointer;
 }
 
-span.castlist:not(:empty) {
+castlist.castlist:not(:empty) {
     width: 100%;
 }
 h3.heading {
@@ -593,58 +593,69 @@ h3.heading {
     text-align: center;
 }
 
-span.castgroup {
+castgroup.castgroup {
     margin-left: 10px;
     margin-right: 5px;
 }
 
-span.role {
+role.role {
     font-weight: bold;
 }
 
-span.roledesc {
+roledesc.roledesc {
     font-style: italic;
     display: inline-block;
     margin-left: 5px;
 }
 
-span.stage {
+stage.stage {
     font-style: italic;
     margin-right: auto !important;
     margin-left: 10px !important;
 }
 
-span.speaker-abbreviation {
+speaker.speaker-abbreviation {
     font-style: italic;
     display: inline-block;
     margin-right: 10px;
     margin-left: 10px;
 }
 
-span.foreign, span.entity {
+foreign.foreign, name.entity, .italicized {
     font-style: italic;
 }
 
+.align-center {
+    text-align: center;
+    display: block;
+    background-color: inherit;
+    border-bottom: inherit;
+}
+
+.align-right {
+    float: right;
+}
+
 /* LINEATION MARKERS */
-span.open-bracket-marker, span.close-bracket-marker, span.open-half-bracket-marker, span.close-half-bracket-marker, span.asterix-marker, span.pipe-marker {
+playlinemarker.open-bracket-marker, playlinemarker.close-bracket-marker, playlinemarker.open-half-bracket-marker, playlinemarker.close-half-bracket-marker, playlinemarker.asterix-marker, playlinemarker.pipe-marker {
     color: var(--nvs-mid-gray);
 }
-span.open-bracket-marker::after {
+playlinemarker.open-bracket-marker::after {
     content: "[";
 }
-span.close-bracket-marker::after {
+playlinemarker.close-bracket-marker::after {
     content: "]";
 }
-span.open-half-bracket-marker::after {
+playlinemarker.open-half-bracket-marker::after {
     content: "⸢";
 }
-span.close-half-bracket-marker::after {
+playlinemarker.close-half-bracket-marker::after {
     content: "⸣";
 }
-span.asterix-marker::after {
+playlinemarker.asterix-marker::after {
     content: "*";
 }
-span.pipe-marker::after {
+playlinemarker.pipe-marker::after {
     content: "|";
 }
 
@@ -1033,6 +1044,7 @@ mark {
     font-family: 'HalyardTextBook';
     max-height: calc(40vh);
     overflow-y: scroll;
+    overscroll-behavior: contain;
 }
 
 .ref-modal-content .comm-heading {
