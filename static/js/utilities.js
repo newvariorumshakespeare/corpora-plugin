@@ -217,7 +217,7 @@ function navigateTo(navType, xmlID, link=null) {
                     data.forEach(line => { linesHTML += lineTemplate(line) })
 
                     let controls = `
-                        <a href="${window.nvsPlayViewerURL}#${startID}-row" target="_blank"><img src="/static/img/controls/Modal-NEWTAB.svg"
+                        <a href="${window.nvs.playViewerURL}#${startID}-row" target="_blank"><img src="/static/img/controls/Modal-NEWTAB.svg"
                             class="ref-modal-control"
                             border="0"
                         ></a>`
@@ -249,6 +249,23 @@ function navigateTo(navType, xmlID, link=null) {
             let controls = `<a href="${biblioURL}" target="_blank"><i class="ref-modal-control new-tab"></i></a>`
             displayNavModal(title, window.nvs.witnesses[xmlID].bibliographic_entry, link, controls)
         }
+    } else if (navType === 'note_tn' && window.nvs.playViewer) {
+        fetch(`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/TextualNote/?f_xml_id=${xmlID}&only=lines.xml_id`)
+            .then(resp => resp.json())
+            .then(searchData => {
+                console.log(searchData)
+                if (searchData.records && searchData.records.length) {
+                    if (searchData.records[0].lines && searchData.records[0].lines.length) {
+                        let textualNoteLineID = searchData.records[0].lines[0].xml_id
+                        window.nvs.playViewer.navigateTo(textualNoteLineID, true, function() {
+                            console.log('navigated to tn')
+                        })
+                    }
+                }
+            })
+    } else if (navType === 'url') {
+        if (!xmlID.startsWith('http')) xmlID = `https://${xmlID}`
+        window.open(xmlID, '_blank').focus()
     } else {
         if (!navMap.hasOwnProperty(navType)) navType = 'anchor'
 
@@ -265,7 +282,7 @@ function navigateTo(navType, xmlID, link=null) {
 
         let contentType = navMap[navType]['content_type']
         let searchField = navMap[navType]['xml_id_field']
-        searchParams[`t_${searchField}`] = xmlIDs.join('__')
+        searchParams[`f_${searchField}${xmlIDs.length > 1 ? '|' : ''}`] = xmlIDs.join('__')
 
         let endpointParams = new URLSearchParams()
         Object.keys(searchParams).forEach(key => endpointParams.set(key, searchParams[key]))
