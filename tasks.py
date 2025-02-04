@@ -907,8 +907,6 @@ def handle_playtext_tag(corpus, play, tag, line_info):
             for child in tag.children:
                 handle_playtext_tag(corpus, play, child, line_info)
 
-        # todo: anchor (with marker attribute)
-
         # div for act/scene
         elif tag.name == 'div' and _contains(tag.attrs, ['type', 'n']):
             # if this is the first act/scene, make sure last line of DP is created
@@ -933,18 +931,28 @@ def handle_playtext_tag(corpus, play, tag, line_info):
         else:
             playtag = None
             playtag_name = None
-            playtag_classes = None
+            playtag_classes = []
+
+            # rend
+            if 'rend' in tag.attrs:
+                if 'italic' in tag['rend']:
+                    playtag_classes.append('italicized')
+
+                if 'align(center)' in tag['rend']:
+                    playtag_classes.append('align-center')
+                elif 'align(right)' in tag['rend']:
+                    playtag_classes.append('align-right')
 
             # stage
             if tag.name == 'stage' and 'type' in tag.attrs:
-                playtag_name = 'span'
-                playtag_classes = 'stage {0}'.format(tag['type'])
+                playtag_name = 'stage'
+                playtag_classes += ['stage', tag['type']]
 
             # sp
             elif tag.name == 'sp' and 'who' in tag.attrs:
-                playtag_name = 'span'
+                playtag_name = 'speech'
                 speaking = tag['who'].replace('#', '')
-                playtag_classes = 'speech {0}'.format(speaking)
+                playtag_classes += ['speech', speaking]
 
                 line_info['current_speech'] = corpus.get_content('Speech')
                 line_info['current_speech'].play = play.id
@@ -955,93 +963,94 @@ def handle_playtext_tag(corpus, play, tag, line_info):
 
             # name
             elif tag.name == 'name':
-                playtag_name = 'span'
-                playtag_classes = 'entity'
+                playtag_name = 'name'
+                playtag_classes.append('entity')
 
             # head
             elif tag.name == 'head':
                 playtag_name = 'h3'
-                playtag_classes = 'heading'
+                playtag_classes.append('heading')
 
             # speaker
             elif tag.name == 'speaker':
-                playtag_name = 'span'
-                playtag_classes = 'speaker-abbreviation'
+                playtag_name = 'speaker'
+                playtag_classes.append('speaker-abbreviation')
 
             # castList
             elif tag.name == 'castList' and 'xml:id' in tag.attrs:
-                playtag_name = 'span'
-                playtag_classes = 'castlist {0}'.format(tag['xml:id'])
+                playtag_name = 'castlist'
+                playtag_classes += ['castlist', tag['xml:id']]
 
             # castGroup
             elif tag.name == 'castGroup' and 'rend' in tag.attrs:
-                playtag_name = 'span'
+                playtag_name = 'castgroup'
                 matches = re.findall(r'[^\(]*\(([^\)]*)\)', tag['rend'])
                 if matches:
-                    playtag_classes = 'castgroup {0}'.format(matches[0].replace('#', ''))
+                    playtag_classes += ['castgroup', matches[0].replace('#', '')]
 
             # castItem
             elif tag.name == 'castItem':
-                playtag_name = 'span'
-                playtag_classes = 'castitem'
+                playtag_name = 'castitem'
+                playtag_classes.append('castitem')
 
             # role
             elif tag.name == 'role' and 'xml:id' in tag.attrs:
-                playtag_name = 'span'
-                playtag_classes = 'role {0}'.format(tag['xml:id'])
+                playtag_name = 'role'
+                playtag_classes += ['role', tag['xml:id']]
 
             # roleDesc
             elif tag.name == 'roleDesc':
-                playtag_name = 'span'
-                playtag_classes = 'roledesc'
+                playtag_name = 'roledesc'
+                playtag_classes.append('roledesc')
 
                 if 'xml:id' in tag.attrs:
-                    playtag_classes += " {0}".format(tag['xml:id'])
+                    playtag_classes.append(tag['xml:id'])
 
             # foreign
             elif tag.name == 'foreign':
-                playtag_name = 'span'
-                playtag_classes = 'foreign'
+                playtag_name = 'foreign'
+                playtag_classes.append('foreign')
                 if 'xml:lang' in tag.attrs:
-                    playtag_classes += " {0}".format(tag['xml:lang'])
+                    playtag_classes.append(tag['xml:lang'])
 
             # p rend=italic
-            elif tag.name == 'p' and 'rend' in tag.attrs and tag['rend'] == 'italic':
-                playtag_name = 'i'
-                playtag_classes = 'italicized'
+            #elif tag.name in ['p', 'hi'] and 'rend' in tag.attrs and tag['rend'] == 'italic':
+            #    playtag_name = 'i'
+            #    playtag_classes = 'italicized'
 
             # lg
             elif tag.name == 'lg' and 'type' in tag.attrs:
-                playtag_name = 'span'
-                playtag_classes = 'linegroup {0}'.format(tag['type'])
-                if 'rend' in tag.attrs and tag['rend'] == 'italic':
-                    playtag_classes += " italicized"
+                playtag_name = 'linegroup'
+                playtag_classes += ['linegroup', tag['type']]
 
             # anchor type=marker
             elif tag.name == 'anchor' and 'type' in tag.attrs and tag['type'] == 'marker' and 'marker' in tag.attrs:
-                playtag_name = 'span'
+                playtag_name = 'playlinemarker'
 
                 if tag['marker'] == '[':
-                    playtag_classes = 'open-bracket-marker'
+                    playtag_classes.append('open-bracket-marker')
                 elif tag['marker'] == ']':
-                    playtag_classes = 'close-bracket-marker'
+                    playtag_classes.append('close-bracket-marker')
                 elif tag['marker'] == '⸢':
-                    playtag_classes = 'open-half-bracket-marker'
+                    playtag_classes.append('open-half-bracket-marker')
                 elif tag['marker'] == '⸣':
-                    playtag_classes = 'close-half-bracket-marker'
+                    playtag_classes.append('close-half-bracket-marker')
                 elif tag['marker'] == '*':
-                    playtag_classes = 'asterix-marker'
+                    playtag_classes.append('asterix-marker')
                 elif tag['marker'] == '|':
-                    playtag_classes = 'pipe-marker'
+                    playtag_classes.append('pipe-marker')
 
             else:
                 line_info['unhandled_tags'].append(tag.name)
 
-            if playtag_name:
+            if playtag_name or playtag_classes:
+                if not playtag_name:
+                    playtag_name = 'span'
+
                 playtag = corpus.get_content('PlayTag')
                 playtag.play = play.id
                 playtag.name = playtag_name
-                playtag.classes = playtag_classes
+                playtag.classes = ' '.join(playtag_classes)
                 playtag.start_location = make_text_location(line_info['line_number'], len(line_info['text']))
 
             for child in tag.children:
@@ -1054,7 +1063,7 @@ def handle_playtext_tag(corpus, play, tag, line_info):
                 if line_info['current_speech'] and 'speech' in playtag.classes:
                     line_info['current_speech_ended'] = True
 
-                elif playtag.classes == 'speaker-abbreviation':
+                elif 'speaker-abbreviation' in playtag_classes:
                     if line_info['current_speech'] and len(line_info['current_speech'].speaking) == 1:
                         char_id = line_info['current_speech'].speaking[0]
                         for char in line_info['characters']:
