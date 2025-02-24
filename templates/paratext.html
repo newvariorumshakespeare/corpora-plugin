@@ -293,7 +293,7 @@
     .rend-alignleft, .rend-alignleft p { text-align: left !important; }
     .rend-alignright, .rend-alignright p { text-align: right !important; }
     .rend-allcaps { text-transform: uppercase; }
-    .rend_smcaps { font-variant: small-caps; font-weight: bold; }
+    .rend_smcaps, .rend-smcaps, .siglum { font-variant: small-caps; font-weight: bold; }
 
     .type-marginalia.nvs-seg, .note-margin {
         float: right;
@@ -859,21 +859,21 @@
 <script src="{% static 'js/jquery-3.3.1.min.js' %}"></script>
 <script src="{% static 'js/popper.min.js' %}"></script>
 <script src="{% static 'js/bootstrap.min.js' %}"></script>
-<script src="{% static 'js/corpora.js' %}"></script>
+<!--<script src="{% static 'js/corpora.js' %}"></script>-->
 <script src="{% static 'js/utilities.js' %}"></script>
 <script type="application/javascript">
+    /*
     let corpora;
-    let corpus_id = "{{ corpus_id }}";
-    let corpora_url = "{{ corpora_url }}";
-    let play_prefix = "{{ play.prefix }}";
-    let play_id = "{{ play.id }}";
-    let witnesses = {{ witnesses|safe }};
-    let playviewer_url = {% if site_request %}`/edition/${play_prefix}/`{% else %}`/corpus/${corpus_id}/play-viewer/${play_prefix}/`{% endif %};
-    let paratext_prefix = {% if site_request %}''{% else %}`/corpus/${corpus_id}/paratext-viewer/${play_prefix}/`{% endif %};
-    let lines_endpoint = {% if site_request %}`${window.location.protocol}//${window.location.host}/lines/${play_prefix}/`{% else %}`/api/corpus/${corpus_id}/nvs-lines/${play_prefix}/`{% endif %};
-    let ref_modal_counter = 0;
+    let corpus_id = "{{ corpus_id }}"
+    let corpora_url = "{{ corpora_url }}"
+    let play_prefix = "{{ play.prefix }}"
+    let play_id = "{{ play.id }}"
+    let playviewer_url = {% if site_request %}`/edition/${play_prefix}/`{% else %}`/corpus/${corpus_id}/play-viewer/${play_prefix}/`{% endif %}
+    let paratext_prefix = {% if site_request %}''{% else %}`/corpus/${corpus_id}/paratext-viewer/${play_prefix}/`{% endif %}
+    let lines_endpoint = {% if site_request %}`${window.location.protocol}//${window.location.host}/lines/${play_prefix}/`{% else %}`/api/corpus/${corpus_id}/nvs-lines/${play_prefix}/`{% endif %}
+    let ref_modal_counter = 0
 
-    /*let nav_map = {
+    let nav_map = {
         'lb': {
             'content_type': 'PlayLine',
             'xml_id_field': 'xml_id',
@@ -955,7 +955,7 @@
     }
 
     $(document).ready(function() {
-        corpora = new Corpora({'csrf_token': "{{ csrf_token }}"{% if site_request %},'host': '{{ corpora_url }}'{% endif %}});
+        //corpora = new Corpora({'csrf_token': "{{ csrf_token }}"{% if site_request %},'host': '{{ corpora_url }}'{% endif %}});
 
         // Place statement about digital edition of NVS before textual note section
         let textual_note_explanation = $('#textual_note_explanation_start');
