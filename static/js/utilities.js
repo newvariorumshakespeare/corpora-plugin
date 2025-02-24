@@ -142,7 +142,7 @@ var navMap = {
         'title': "BIBLIOGRAPHY",
         'title_plural': "BIBLIOGRAPHY",
         'scroll_anchor': false,
-        'filter_play': false,
+        'filter_play': true,
     },
     'siglum': {
         'content_type': 'Reference',
@@ -151,7 +151,7 @@ var navMap = {
         'title': "COLLATED EDITION",
         'title_plural': "COLLATED EDITIONS",
         'scroll_anchor': false,
-        'filter_play': false,
+        'filter_play': true,
     },
     'note_cn': {
         'content_type': 'Commentary',
@@ -183,6 +183,9 @@ var navMap = {
 }
 function navigate_to(navType, xmlID, link=null) { navigateTo(navType, xmlID, link) }
 function navigateTo(navType, xmlID, link=null) {
+    // clean up xml id
+    xmlID = xmlID.replace(/#/g, '')
+
     // handle navigation to playlines
     if (navType === 'lb') {
         let startID = xmlID
@@ -231,10 +234,22 @@ function navigateTo(navType, xmlID, link=null) {
             return
         }
 
-        if (!xmlID.startsWith('s_')) xmlID = `s_${xmlID.toLowerCase().replace('&', '')}`
+        let xmlIDOptions = []
+        if (!xmlID.startsWith('s_')){
+            if (xmlID.includes('&')) {
+                xmlIDOptions.push(`s_${xmlID.toLowerCase().replace('&', 'and')}`)
+                xmlIDOptions.push(`s_${xmlID.toLowerCase().replace('&', 'and')}_${window.nvs.play}`)
+            }
+            xmlIDOptions.push(`s_${xmlID.toLowerCase().replace('&', '')}`)
+            xmlIDOptions.push(`s_${xmlID.toLowerCase().replace('&', '')}_${window.nvs.play}`)
+        }
 
-        if(!(xmlID in window.nvs.witnesses)) {
-            xmlID = `${xmlID}_${window.nvs.play}`
+        for (let x = 0; x < xmlIDOptions.length; x++) {
+            let xmlIDOption = xmlIDOptions[x]
+            if (xmlIDOption in window.nvs.witnesses) {
+                xmlID = xmlIDOption
+                break
+            }
         }
 
         if (xmlID in window.nvs.witnesses) {
@@ -293,7 +308,7 @@ function navigateTo(navType, xmlID, link=null) {
                 if (searchData.records && searchData.records.length) {
                     let ids = searchData.records.map(record => record.id)
                     populateNavContents(navType, ids, [], xmlIDs[0], link)
-                } else if (navType == 'div') {
+                } else if (navType === 'div') {
                     navigateTo('anchor', xmlID, link)
                 }
             })
