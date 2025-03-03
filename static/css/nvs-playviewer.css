@@ -542,6 +542,12 @@ body.mobile #playtext-col::-webkit-scrollbar-thumb {
     font-size: 12px;
 }
 
+.line-label-link {
+    color: var(--nvs-mid-gray);
+    font-family: inherit;
+    font-size: inherit;
+}
+
 body.mobile .play-label {
     border-left: unset;
     border-right: unset;

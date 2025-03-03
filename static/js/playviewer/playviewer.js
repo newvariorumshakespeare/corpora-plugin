@@ -285,7 +285,7 @@ export class PlayViewer {
                         <div id="${line.xml_id}-number-col" class="col-1 m-0 p-0">
                             <div class="row gx-0 h-100 bg-nvs">
                                 <div class="col-12 col-md-8 offset-md-4 play-label d-flex justify-content-center align-items-center">
-                                    ${line.line_label}
+                                    <a href="${window.nvs.playViewerURL}#${lineID}-row" target="_blank" class="line-label-link">${line.line_label}</a>
                                 </div>
                             </div>
                         </div>
