@@ -361,6 +361,10 @@ Ingestion Scope:    {4}
                         job.set_status('running', percent_complete=85)
 
                     if ingestion_scope in ['Full', 'Playtext Only', 'Commentary Only']:
+                        time_it("Lineating Transcendent Tags")
+                        lineate_transcendent_tags(corpus, play)
+                        time_it("Lineating Transcendent Tags", True)
+
                         time_it("Rendering Playline HTML")
                         line_count = corpus.get_content('PlayLine', {'play': play.id}, all=True).count()
                         line_cursor = 0
@@ -1123,6 +1127,104 @@ def make_text_location(line_number, char_index):
         text_location = '0' + text_location
     text_location = "{0}.{1}".format(line_number, text_location)
     return float(text_location)
+
+
+def lineate_transcendent_tags(corpus, play):
+    #lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_number', 'text'])
+    tags = corpus.get_content('PlayTag', {'play': play.id}).order_by('+start_location', '-end_location')
+    tags = tags.no_cache()
+    tags = tags.batch_size(10)
+
+    for tag in tags:
+        tag_start_line_no = floor(tag.start_location)
+        tag_end_line_no = floor(tag.end_location)
+
+        if tag_start_line_no < tag_end_line_no:
+            original_end_location = tag.end_location
+
+            lines = corpus.get_content('PlayLine', {
+                'play': play.id,
+                'line_number__gte': tag_start_line_no,
+                'line_number__lte': tag_end_line_no
+            }, only=['line_number', 'text']).order_by('+line_number')
+
+            for line in lines:
+                if line.line_number == tag_start_line_no:
+                    if tag.start_location == make_text_location(tag_start_line_no, len(line.text)):
+                        tag.start_location = make_text_location(tag_start_line_no + 1, 0)
+                        tag_start_line_no = floor(tag.start_location)
+                        if tag_start_line_no == tag_end_line_no:
+                            tag.save(do_indexing=False, do_linking=False)
+                            handle_overlapping_tags(corpus, play, tag)
+                            break
+
+                    tag.end_location = make_text_location(line.line_number, len(line.text))
+                    tag.save(do_indexing=False, do_linking=False)
+                    handle_overlapping_tags(corpus, play, tag)
+                else:
+                    new_tag = corpus.get_content('PlayTag')
+                    new_tag.name = tag.name
+                    new_tag.classes = tag.classes + ' continuation'
+                    new_tag.play = play.id
+                    might_overlap = False
+
+                    if line.line_number == tag_end_line_no:
+                        new_tag.start_location = make_text_location(line.line_number, 0)
+                        new_tag.end_location = original_end_location
+                        might_overlap = True
+                    else:
+                        new_tag.start_location = make_text_location(line.line_number, 0)
+                        new_tag.end_location = make_text_location(line.line_number, len(line.text))
+
+                    new_tag.save(do_indexing=False, do_linking=False)
+                    if might_overlap:
+                        handle_overlapping_tags(corpus, play, new_tag)
+
+
+def handle_overlapping_tags(corpus, play, overlapper):
+    starting_line_num = floor(overlapper.start_location)
+    ending_line_num = floor(overlapper.end_location)
+
+    if starting_line_num == ending_line_num:
+        starting_location = overlapper.start_location
+        ending_location = overlapper.end_location
+
+        fellow_tags = corpus.get_content('PlayTag', {
+            'play': play.id,
+            'start_location__gte': starting_line_num,
+            'end_location__lt': ending_line_num + 1
+        })
+
+        for fellow_tag in fellow_tags:
+            if fellow_tag.start_location < starting_location and \
+                    fellow_tag.end_location > starting_location and \
+                    fellow_tag.end_location < ending_location:
+
+                new_tag = corpus.get_content('PlayTag')
+                new_tag.play = play.id
+                new_tag.name = fellow_tag.name
+                new_tag.classes = fellow_tag.classes
+                new_tag.start_location = fellow_tag.start_location
+                new_tag.end_location = starting_location
+                new_tag.save(do_indexing=False, do_linking=False)
+
+                fellow_tag.start_location = starting_location
+                fellow_tag.save(do_indexing=False, do_linking=False)
+
+            elif fellow_tag.start_location > starting_location and \
+                    fellow_tag.start_location < ending_location and \
+                    fellow_tag.end_location > ending_location:
+
+                new_tag = corpus.get_content('PlayTag')
+                new_tag.play = play.id
+                new_tag.name = fellow_tag.name
+                new_tag.classes = fellow_tag.classes
+                new_tag.start_location = fellow_tag.start_location
+                new_tag.end_location = ending_location
+                new_tag.save(do_indexing=False, do_linking=False)
+
+                fellow_tag.start_location = ending_location
+                fellow_tag.save(do_indexing=False, do_linking=False)
 
 
 def parse_textualnotes_file(corpus, play, textualnotes_file_path, line_id_map, ordered_line_ids, tn_xml_id=None):
@@ -2237,55 +2339,14 @@ def mark_commentary_lemma(corpus, play, note):
             lemma_span = corpus.get_content('PlayTag')
             lemma_span.play = play.id
             lemma_span.name = 'comspan'
-            lemma_span.classes = "commentary-lemma-{0}".format(slugify(note.xml_id))
+            lemma_span.classes = "commentary-lemma-{0}".format(note.xml_id.replace('.', '--'))
             lemma_span.start_location = starting_location
             lemma_span.end_location = ending_location
             lemma_span.save(do_indexing=False, do_linking=False)
 
             # the following bit of code is intended to address a situation that arises where
             # commentary tags are inserted into a line such that it creates an overlap problem.
-
-            if floor(lemma_span.start_location) == floor(lemma_span.end_location):
-                fellow_tags = corpus.get_content('PlayTag', {
-                    'play': play.id,
-                    'start_location__gte': floor(starting_location),
-                    'end_location__lt': floor(ending_location) + 1
-                })
-
-                for fellow_tag in fellow_tags:
-                    if fellow_tag.start_location < starting_location and \
-                            fellow_tag.end_location > starting_location and \
-                            fellow_tag.end_location < ending_location:
-
-                        print('fixing overlapping tag')
-
-                        new_tag = corpus.get_content('PlayTag')
-                        new_tag.play = play.id
-                        new_tag.name = fellow_tag.name
-                        new_tag.classes = fellow_tag.classes
-                        new_tag.start_location = fellow_tag.start_location
-                        new_tag.end_location = starting_location
-                        new_tag.save(do_indexing=False, do_linking=False)
-
-                        fellow_tag.start_location = starting_location
-                        fellow_tag.save(do_indexing=False, do_linking=False)
-
-                    elif fellow_tag.start_location > starting_location and \
-                            fellow_tag.start_location < ending_location and \
-                            fellow_tag.end_location > ending_location:
-
-                        print('fixing overlapping tag')
-
-                        new_tag = corpus.get_content('PlayTag')
-                        new_tag.play = play.id
-                        new_tag.name = fellow_tag.name
-                        new_tag.classes = fellow_tag.classes
-                        new_tag.start_location = fellow_tag.start_location
-                        new_tag.end_location = ending_location
-                        new_tag.save(do_indexing=False, do_linking=False)
-
-                        fellow_tag.start_location = ending_location
-                        fellow_tag.save(do_indexing=False, do_linking=False)
+            handle_overlapping_tags(corpus, play, lemma_span)
 
         else:
             report += "-----------------------------------------------\n"
