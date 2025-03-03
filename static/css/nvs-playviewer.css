@@ -585,6 +585,9 @@ comspan.highlight {
     border-bottom: solid 1px var(--nvs-dark-yellow);
     cursor: pointer;
 }
+comspan.highlight.continuation {
+    background-color: azure;
+}
 
 castlist.castlist:not(:empty) {
     width: 100%;

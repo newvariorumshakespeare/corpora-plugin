@@ -57,11 +57,10 @@ export class PlayViewer {
                     if (el.classList.contains('ref-modal')) {
                         searchForTargets = false
                     } else if (searchForTargets && el.tagName === 'COMSPAN' && this.highlightCommLemmas) {
-                        let commInfo = el.className
-                        let commID = commInfo
+                        let commID = el.classList.item(0)
                             .replace('commentary-lemma-', '')
-                            .replace('highlight', '')
-                            .replace(' ', '')
+                            .replace('--', '.')
+
                         this.commViewer.navigateTo(commID)
                         searchForTargets = false
                     } else if (searchForTargets && el.classList.contains('comm-heading')) {
@@ -89,8 +88,8 @@ export class PlayViewer {
                 } else {
                     this.highlightCommLemmas = false
                     forElsMatching('comspan.highlight', (el) => {
-                        el.removeEventListener('mouseenter', this.comspanHover)
-                        el.removeEventListener('mouseleave', this.comspanLeave)
+                        el.removeEventListener('mouseover', this.comspanHover)
+                        el.removeEventListener('mouseout', this.comspanLeave)
                         el.classList.remove('highlight')
                     })
                 }
@@ -141,8 +140,8 @@ export class PlayViewer {
                 el.classList.add('highlight')
 
                 // add the hover events
-                el.addEventListener('mouseenter', this.comspanHover)
-                el.addEventListener('mouseleave', this.comspanLeave)
+                el.addEventListener('mouseover', this.comspanHover)
+                el.addEventListener('mouseout', this.comspanLeave)
             }
         })
     }
@@ -272,7 +271,7 @@ export class PlayViewer {
                         </a>
                     `
                 }
-                
+
                 lineRow.innerHTML = `
                     <div class="row gx-0 flex-grow-1">
                         <div id="${line.xml_id}-witness-col" class="d-none d-md-flex col-md-4 m-0 p-0 witness-meter${hasVariants ? ' clickable' : ''}">
@@ -634,18 +633,24 @@ export class PlayViewer {
     }
 
     comspanHover(e){
-        e.target.classList.forEach(commClass => {
-            if (commClass !== 'highlight') {
+        forElsMatching('comspan.highlight', highlighted => highlighted.removeAttribute('style'))
+
+        let target = e.target
+        while (target.parentElement && target.tagName !== 'COMSPAN') target = target.parentElement
+
+        target.classList.forEach(commClass => {
+            if (commClass.startsWith('commentary-lemma')) {
                 forElsMatching(`.${commClass}`, hovered => {
                     hovered.style.borderBottom = 'solid 1px var(--nvs-primary-orange) !important'
                 })
             }
         })
+        e.stopPropagation()
     }
 
     comspanLeave(e) {
         e.target.classList.forEach(commClass => {
-            if (commClass !== 'highlight') {
+            if (commClass.startsWith('commentary-lemma')) {
                 forElsMatching(`.${commClass}`, hovered => hovered.removeAttribute('style'))
             }
         })
