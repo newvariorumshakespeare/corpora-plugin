@@ -343,7 +343,7 @@ def paratext(request, corpus_id=None, play_prefix=None, section=None):
             'corpus_id': corpus_id,
             'site_request': site_request,
             'nvs_page': nvs_page,
-            'corpora_url': corpora_url,
+            'corpora_host': corpora_url,
             'play': play,
             'witnesses': json.dumps(witnesses),
             'section': section,
