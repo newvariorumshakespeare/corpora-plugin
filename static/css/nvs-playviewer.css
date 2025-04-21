@@ -636,7 +636,7 @@ foreign.foreign, name.entity, .italicized {
 
 .align-center {
     text-align: center;
-    display: block;
+    display: block!important;
     background-color: inherit;
     border-bottom: inherit;
 }
