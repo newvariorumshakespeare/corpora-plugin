@@ -1355,53 +1355,57 @@ TEXTUAL NOTES INGESTION
                                 excluding_sigla.append(siglum_label)
 
                         else:
-                            if 'etc.' in str(child.string):
-                                textual_variant.witness_formula += note_exclusion_formula
+                            if child.name == 'note':
+                                child.name = 'hi'
+                                textual_variant.witness_formula += tei_to_html(child)
                             else:
-                                textual_variant.witness_formula += str(child.string)
+                                if 'etc.' in str(child.string):
+                                    textual_variant.witness_formula += note_exclusion_formula
+                                else:
+                                    textual_variant.witness_formula += str(child.string)
 
-                            formula = str(child.string).strip()
+                                formula = str(child.string).strip()
 
-                            # handle '+' ranges
-                            if formula.startswith('+') or 'etc.' in formula:
-                                include_all_following = True
+                                # handle '+' ranges
+                                if formula.startswith('+') or 'etc.' in formula:
+                                    include_all_following = True
+                                    if '(−' in formula:
+                                        exclusion_started = True
+
+                                # handle exclusions
                                 if '(−' in formula:
                                     exclusion_started = True
+                                elif formula.startswith(')') and exclusion_started:
+                                    exclusion_started = False
 
-                            # handle exclusions
-                            if '(−' in formula:
-                                exclusion_started = True
-                            elif formula.startswith(')') and exclusion_started:
-                                exclusion_started = False
+                                # handle '-' ranges
+                                elif formula.startswith('-'):
+                                    next_siglum_ends = True
 
-                            # handle '-' ranges
-                            elif formula.startswith('-'):
-                                next_siglum_ends = True
+                                # use ',' to delimit the need to add individual sigla or add ranges
+                                if ',' in formula:
+                                    if starting_siglum and not exclusion_started:
 
-                            # use ',' to delimit the need to add individual sigla or add ranges
-                            if ',' in formula:
-                                if starting_siglum and not exclusion_started:
-
-                                    # the "get_witness_ids" function will handle:
-                                    # '-' ranges
-                                    # '+' ranges
-                                    # exclusions
-                                    # individual sigla
-                                    textual_variant.witnesses.extend(
-                                        get_witness_ids(
-                                            witnesses,
-                                            witness_groups,
-                                            starting_siglum,
-                                            ending_witness_siglum=ending_siglum,
-                                            include_all_following=include_all_following,
-                                            excluding_sigla=excluding_sigla + note_exclusions
+                                        # the "get_witness_ids" function will handle:
+                                        # '-' ranges
+                                        # '+' ranges
+                                        # exclusions
+                                        # individual sigla
+                                        textual_variant.witnesses.extend(
+                                            get_witness_ids(
+                                                witnesses,
+                                                witness_groups,
+                                                starting_siglum,
+                                                ending_witness_siglum=ending_siglum,
+                                                include_all_following=include_all_following,
+                                                excluding_sigla=excluding_sigla + note_exclusions
+                                            )
                                         )
-                                    )
 
-                                    starting_siglum = None
-                                    ending_siglum = None
-                                    include_all_following = False
-                                    excluding_sigla = []
+                                        starting_siglum = None
+                                        ending_siglum = None
+                                        include_all_following = False
+                                        excluding_sigla = []
 
                     # handle any further additions of sigla at the end of the formula
                     if starting_siglum:
@@ -1728,6 +1732,17 @@ def perform_variant_transform(corpus, note, variant):
                 # ellipsis in lemma only
                 elif ellipsis in lemma:
                     lemma_delimiters = lemma.split(ellipsis)
+                    lemma_start_index = original_text.find(lemma_delimiters[0])
+
+                    if lemma_start_index > -1:
+                        lemma_search_cursor = lemma_start_index + len(lemma_delimiters[0])
+                        lemma_end_index = original_text[lemma_search_cursor:].find(lemma_delimiters[1])
+
+                        if lemma_end_index > -1:
+                            lemma_end_index += lemma_search_cursor + len(lemma_delimiters[1])
+                            lemma = original_text[lemma_start_index:lemma_end_index]
+
+                    '''
                     lemma_parts = []
                     adding_lemma_parts = False
                     for word in original_text.split():
@@ -1739,8 +1754,9 @@ def perform_variant_transform(corpus, note, variant):
                             break
                         elif adding_lemma_parts:
                             lemma_parts.append(word)
-
+                    
                     lemma = " ".join(lemma_parts)
+                    '''
 
                 # replacement/insertion w/ lemma
                 if not result and lemma in original_text:
@@ -1796,6 +1812,23 @@ def perform_variant_transform(corpus, note, variant):
                 result = original_text.replace(lemma, "")
 
     if original_text and result:
+        line_words = original_text.split()
+        variant_words = result.split()
+        matcher = difflib.SequenceMatcher(None, line_words, variant_words)
+
+        diffed_html = []
+        for diff_type, a_start, a_end, b_start, b_end in matcher.get_opcodes():
+            if diff_type == 'equal':
+                diffed_html.append(' '.join(line_words[a_start:a_end]))
+            elif diff_type in ['replace', 'insert']:
+                segment = ' '.join(variant_words[b_start:b_end])
+                diffed_html.append(f'<span class="difference">{segment}</span>')
+            elif diff_type == 'delete':
+                diffed_html.append('<span class="difference"> </span>')
+
+        result = ' '.join(diffed_html)
+
+        '''
         differ = difflib.Differ()
         differences = list(differ.compare(original_text, result))
         difference_started = False
@@ -1823,6 +1856,7 @@ def perform_variant_transform(corpus, note, variant):
 
         if difference_started:
             result += "</span>"
+        '''
 
     if not result:
         return None, False
