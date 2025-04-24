@@ -2495,6 +2495,7 @@ def handle_paratext_tag(tag, pt, pt_data):
         'speaker': 'span:speaker',
         'trailer': 'div:trailer',
         'label': 'b:label',
+        'app': 'span:apparatus',
         'figure': 'div:figure',
         'salute': 'span:salute',
         'abbr': 'dt:abbr',
@@ -2511,7 +2512,7 @@ def handle_paratext_tag(tag, pt, pt_data):
     }
 
     silent = [
-        'app', 'appPart', 'lem', 'wit', 'rdgDesc',
+        'appPart', 'lem', 'wit', 'rdgDesc',
         'rdg', 'rs', 'epigraph',
         'body', 'foreign', 'cit',
     ]
