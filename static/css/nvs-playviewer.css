@@ -17,7 +17,7 @@
     --nvs-yellow-gray: #3b371c;
     --nvs-dark-blue: #2a69a1;
     --nvs-light-blue: #6c9ecc;
-    --nvs-lightest-blue: rgb(235, 244, 252);
+    --nvs-lightest-blue: #EBF4FC;
     --nvs-primary-orange: #CC5F38;
     --nvs-secondary-orange: #F1B06E;
     --nvs-burnt-orange: #d87448;
@@ -586,7 +586,7 @@ comspan.highlight {
     cursor: pointer;
 }
 comspan.highlight.continuation {
-    background-color: azure;
+    background-color: var(--nvs-lightest-blue);
 }
 
 castlist.castlist:not(:empty) {
@@ -643,6 +643,10 @@ foreign.foreign, name.entity, .italicized {
 
 .align-right {
     float: right;
+}
+
+.rend-italic {
+    font-style: italic;
 }
 
 /* LINEATION MARKERS */
