@@ -117,7 +117,7 @@ export class PlayViewer {
                         lineRow = getEl(`tln_${lineNo}-row`)
                         if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
                         else {
-                            fetch(`${window.nvs.endpoints.line}?f_alt_xml_ids=tln_${lineNo}&page-size=1&only=xml_id`)
+                            fetch(`${window.nvs.endpoints.line}?f_play.prefix=${window.nvs.play}&f_alt_xml_ids=tln_${lineNo}&page-size=1&only=xml_id`)
                                 .then(res => res.json())
                                 .then(lineInfo => {
                                     if (lineInfo.records && lineInfo.records.length === 1) {
