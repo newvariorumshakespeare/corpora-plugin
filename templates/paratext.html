@@ -54,7 +54,7 @@
         font-weight: 500;
         margin-top: 10px;
         margin-bottom: 10px;
-        line-height: 22px;
+        /*line-height: 22px;*/
     }
     .paratext h1 {
         font-family: "Halyard Text", sans-serif;
@@ -115,15 +115,20 @@
         margin: 10px 0 10px 30px;
         font-size: 15px;
         line-height: 20px;
-        text-align: left;
-        padding-left: 120px;
-        position: relative;
+        display: flex;
+        flex-direction: row;
     }
     .pt_textual_note > .ref-lb:first-child {
-        position: absolute;
-        top: 0;
-        left: 0;
+        flex: 0 0 120px;
+        padding-right: 15px;
     }
+    .pt_textual_note > .apparatus:first-child {
+        margin-left: 120px;
+    }
+    .apparatus .under-caret {
+        font-size: 24px;
+    }
+
     .ref-lb,
     .ref {
         color: var(--blue);
@@ -143,7 +148,7 @@
         text-decoration: underline;
         font-weight: 700;
         font-variant-numeric: normal;
-        font-size: 14px;
+        /*font-size: 14px;*/
         cursor: pointer;
     }
     .witness-list {
@@ -170,6 +175,9 @@
         text-decoration: none;
     }
 
+    .name {
+        text-transform: capitalize;
+    }
     .name, .author, .editor, .note-toggler {
         color: var(--blue);
         font-weight: 700;
