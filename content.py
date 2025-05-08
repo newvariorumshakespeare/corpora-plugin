@@ -664,7 +664,7 @@ REGISTRY = [
                 "indexed": False,
                 "unique": False,
                 "multiple": False,
-                "in_lists": True,
+                "in_lists": False,
                 "type": "keyword",
                 "choices": [],
                 "cross_reference_type": "",
