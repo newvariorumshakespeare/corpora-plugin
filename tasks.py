@@ -782,6 +782,8 @@ PLAY TEXT INGESTION
             'character_id_map': {},
             'current_speech': None,
             'current_speech_ended': False,
+            'sibling_playtag_id': None,
+            'self_closing_pair_sibling': None,
             'text': ''
         }
 
@@ -891,6 +893,8 @@ def handle_playtext_tag(corpus, play, tag, line_info):
             line_info['line_xml_id'] = tag['xml:id']
             line_info['line_label'] = tag['n']
             line_info['line_alt_xml_ids'] = []
+            line_info['sibling_playtag_id'] = None
+            line_info['self_closing_pair_sibling'] = None
 
             tln_matches = re.findall(r'(tln_\d\d\d\d)', tag['xml:id'])
             if tln_matches:
@@ -1017,11 +1021,6 @@ def handle_playtext_tag(corpus, play, tag, line_info):
                 if 'xml:lang' in tag.attrs:
                     playtag_classes.append(tag['xml:lang'])
 
-            # p rend=italic
-            #elif tag.name in ['p', 'hi'] and 'rend' in tag.attrs and tag['rend'] == 'italic':
-            #    playtag_name = 'i'
-            #    playtag_classes = 'italicized'
-
             # lg
             elif tag.name == 'lg' and 'type' in tag.attrs:
                 playtag_name = 'linegroup'
@@ -1032,17 +1031,17 @@ def handle_playtext_tag(corpus, play, tag, line_info):
                 playtag_name = 'playlinemarker'
 
                 if tag['marker'] == '[':
-                    playtag_classes.append('open-bracket-marker')
+                    playtag_classes.append('open-bracket-marker self-closing')
                 elif tag['marker'] == ']':
-                    playtag_classes.append('close-bracket-marker')
+                    playtag_classes.append('close-bracket-marker self-closing')
                 elif tag['marker'] == '⸢':
-                    playtag_classes.append('open-half-bracket-marker')
+                    playtag_classes.append('open-half-bracket-marker self-closing')
                 elif tag['marker'] == '⸣':
-                    playtag_classes.append('close-half-bracket-marker')
+                    playtag_classes.append('close-half-bracket-marker self-closing')
                 elif tag['marker'] == '*':
-                    playtag_classes.append('asterix-marker')
+                    playtag_classes.append('asterix-marker self-closing')
                 elif tag['marker'] == '|':
-                    playtag_classes.append('pipe-marker')
+                    playtag_classes.append('pipe-marker self-closing')
 
             else:
                 line_info['unhandled_tags'].append(tag.name)
@@ -1056,6 +1055,24 @@ def handle_playtext_tag(corpus, play, tag, line_info):
                 playtag.name = playtag_name
                 playtag.classes = ' '.join(playtag_classes)
                 playtag.start_location = make_text_location(line_info['line_number'], len(line_info['text']))
+
+                if 'self-closing' in playtag.classes and 'pipe-marker' not in playtag.classes:
+                    if line_info['self_closing_pair_sibling'] == 'missing':
+                        line_info['self_closing_pair_sibling'] = None
+
+                    elif line_info['self_closing_pair_sibling']:
+                        playtag.sibling_tag = line_info['self_closing_pair_sibling']
+                        line_info['self_closing_pair_sibling'] = None
+
+                    elif line_info['sibling_playtag_id']:
+                        playtag.sibling_tag = line_info['sibling_playtag_id']
+                        line_info['self_closing_pair_sibling'] = playtag.sibling_tag
+
+                    else:
+                        line_info['self_closing_pair_sibling'] = 'missing'
+
+                playtag.save(do_indexing=False, do_linking=False)
+                line_info['sibling_playtag_id'] = str(playtag.id)
 
             for child in tag.children:
                 handle_playtext_tag(corpus, play, child, line_info)
@@ -3051,29 +3068,28 @@ def render_lines_html(corpus, play, starting_line_no=None, ending_line_no=None):
     taggings = {}
     for tag in tags:
         if tag.start_location not in taggings:
-            taggings[tag.start_location] = {'open': [], 'close': []}
+            taggings[tag.start_location] = {'open': [], 'close': [], 'empty': []}
         if tag.end_location not in taggings:
-            taggings[tag.end_location] = {'open': [], 'close': []}
+            taggings[tag.end_location] = {'open': [], 'close': [], 'empty': []}
 
         open_html = tag.label.replace('[', '<').replace(']', '>')
         close_html = "</{0}>".format(open_html[1:open_html.index(" ")])
 
         if tag.start_location == tag.end_location:
-            if 'empty' not in taggings[tag.start_location]:
-                taggings[tag.start_location]['empty'] = []
             taggings[tag.start_location]['empty'].append({
                 'html': open_html + close_html,
-                'id': str(tag.id)
+                'id': str(tag.id),
+                'sibling_tag': tag.sibling_tag
             })
 
         else:
             taggings[tag.start_location]['open'].append({
                 'html': open_html,
-                'id': str(tag.id)
+                'id': str(tag.id),
             })
             taggings[tag.end_location]['close'].insert(0, {
                 'html': close_html,
-                'id': str(tag.id)
+                'id': str(tag.id),
             })
 
     del tags
@@ -3105,11 +3121,32 @@ def render_lines_html(corpus, play, starting_line_no=None, ending_line_no=None):
     del lines
     taggings.clear()
 
+def remove_tag_from_list(tag_list, tag_id):
+    if tag_id:
+        return [t for t in tag_list if t['id'] != tag_id]
+    return tag_list
 
 def place_tags(location, line, taggings, open_tags):
     if location in taggings:
+        # handle any self-closing tags that occur before existing tags
+        placed_empty_tag_id = None
+        for empty_tag in taggings[location]['empty']:
+            if empty_tag['sibling_tag'] is None:
+                line.rendered_html += empty_tag['html']
+                placed_empty_tag_id = empty_tag['id']
+        taggings[location]['empty'] = remove_tag_from_list(taggings[location]['empty'], placed_empty_tag_id)
+
+        # handle closing tags
         for closing_tag in taggings[location]['close']:
+            placed_empty_tag_id = None
+            for empty_tag in taggings[location]['empty']:
+                if empty_tag['sibling_tag'] == closing_tag['id']:
+                    line.rendered_html += empty_tag['html']
+                    placed_empty_tag_id = empty_tag['id']
+            taggings[location]['empty'] = remove_tag_from_list(taggings[location]['empty'], placed_empty_tag_id)
+
             line.rendered_html += closing_tag['html']
+
             remove_tag_index = -1
             for tag_index in range(0, len(open_tags)):
                 if open_tags[tag_index]['id'] == closing_tag['id']:
@@ -3118,13 +3155,21 @@ def place_tags(location, line, taggings, open_tags):
             if remove_tag_index > -1:
                 open_tags.pop(remove_tag_index)
 
+        # handle opening tags
         for opening_tag in taggings[location]['open']:
             line.rendered_html += opening_tag['html']
             open_tags.append(opening_tag)
 
-        if 'empty' in taggings[location]:
+            placed_empty_tag_id = None
             for empty_tag in taggings[location]['empty']:
-                line.rendered_html += empty_tag['html']
+                if empty_tag['sibling_tag'] == opening_tag['id']:
+                    line.rendered_html += empty_tag['html']
+                    placed_empty_tag_id = empty_tag['id']
+            taggings[location]['empty'] = remove_tag_from_list(taggings[location]['empty'], placed_empty_tag_id)
+
+        # handle any remaining self-closing tags
+        for empty_tag in taggings[location]['empty']:
+            line.rendered_html += empty_tag['html']
 
 
 def time_it(timer_name, stop=False):

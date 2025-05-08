@@ -659,6 +659,25 @@ REGISTRY = [
                 "inherited": False
             },
             {
+                "name": "sibling_tag",
+                "label": "Sibling Tag",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "keyword",
+                "choices": [],
+                "cross_reference_type": "",
+                "has_intensity": False,
+                "language": None,
+                "autocomplete": False,
+                "synonym_file": None,
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
                 "name": "play",
                 "label": "Play",
                 "indexed": True,
