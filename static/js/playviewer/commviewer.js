@@ -11,25 +11,31 @@ export class CommentaryViewer {
     }
 
     noteTemplate(comm, area, swathLoader) {
-        return `
-            <div id="commentary-container-${comm.xml_id}" class="row g-0"><div class="col-sm-12">
-            <div class="row">
-                <div id="commentary-note-${comm.xml_id}"
-                        class="col-sm-12 comm-heading${swathLoader ? ' swath-loader' : ''}"
-                        data-xml_id="${comm.xml_id}"
-                        data-first_line="${comm.lines.length ? comm.lines[0].xml_id : ''}"
-                        data-status="stub"
-                        data-area="${area}"
-                        data-sequence="${comm.sequence}"
-                        data-corpora_id="${comm.id}">
-                    <span class="comm-indicator">n. ${comm.line_label}:</span> ${comm.subject_matter}
+        let html = ''
+
+        if (comm.lines) {
+            html = `
+                <div id="commentary-container-${comm.xml_id}" class="row g-0"><div class="col-sm-12">
+                <div class="row">
+                    <div id="commentary-note-${comm.xml_id}"
+                            class="col-sm-12 comm-heading${swathLoader ? ' swath-loader' : ''}"
+                            data-xml_id="${comm.xml_id}"
+                            data-first_line="${comm.lines.length ? comm.lines[0].xml_id : ''}"
+                            data-status="stub"
+                            data-area="${area}"
+                            data-sequence="${comm.sequence}"
+                            data-corpora_id="${comm.id}">
+                        <span class="comm-indicator">n. ${comm.line_label}:</span> ${comm.subject_matter}
+                    </div>
                 </div>
-            </div>
-            <div class="row">
-                <div id="commentary-content-${comm.xml_id}" class="col-sm-12 comm-block">${comm.contents}</div>
-            </div>
-            </div></div>
-        `
+                <div class="row">
+                    <div id="commentary-content-${comm.xml_id}" class="col-sm-12 comm-block">${comm.contents}</div>
+                </div>
+                </div></div>
+            `
+            this.commsLoaded.add(comm.xml_id)
+        }
+        return html
     }
 
     async navigateTo(commID, callback=null) {
@@ -72,7 +78,6 @@ export class CommentaryViewer {
                     Promise.all([sender.loadSwath('Up'), sender.loadSwath('Down')])
                         .then(() => {
                             getEl(`commentary-note-${commID}`).scrollIntoView()
-                            sender.commsLoaded.add(commID)
                         })
 
                 }
@@ -155,7 +160,6 @@ export class CommentaryViewer {
             forElsMatching(`#commFrame${area} .comm-heading[data-status="stub"]`, (newStub) => {
                 newStub.dataset.status = 'observed'
                 sender.commObserver.observe(newStub)
-                sender.commsLoaded.add(newStub.dataset.xml_id)
             })
         })
     }
