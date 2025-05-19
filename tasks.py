@@ -2241,6 +2241,11 @@ def handle_commentary_tag(tag, data={}):
                 html += "".join([handle_commentary_tag(child, data) for child in tag.children])
                 html += '''</span>'''
 
+            elif tag['rend'] == 'bold':
+                html += '''<b>'''
+                html += "".join([handle_commentary_tag(child, data) for child in tag.children])
+                html += '''</b>'''
+
         elif tag.name == 'ptr' and _contains(tag.attrs, ['targType', 'target']):
             target = tag['target'].replace('#', '')
             if 'targetEnd' in tag.attrs:
