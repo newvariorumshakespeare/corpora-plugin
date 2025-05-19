@@ -806,15 +806,20 @@ def api_lines(request, corpus_id=None, play_prefix=None, starting_line_id=None, 
     if corpus_id and play_prefix:
         corpus = get_corpus(corpus_id)
         play = corpus.get_content('Play', {'prefix': play_prefix})[0]
+        tlns = request.GET.get('tlns', [])
+        if tlns:
+            tlns = tlns.split(',')
 
-        if starting_line_id:
+        if starting_line_id or tlns:
             all_lines = corpus.get_content('PlayLine', {'play': play.id}).order_by('line_number')
             started_collecting = False
             for line in all_lines:
-                if line.xml_id == starting_line_id or starting_line_id in line.alt_xml_ids:
+                if line.xml_id == starting_line_id or starting_line_id in line.alt_xml_ids or line.xml_id in tlns or [tln for tln in tlns if tln in line.alt_xml_ids]:
                     lines.append(line.to_dict())
                     if ending_line_id and not (line.xml_id == ending_line_id or ending_line_id in line.alt_xml_ids):
                         started_collecting = True
+                    elif tlns:
+                        pass
                     else:
                         break
                 elif line.xml_id == ending_line_id or ending_line_id in line.alt_xml_ids:

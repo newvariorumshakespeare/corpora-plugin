@@ -189,21 +189,26 @@ function navigateTo(navType, xmlID, link=null) {
     // handle navigation to playlines
     if (navType === 'lb') {
         let startID = xmlID
-        let endID = null
-        if (startID.includes(' ')) {
-            let idParts = startID.split(' ')
-            startID = idParts[0]
-            endID = idParts[1]
-        }
+        let tlns = []
+        let lineEndpointSuffix = ''
 
-        let lineEndpointSuffix = `${startID}/`
-        if (endID) lineEndpointSuffix += `${endID}/`
+        if (startID.includes(' ')) {
+            tlns = startID.split(' ')
+            if (tlns.length === 2) {
+                lineEndpointSuffix = `${tlns[0]}/${tlns[1]}/`
+            } else {
+                lineEndpointSuffix = `?tlns=${tlns.join(',')}`
+            }
+        } else lineEndpointSuffix = `${startID}/`
 
         fetch(window.nvs.endpoints.lineRange + lineEndpointSuffix)
             .then(res => res.json())
             .then(data => {
                 if (data.length) {
-                    let linesLabel = data.length === 1 ? `Line ${data[0].line_label}` : `Lines ${data[0].line_label}-${data[data.length - 1].line_label}`;
+                    let linesLabel = `Line ${data[0].line_label}`
+                    if (tlns.length === 2) linesLabel = `Lines ${data[0].line_label}-${data[data.length - 1].line_label}`
+                    else if (tlns.length > 2) linesLabel = `Lines ${data.map(l => l.line_label).join(', ')}`
+
                     let linesHTML = '';
                     let lineTemplate = (line) =>
                         `<div class="row gx-0 ref-row">
@@ -265,7 +270,10 @@ function navigateTo(navType, xmlID, link=null) {
             displayNavModal(title, window.nvs.witnesses[xmlID].bibliographic_entry, link, controls)
         }
     } else if (navType === 'note_tn' && window.nvs.playViewer) {
-        fetch(`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/TextualNote/?f_xml_id=${xmlID}&only=lines.xml_id`)
+        let firstTN = xmlID
+        if (firstTN.includes(' ')) firstTN = firstTN.split(' ')[0]
+
+        fetch(`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/TextualNote/?f_xml_id=${firstTN}&only=lines.xml_id`)
             .then(resp => resp.json())
             .then(searchData => {
                 console.log(searchData)
@@ -289,7 +297,7 @@ function navigateTo(navType, xmlID, link=null) {
             page: 1,
             'page-size': xmlIDs.length,
             only: 'id',
-        };
+        }
 
         if (navMap[navType]['filter_play']) {
             searchParams['f_play.prefix'] = window.nvs.play
@@ -331,7 +339,7 @@ function populateNavContents(navType, ids, contents=[], firstXMLid=null, link=nu
                     let controls = '';
                     let navContent = '';
 
-                    contents.map(function(content, contentIndex) {
+                    contents.forEach((content, contentIndex) => {
                         if (navContent === '') navContent += '<a name="nav-content-start"></a>'
                         else navContent += '<br><br>'
 
@@ -383,7 +391,9 @@ function populateNavContents(navType, ids, contents=[], firstXMLid=null, link=nu
                             } else {
                                 paratextURL = `/${paratextSectionMap[content.section]}/${window.nvs.play}/`
                             }
-                            paratextURL += `#paratext-${content.id}`;
+
+                            if (navMap[navType].scroll_anchor) paratextURL += `#${firstXMLid}`
+                            else paratextURL += `#paratext-${content.id}`
 
                             if (!controls) {
                                 controls += `<a href="${paratextURL}" target="_blank"><i class="ref-modal-control new-tab"></i></a>`
