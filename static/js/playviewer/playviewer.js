@@ -272,6 +272,9 @@ export class PlayViewer {
                     `
                 }
 
+                let css_classes = ''
+                if (line.css_classes) css_classes = ` ${line.css_classes}`
+
                 lineRow.innerHTML = `
                     <div class="row gx-0 flex-grow-1">
                         <div id="${line.xml_id}-witness-col" class="d-none d-md-flex col-md-4 m-0 p-0 witness-meter${hasVariants ? ' clickable' : ''}">
@@ -279,7 +282,7 @@ export class PlayViewer {
                         </div>
                         <div id="${line.xml_id}-text-col" class="col-11 col-md-7 m-0 p-0 play-words${hasVariants ? '' : ' no-variants'}">
                             ${disclosureTriangle}
-                            <div class="w-100 play-html">${line.rendered_html}</div>
+                            <div class="w-100 play-html${css_classes}">${line.rendered_html}</div>
                         </div>
                         <div id="${line.xml_id}-number-col" class="col-1 m-0 p-0">
                             <div class="row gx-0 h-100 bg-nvs">
@@ -736,7 +739,7 @@ export class PlayViewer {
     async fetchLines(startLineNo, endLineNo, callback) {
         let lineParams = this.getEndpointParams({
             r_line_number: `${startLineNo}to${endLineNo}`,
-            only: 'xml_id,line_number,rendered_html,act,scene,line_label,witness_meter',
+            only: 'xml_id,line_number,rendered_html,css_classes,act,scene,line_label,witness_meter',
             'page-size': 1000
         }, 'line')
 

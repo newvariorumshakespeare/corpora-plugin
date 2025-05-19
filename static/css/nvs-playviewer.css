@@ -553,6 +553,13 @@ body.mobile .play-label {
     border-right: unset;
 }
 
+.indent1em { padding-left: 1em; }
+.indent2em { padding-left: 2em; }
+.indent3em { padding-left: 3em; }
+.indent4em { padding-left: 4em; }
+.indent5em { padding-left: 5em; }
+.indent55em { padding-left: 5.5em; }
+
 .play-words {
     padding-top: 10px;
     padding-bottom: 5px;

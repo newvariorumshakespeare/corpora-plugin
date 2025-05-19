@@ -545,6 +545,21 @@ REGISTRY = [
                 "inherited": False
             },
             {
+                "name": "css_classes",
+                "label": "CSS Classes",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "keyword",
+                "choices": [],
+                "cross_reference_type": "",
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
                 "name": "witness_meter",
                 "label": "Witness Meter",
                 "indexed": False,

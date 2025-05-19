@@ -784,6 +784,7 @@ PLAY TEXT INGESTION
             'current_speech_ended': False,
             'sibling_playtag_id': None,
             'self_closing_pair_sibling': None,
+            'css_classes': '',
             'text': ''
         }
 
@@ -901,6 +902,16 @@ def handle_playtext_tag(corpus, play, tag, line_info):
                 for match in tln_matches:
                     if match != line_info['line_xml_id']:
                         line_info['line_alt_xml_ids'].append(match)
+
+            if 'rend' in tag.attrs:
+                rend_strings = tag.attrs['rend'].split()
+                css_classes = []
+                for rend_string in rend_strings:
+                    if rend_string and rend_string != 'print_tln':
+                        css_classes.append(slugify(rend_string))
+
+                if css_classes:
+                    line_info['css_classes'] = ' '.join(css_classes)
 
         # nvsSeg
         elif tag.name == 'nvsSeg':
@@ -1121,11 +1132,13 @@ def make_playtext_line(corpus, play, line_info):
     if line_info['witness_location_id']:
         line.witness_locations.append(line_info['witness_location_id'])
     line.text = line_info['text'].strip()
+    line.css_classes = line_info['css_classes']
     line.witness_meter = "0" * (line_info['witness_count'] + 1)
     line.save()
 
     line_info['line_number'] += 1
     line_info['text'] = ''
+    line_info['css_classes'] = ''
 
     if line_info['current_speech']:
         line_info['current_speech'].lines.append(line)
