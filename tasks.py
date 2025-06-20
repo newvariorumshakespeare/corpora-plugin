@@ -532,21 +532,18 @@ FRONT MATTER INGESTION
     title_page = front_tei.find('titlePage', type='main')
     volume_title = title_page.find('titlePart', type='volume')
     if volume_title:
-        pt.html_content += '<p style="margin-top: 20px;">{0}</p>\n\n<p>Edited by<br />'.format(volume_title.string)
+        pt.html_content += '<h3 style="margin-top: 20px;">{0}</h3>'.format(volume_title.string)
 
-        primary_editors = title_page.find_all('editor', role='primary')
-        if primary_editors:
-            primary_editors = [pri_ed.string for pri_ed in primary_editors]
-            pt.html_content += "{0}".format("<br />".join(primary_editors))
+        byline = title_page.find('byline')
+        pt_data = {
+            'current_note': None,
+            'unhandled': [],
+            'corpus': corpus
+        }
+        for child in byline.children:
+            pt.html_content += handle_paratext_tag(child, pt, pt_data)
 
-            secondary_editors = title_page.find_all('editor', role='secondary')
-            if secondary_editors:
-                pt.html_content += "<br />with<br />"
-                secondary_editors = [sec_ed.string for sec_ed in secondary_editors]
-                pt.html_content += "<br />".join(secondary_editors)
-
-            pt.html_content += "</p>"
-            pt.save()
+        pt.save()
 
     # extract preface
     preface = front_tei.find('div', type='preface')
