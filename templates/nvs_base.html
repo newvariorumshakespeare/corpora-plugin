@@ -7,8 +7,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="shortcut icon" type="image/png" href="{% static 'img/favicon.ico' %}"/>
   <link rel="stylesheet" href="{% static 'css/nvs.css' %}">
-  <!-- Gumshoe (For active anchor links) -->
-  <script src="{% static 'js/gumshoe.polyfills.min.js' %}"></script>
   <!-- Plausible.io (for site analytics) -->
   <script defer data-domain="newvariorumshakespeare.org" src="https://plausible.io/js/plausible.js"></script>
 
@@ -45,6 +43,9 @@
 </body>
 
 <script type="text/javascript">
+  let scrollSpy = null
+  let navLinkMap = {}
+  let currentActiveNavLink = null
 
   function navInit() {
     let holders = document.querySelectorAll('.navigation--holder');
@@ -94,18 +95,38 @@
       }
 
       // Set up active states if content is in screen
-      let anchorLinks = holder.querySelector('.anchor-links--holder .anchor-link a');
-      if (anchorLinks) {
-        let spy = new Gumshoe('.anchor-links--holder .anchor-link a', {
-          offset: 70,
-        });
+      let anchorLinks = document.querySelectorAll('.anchor-links--holder .anchor-link a')
+      if (anchorLinks.length) {
+        scrollSpy = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    if (entry.target.id in navLinkMap && entry.target.id !== currentActiveNavLink) {
+                        if (currentActiveNavLink !== null) navLinkMap[currentActiveNavLink].classList.remove('active')
+                        navLinkMap[entry.target.id].classList.add('active')
+                        currentActiveNavLink = entry.target.id
+                    }
+                }
+            })
+        })
+
+        anchorLinks.forEach(link => {
+            if (link.getAttribute('href').startsWith('#')) {
+                let linkTargetId = link.getAttribute('href').replace('#', '')
+                let linkTarget = document.getElementById(linkTargetId)
+
+                if (linkTarget) {
+                    scrollSpy.observe(linkTarget)
+                    navLinkMap[linkTargetId] = link.parentNode
+                }
+            }
+        })
       }
     }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     navInit();
-    anchorInit();
+    setTimeout(() => anchorInit(), 1000);
   })
 </script>
 
