@@ -619,10 +619,6 @@ FRONT MATTER INGESTION
 
     # extract witness and reference documents
     try:
-        # todo: cleanup old reference approach
-        for field in ['primary_witnesses', 'occasional_witnesses', 'primary_sources', 'occasional_sources']:
-            setattr(play, field, [])
-
         witness_collections = []
         unhandled = []
 
