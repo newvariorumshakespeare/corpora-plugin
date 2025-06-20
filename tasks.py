@@ -1,19 +1,25 @@
+import os
 import re
+import json
 import difflib
+import logging
+import traceback
 import html as html_lib
 from timeit import default_timer as timer
+from copy import deepcopy
 from dateutil.relativedelta import relativedelta
-from .content import REGISTRY as NVS_CONTENT_TYPE_SCHEMA
-from plugins.document.content import REGISTRY as DOCUMENT_REGISTRY
-from corpus import *
-from manager.utilities import _contains, _contains_any
 from bs4 import BeautifulSoup
+from bson.objectid import ObjectId
 from django.utils.html import strip_tags
 from django.utils.text import slugify
 from string import punctuation
 from random import randint
 from math import floor
 from mongoengine.queryset.visitor import Q
+from .content import REGISTRY as NVS_CONTENT_TYPE_SCHEMA
+from plugins.document.content import REGISTRY as DOCUMENT_REGISTRY
+from manager.utilities import _contains, _contains_any
+from corpus import Job
 
 
 REGISTRY = {
