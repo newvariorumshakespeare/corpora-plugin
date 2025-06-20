@@ -731,10 +731,10 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
                 break
 
         if edition_slot > -1:
-            play_lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_label', 'act', 'scene', 'text']).order_by('+line_number')
+            play_lines = corpus.get_content('PlayLine', {'play': play.id}, only=['xml_id', 'act', 'scene', 'text']).order_by('+line_number')
             for play_line in play_lines:
                 lines.append({
-                    'tlns': [play_line.line_label],
+                    'tlns': [play_line.xml_id],
                     'modified': False,
                     'text': play_line.text
                 })
@@ -744,7 +744,7 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
                 **build_search_params_from_dict({
                     'page-size': 10000,
                     'f_play.id': str(play.id),
-                    'only': 'lines.line_number,lines.line_label,witness_meter,variants.witness_meter,variants.variant',
+                    'only': 'lines.line_number,lines.line_xml_id,witness_meter,variants.witness_meter,variants.variant',
                     's_lines.line_number': 'asc'
                 })
             )
@@ -760,7 +760,7 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
 
                                 for line in tn['lines']:
                                     line_nos.append(line['line_number'])
-                                    tlns.append(line['line_label'])
+                                    tlns.append(line['xml_id'])
 
                                 first_line_no = line_nos[0]
 
