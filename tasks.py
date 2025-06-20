@@ -2146,6 +2146,9 @@ COMMENTARY NOTE INGESTION
                     )
 
             else:
+                note.line_label = note_data.get('line_label', '')
+                note.subject_matter = note_data.get('subject_matter', '')
+                note.save()
                 report += "Commentary note {0} missing label or lemma\n\n".format(note.xml_id)
 
             if 'unhandled' in note_data:
@@ -2234,6 +2237,11 @@ def handle_commentary_tag(tag, data={}):
                 html += '''<sup>'''
                 html += "".join([handle_commentary_tag(child, data) for child in tag.children])
                 html += '''</sup>'''
+
+            elif tag['rend'] == 'subscript':
+                html += '''<sub>'''
+                html += "".join([handle_commentary_tag(child, data) for child in tag.children])
+                html += '''</sub>'''
 
             elif tag['rend'] == 'smcaps':
                 html += '''<span style="font-variant: small-caps;">'''
@@ -2519,7 +2527,6 @@ def handle_paratext_tag(tag, pt, pt_data):
         'docImprint': 'p:doc-imprint',
         'byline': 'p:byline',
         'docAuthor': 'span:doc-author',
-        'lb': 'br',
         'div': 'div',
         'signed': 'div:signed',
         'lg': 'i:mt-2',
@@ -2717,6 +2724,9 @@ def handle_paratext_tag(tag, pt, pt_data):
                 html += handle_paratext_tag(child, pt, pt_data)
             html += '</span>'
 
+        elif tag.name == "lb":
+            html += "<br />"
+
         elif tag.name == "graphic" and 'url' in tag.attrs:
             img_path = tag['url']
             if classes:
@@ -2730,7 +2740,7 @@ def handle_paratext_tag(tag, pt, pt_data):
                 img_path
             )
 
-        elif tag.name == "name":
+        elif tag.name in ["name", "editor"]:
             classes.append("name")
 
             attributes += ' class="{0}"'.format(
