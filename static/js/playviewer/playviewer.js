@@ -582,7 +582,8 @@ export class PlayViewer {
                     hideLoadingModal()
 
                     if (window.location.hash) {
-                        let lineID = window.location.hash.replace('#', '').replace('-row', '')
+                        let firstLineID = window.location.hash.split('%20')[0]
+                        let lineID = firstLineID.replace('#', '').replace('-row', '')
                         sender.navigateTo(lineID, false)
                     }
                 }, 500)
