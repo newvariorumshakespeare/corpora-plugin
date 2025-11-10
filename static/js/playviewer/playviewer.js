@@ -57,11 +57,10 @@ export class PlayViewer {
                     if (el.classList.contains('ref-modal')) {
                         searchForTargets = false
                     } else if (searchForTargets && el.tagName === 'COMSPAN' && this.highlightCommLemmas) {
-                        let commInfo = el.className
-                        let commID = commInfo
+                        let commID = el.classList.item(0)
                             .replace('commentary-lemma-', '')
-                            .replace('highlight', '')
-                            .replace(' ', '')
+                            .replace('--', '.')
+
                         this.commViewer.navigateTo(commID)
                         searchForTargets = false
                     } else if (searchForTargets && el.classList.contains('comm-heading')) {
@@ -89,8 +88,8 @@ export class PlayViewer {
                 } else {
                     this.highlightCommLemmas = false
                     forElsMatching('comspan.highlight', (el) => {
-                        el.removeEventListener('mouseenter', this.comspanHover)
-                        el.removeEventListener('mouseleave', this.comspanLeave)
+                        el.removeEventListener('mouseover', this.comspanHover)
+                        el.removeEventListener('mouseout', this.comspanLeave)
                         el.classList.remove('highlight')
                     })
                 }
@@ -118,7 +117,7 @@ export class PlayViewer {
                         lineRow = getEl(`tln_${lineNo}-row`)
                         if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
                         else {
-                            fetch(`${window.nvs.endpoints.line}?f_alt_xml_ids=tln_${lineNo}&page-size=1&only=xml_id`)
+                            fetch(`${window.nvs.endpoints.line}?f_play.prefix=${window.nvs.play}&f_alt_xml_ids=tln_${lineNo}&page-size=1&only=xml_id`)
                                 .then(res => res.json())
                                 .then(lineInfo => {
                                     if (lineInfo.records && lineInfo.records.length === 1) {
@@ -141,8 +140,8 @@ export class PlayViewer {
                 el.classList.add('highlight')
 
                 // add the hover events
-                el.addEventListener('mouseenter', this.comspanHover)
-                el.addEventListener('mouseleave', this.comspanLeave)
+                el.addEventListener('mouseover', this.comspanHover)
+                el.addEventListener('mouseout', this.comspanLeave)
             }
         })
     }
@@ -272,7 +271,10 @@ export class PlayViewer {
                         </a>
                     `
                 }
-                
+
+                let css_classes = ''
+                if (line.css_classes) css_classes = ` ${line.css_classes}`
+
                 lineRow.innerHTML = `
                     <div class="row gx-0 flex-grow-1">
                         <div id="${line.xml_id}-witness-col" class="d-none d-md-flex col-md-4 m-0 p-0 witness-meter${hasVariants ? ' clickable' : ''}">
@@ -280,12 +282,12 @@ export class PlayViewer {
                         </div>
                         <div id="${line.xml_id}-text-col" class="col-11 col-md-7 m-0 p-0 play-words${hasVariants ? '' : ' no-variants'}">
                             ${disclosureTriangle}
-                            <div class="w-100 play-html">${line.rendered_html}</div>
+                            <div class="w-100 play-html${css_classes}">${line.rendered_html}</div>
                         </div>
                         <div id="${line.xml_id}-number-col" class="col-1 m-0 p-0">
                             <div class="row gx-0 h-100 bg-nvs">
                                 <div class="col-12 col-md-8 offset-md-4 play-label d-flex justify-content-center align-items-center">
-                                    ${line.line_label}
+                                    <a href="${window.nvs.playViewerURL}#${lineID}-row" target="_blank" class="line-label-link">${line.line_label}</a>
                                 </div>
                             </div>
                         </div>
@@ -578,6 +580,12 @@ export class PlayViewer {
                 setTimeout(() => {
                     sender.viewerScroll()
                     hideLoadingModal()
+
+                    if (window.location.hash) {
+                        let firstLineID = window.location.hash.split('%20')[0]
+                        let lineID = firstLineID.replace('#', '').replace('-row', '')
+                        sender.navigateTo(lineID, false)
+                    }
                 }, 500)
             })
 
@@ -629,18 +637,24 @@ export class PlayViewer {
     }
 
     comspanHover(e){
-        e.target.classList.forEach(commClass => {
-            if (commClass !== 'highlight') {
+        forElsMatching('comspan.highlight', highlighted => highlighted.removeAttribute('style'))
+
+        let target = e.target
+        while (target.parentElement && target.tagName !== 'COMSPAN') target = target.parentElement
+
+        target.classList.forEach(commClass => {
+            if (commClass.startsWith('commentary-lemma')) {
                 forElsMatching(`.${commClass}`, hovered => {
                     hovered.style.borderBottom = 'solid 1px var(--nvs-primary-orange) !important'
                 })
             }
         })
+        e.stopPropagation()
     }
 
     comspanLeave(e) {
         e.target.classList.forEach(commClass => {
-            if (commClass !== 'highlight') {
+            if (commClass.startsWith('commentary-lemma')) {
                 forElsMatching(`.${commClass}`, hovered => hovered.removeAttribute('style'))
             }
         })
@@ -726,7 +740,7 @@ export class PlayViewer {
     async fetchLines(startLineNo, endLineNo, callback) {
         let lineParams = this.getEndpointParams({
             r_line_number: `${startLineNo}to${endLineNo}`,
-            only: 'xml_id,line_number,rendered_html,act,scene,line_label,witness_meter',
+            only: 'xml_id,line_number,rendered_html,css_classes,act,scene,line_label,witness_meter',
             'page-size': 1000
         }, 'line')
 

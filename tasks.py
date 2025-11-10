@@ -1,18 +1,25 @@
+import os
 import re
+import json
 import difflib
+import logging
+import traceback
 import html as html_lib
 from timeit import default_timer as timer
+from copy import deepcopy
 from dateutil.relativedelta import relativedelta
-from .content import REGISTRY as NVS_CONTENT_TYPE_SCHEMA
-from plugins.document.content import REGISTRY as DOCUMENT_REGISTRY
-from corpus import *
-from manager.utilities import _contains, _contains_any
 from bs4 import BeautifulSoup
+from bson.objectid import ObjectId
 from django.utils.html import strip_tags
 from django.utils.text import slugify
 from string import punctuation
 from random import randint
+from math import floor
 from mongoengine.queryset.visitor import Q
+from .content import REGISTRY as NVS_CONTENT_TYPE_SCHEMA
+from plugins.document.content import REGISTRY as DOCUMENT_REGISTRY
+from manager.utilities import _contains, _contains_any
+from corpus import Job
 
 
 REGISTRY = {
@@ -360,6 +367,10 @@ Ingestion Scope:    {4}
                         job.set_status('running', percent_complete=85)
 
                     if ingestion_scope in ['Full', 'Playtext Only', 'Commentary Only']:
+                        time_it("Lineating Transcendent Tags")
+                        lineate_transcendent_tags(corpus, play)
+                        time_it("Lineating Transcendent Tags", True)
+
                         time_it("Rendering Playline HTML")
                         line_count = corpus.get_content('PlayLine', {'play': play.id}, all=True).count()
                         line_cursor = 0
@@ -521,21 +532,18 @@ FRONT MATTER INGESTION
     title_page = front_tei.find('titlePage', type='main')
     volume_title = title_page.find('titlePart', type='volume')
     if volume_title:
-        pt.html_content += '<p style="margin-top: 20px;">{0}</p>\n\n<p>Edited by<br />'.format(volume_title.string)
+        pt.html_content += '<h3 style="margin-top: 20px;">{0}</h3>'.format(volume_title.string)
 
-        primary_editors = title_page.find_all('editor', role='primary')
-        if primary_editors:
-            primary_editors = [pri_ed.string for pri_ed in primary_editors]
-            pt.html_content += "{0}".format("<br />".join(primary_editors))
+        byline = title_page.find('byline')
+        pt_data = {
+            'current_note': None,
+            'unhandled': [],
+            'corpus': corpus
+        }
+        for child in byline.children:
+            pt.html_content += handle_paratext_tag(child, pt, pt_data)
 
-            secondary_editors = title_page.find_all('editor', role='secondary')
-            if secondary_editors:
-                pt.html_content += "<br />with<br />"
-                secondary_editors = [sec_ed.string for sec_ed in secondary_editors]
-                pt.html_content += "<br />".join(secondary_editors)
-
-            pt.html_content += "</p>"
-            pt.save()
+        pt.save()
 
     # extract preface
     preface = front_tei.find('div', type='preface')
@@ -611,10 +619,6 @@ FRONT MATTER INGESTION
 
     # extract witness and reference documents
     try:
-        # todo: cleanup old reference approach
-        for field in ['primary_witnesses', 'occasional_witnesses', 'primary_sources', 'occasional_sources']:
-            setattr(play, field, [])
-
         witness_collections = []
         unhandled = []
 
@@ -777,6 +781,9 @@ PLAY TEXT INGESTION
             'character_id_map': {},
             'current_speech': None,
             'current_speech_ended': False,
+            'sibling_playtag_id': None,
+            'self_closing_pair_sibling': None,
+            'css_classes': '',
             'text': ''
         }
 
@@ -886,12 +893,24 @@ def handle_playtext_tag(corpus, play, tag, line_info):
             line_info['line_xml_id'] = tag['xml:id']
             line_info['line_label'] = tag['n']
             line_info['line_alt_xml_ids'] = []
+            line_info['sibling_playtag_id'] = None
+            line_info['self_closing_pair_sibling'] = None
 
             tln_matches = re.findall(r'(tln_\d\d\d\d)', tag['xml:id'])
             if tln_matches:
                 for match in tln_matches:
                     if match != line_info['line_xml_id']:
                         line_info['line_alt_xml_ids'].append(match)
+
+            if 'rend' in tag.attrs:
+                rend_strings = tag.attrs['rend'].split()
+                css_classes = []
+                for rend_string in rend_strings:
+                    if rend_string and rend_string != 'print_tln':
+                        css_classes.append(slugify(rend_string))
+
+                if css_classes:
+                    line_info['css_classes'] = ' '.join(css_classes)
 
         # nvsSeg
         elif tag.name == 'nvsSeg':
@@ -905,8 +924,6 @@ def handle_playtext_tag(corpus, play, tag, line_info):
 
             for child in tag.children:
                 handle_playtext_tag(corpus, play, child, line_info)
-
-        # todo: anchor (with marker attribute)
 
         # div for act/scene
         elif tag.name == 'div' and _contains(tag.attrs, ['type', 'n']):
@@ -932,18 +949,28 @@ def handle_playtext_tag(corpus, play, tag, line_info):
         else:
             playtag = None
             playtag_name = None
-            playtag_classes = None
+            playtag_classes = []
+
+            # rend
+            if 'rend' in tag.attrs:
+                if 'italic' in tag['rend']:
+                    playtag_classes.append('italicized')
+
+                if 'align(center)' in tag['rend']:
+                    playtag_classes.append('align-center')
+                elif 'align(right)' in tag['rend']:
+                    playtag_classes.append('align-right')
 
             # stage
             if tag.name == 'stage' and 'type' in tag.attrs:
-                playtag_name = 'span'
-                playtag_classes = 'stage {0}'.format(tag['type'])
+                playtag_name = 'stage'
+                playtag_classes += ['stage', tag['type']]
 
             # sp
             elif tag.name == 'sp' and 'who' in tag.attrs:
-                playtag_name = 'span'
+                playtag_name = 'speech'
                 speaking = tag['who'].replace('#', '')
-                playtag_classes = 'speech {0}'.format(speaking)
+                playtag_classes += ['speech', speaking]
 
                 line_info['current_speech'] = corpus.get_content('Speech')
                 line_info['current_speech'].play = play.id
@@ -954,94 +981,108 @@ def handle_playtext_tag(corpus, play, tag, line_info):
 
             # name
             elif tag.name == 'name':
-                playtag_name = 'span'
-                playtag_classes = 'entity'
+                playtag_name = 'name'
+                playtag_classes.append('entity')
 
             # head
             elif tag.name == 'head':
                 playtag_name = 'h3'
-                playtag_classes = 'heading'
+                playtag_classes.append('heading')
 
             # speaker
             elif tag.name == 'speaker':
-                playtag_name = 'span'
-                playtag_classes = 'speaker-abbreviation'
+                playtag_name = 'speaker'
+                playtag_classes.append('speaker-abbreviation')
 
             # castList
             elif tag.name == 'castList' and 'xml:id' in tag.attrs:
-                playtag_name = 'span'
-                playtag_classes = 'castlist {0}'.format(tag['xml:id'])
+                playtag_name = 'castlist'
+                playtag_classes += ['castlist', tag['xml:id']]
 
             # castGroup
             elif tag.name == 'castGroup' and 'rend' in tag.attrs:
-                playtag_name = 'span'
+                playtag_name = 'castgroup'
                 matches = re.findall(r'[^\(]*\(([^\)]*)\)', tag['rend'])
                 if matches:
-                    playtag_classes = 'castgroup {0}'.format(matches[0].replace('#', ''))
+                    playtag_classes += ['castgroup', matches[0].replace('#', '')]
 
             # castItem
             elif tag.name == 'castItem':
-                playtag_name = 'span'
-                playtag_classes = 'castitem'
+                playtag_name = 'castitem'
+                playtag_classes.append('castitem')
 
             # role
             elif tag.name == 'role' and 'xml:id' in tag.attrs:
-                playtag_name = 'span'
-                playtag_classes = 'role {0}'.format(tag['xml:id'])
+                playtag_name = 'role'
+                playtag_classes += ['role', tag['xml:id']]
 
             # roleDesc
             elif tag.name == 'roleDesc':
-                playtag_name = 'span'
-                playtag_classes = 'roledesc'
+                playtag_name = 'roledesc'
+                playtag_classes.append('roledesc')
 
                 if 'xml:id' in tag.attrs:
-                    playtag_classes += " {0}".format(tag['xml:id'])
+                    playtag_classes.append(tag['xml:id'])
 
             # foreign
             elif tag.name == 'foreign':
-                playtag_name = 'span'
-                playtag_classes = 'foreign'
+                playtag_name = 'foreign'
+                playtag_classes.append('foreign')
                 if 'xml:lang' in tag.attrs:
-                    playtag_classes += " {0}".format(tag['xml:lang'])
-
-            # p rend=italic
-            elif tag.name == 'p' and 'rend' in tag.attrs and tag['rend'] == 'italic':
-                playtag_name = 'i'
-                playtag_classes = 'italicized'
+                    playtag_classes.append(tag['xml:lang'])
 
             # lg
             elif tag.name == 'lg' and 'type' in tag.attrs:
-                playtag_name = 'span'
-                playtag_classes = 'linegroup {0}'.format(tag['type'])
-                if 'rend' in tag.attrs and tag['rend'] == 'italic':
-                    playtag_classes += " italicized"
+                playtag_name = 'linegroup'
+                playtag_classes += ['linegroup', tag['type']]
 
             # anchor type=marker
             elif tag.name == 'anchor' and 'type' in tag.attrs and tag['type'] == 'marker' and 'marker' in tag.attrs:
-                playtag_name = 'span'
+                playtag_name = 'playlinemarker'
 
                 if tag['marker'] == '[':
-                    playtag_classes = 'open-bracket-marker'
+                    playtag_classes.append('open-bracket-marker self-closing')
                 elif tag['marker'] == ']':
-                    playtag_classes = 'close-bracket-marker'
+                    playtag_classes.append('close-bracket-marker self-closing')
                 elif tag['marker'] == '⸢':
-                    playtag_classes = 'open-half-bracket-marker'
+                    playtag_classes.append('open-half-bracket-marker self-closing')
                 elif tag['marker'] == '⸣':
-                    playtag_classes = 'close-half-bracket-marker'
+                    playtag_classes.append('close-half-bracket-marker self-closing')
                 elif tag['marker'] == '*':
-                    playtag_classes = 'asterix-marker'
+                    playtag_classes.append('asterix-marker self-closing')
                 elif tag['marker'] == '|':
-                    playtag_classes = 'pipe-marker'
+                    playtag_classes.append('pipe-marker self-closing')
 
             else:
                 line_info['unhandled_tags'].append(tag.name)
 
-            if playtag_name:
+            if playtag_name or playtag_classes:
+                if not playtag_name:
+                    playtag_name = 'span'
+
                 playtag = corpus.get_content('PlayTag')
                 playtag.play = play.id
                 playtag.name = playtag_name
-                playtag.classes = playtag_classes
+                playtag.classes = ' '.join(playtag_classes)
                 playtag.start_location = make_text_location(line_info['line_number'], len(line_info['text']))
+
+                if 'self-closing' in playtag.classes and 'pipe-marker' not in playtag.classes:
+                    if line_info['self_closing_pair_sibling'] == 'missing':
+                        line_info['self_closing_pair_sibling'] = None
+
+                    elif line_info['self_closing_pair_sibling']:
+                        playtag.sibling_tag = line_info['self_closing_pair_sibling']
+                        line_info['self_closing_pair_sibling'] = None
+
+                    elif line_info['sibling_playtag_id']:
+                        playtag.sibling_tag = line_info['sibling_playtag_id']
+                        line_info['self_closing_pair_sibling'] = playtag.sibling_tag
+
+                    else:
+                        line_info['self_closing_pair_sibling'] = 'missing'
+
+                playtag.save(do_indexing=False, do_linking=False)
+                line_info['sibling_playtag_id'] = str(playtag.id)
 
             for child in tag.children:
                 handle_playtext_tag(corpus, play, child, line_info)
@@ -1053,7 +1094,7 @@ def handle_playtext_tag(corpus, play, tag, line_info):
                 if line_info['current_speech'] and 'speech' in playtag.classes:
                     line_info['current_speech_ended'] = True
 
-                elif playtag.classes == 'speaker-abbreviation':
+                elif 'speaker-abbreviation' in playtag_classes:
                     if line_info['current_speech'] and len(line_info['current_speech'].speaking) == 1:
                         char_id = line_info['current_speech'].speaking[0]
                         for char in line_info['characters']:
@@ -1090,11 +1131,13 @@ def make_playtext_line(corpus, play, line_info):
     if line_info['witness_location_id']:
         line.witness_locations.append(line_info['witness_location_id'])
     line.text = line_info['text'].strip()
+    line.css_classes = line_info['css_classes']
     line.witness_meter = "0" * (line_info['witness_count'] + 1)
     line.save()
 
     line_info['line_number'] += 1
     line_info['text'] = ''
+    line_info['css_classes'] = ''
 
     if line_info['current_speech']:
         line_info['current_speech'].lines.append(line)
@@ -1113,6 +1156,104 @@ def make_text_location(line_number, char_index):
         text_location = '0' + text_location
     text_location = "{0}.{1}".format(line_number, text_location)
     return float(text_location)
+
+
+def lineate_transcendent_tags(corpus, play):
+    #lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_number', 'text'])
+    tags = corpus.get_content('PlayTag', {'play': play.id}).order_by('+start_location', '-end_location')
+    tags = tags.no_cache()
+    tags = tags.batch_size(10)
+
+    for tag in tags:
+        tag_start_line_no = floor(tag.start_location)
+        tag_end_line_no = floor(tag.end_location)
+
+        if tag_start_line_no < tag_end_line_no:
+            original_end_location = tag.end_location
+
+            lines = corpus.get_content('PlayLine', {
+                'play': play.id,
+                'line_number__gte': tag_start_line_no,
+                'line_number__lte': tag_end_line_no
+            }, only=['line_number', 'text']).order_by('+line_number')
+
+            for line in lines:
+                if line.line_number == tag_start_line_no:
+                    if tag.start_location == make_text_location(tag_start_line_no, len(line.text)):
+                        tag.start_location = make_text_location(tag_start_line_no + 1, 0)
+                        tag_start_line_no = floor(tag.start_location)
+                        if tag_start_line_no == tag_end_line_no:
+                            tag.save(do_indexing=False, do_linking=False)
+                            handle_overlapping_tags(corpus, play, tag)
+                            break
+
+                    tag.end_location = make_text_location(line.line_number, len(line.text))
+                    tag.save(do_indexing=False, do_linking=False)
+                    handle_overlapping_tags(corpus, play, tag)
+                else:
+                    new_tag = corpus.get_content('PlayTag')
+                    new_tag.name = tag.name
+                    new_tag.classes = tag.classes + ' continuation'
+                    new_tag.play = play.id
+                    might_overlap = False
+
+                    if line.line_number == tag_end_line_no:
+                        new_tag.start_location = make_text_location(line.line_number, 0)
+                        new_tag.end_location = original_end_location
+                        might_overlap = True
+                    else:
+                        new_tag.start_location = make_text_location(line.line_number, 0)
+                        new_tag.end_location = make_text_location(line.line_number, len(line.text))
+
+                    new_tag.save(do_indexing=False, do_linking=False)
+                    if might_overlap:
+                        handle_overlapping_tags(corpus, play, new_tag)
+
+
+def handle_overlapping_tags(corpus, play, overlapper):
+    starting_line_num = floor(overlapper.start_location)
+    ending_line_num = floor(overlapper.end_location)
+
+    if starting_line_num == ending_line_num:
+        starting_location = overlapper.start_location
+        ending_location = overlapper.end_location
+
+        fellow_tags = corpus.get_content('PlayTag', {
+            'play': play.id,
+            'start_location__gte': starting_line_num,
+            'end_location__lt': ending_line_num + 1
+        })
+
+        for fellow_tag in fellow_tags:
+            if fellow_tag.start_location < starting_location and \
+                    fellow_tag.end_location > starting_location and \
+                    fellow_tag.end_location < ending_location:
+
+                new_tag = corpus.get_content('PlayTag')
+                new_tag.play = play.id
+                new_tag.name = fellow_tag.name
+                new_tag.classes = fellow_tag.classes
+                new_tag.start_location = fellow_tag.start_location
+                new_tag.end_location = starting_location
+                new_tag.save(do_indexing=False, do_linking=False)
+
+                fellow_tag.start_location = starting_location
+                fellow_tag.save(do_indexing=False, do_linking=False)
+
+            elif fellow_tag.start_location > starting_location and \
+                    fellow_tag.start_location < ending_location and \
+                    fellow_tag.end_location > ending_location:
+
+                new_tag = corpus.get_content('PlayTag')
+                new_tag.play = play.id
+                new_tag.name = fellow_tag.name
+                new_tag.classes = fellow_tag.classes
+                new_tag.start_location = fellow_tag.start_location
+                new_tag.end_location = ending_location
+                new_tag.save(do_indexing=False, do_linking=False)
+
+                fellow_tag.start_location = ending_location
+                fellow_tag.save(do_indexing=False, do_linking=False)
 
 
 def parse_textualnotes_file(corpus, play, textualnotes_file_path, line_id_map, ordered_line_ids, tn_xml_id=None):
@@ -1243,53 +1384,57 @@ TEXTUAL NOTES INGESTION
                                 excluding_sigla.append(siglum_label)
 
                         else:
-                            if 'etc.' in str(child.string):
-                                textual_variant.witness_formula += note_exclusion_formula
+                            if child.name == 'note':
+                                child.name = 'hi'
+                                textual_variant.witness_formula += tei_to_html(child)
                             else:
-                                textual_variant.witness_formula += str(child.string)
+                                if 'etc.' in str(child.string):
+                                    textual_variant.witness_formula += note_exclusion_formula
+                                else:
+                                    textual_variant.witness_formula += str(child.string)
 
-                            formula = str(child.string).strip()
+                                formula = str(child.string).strip()
 
-                            # handle '+' ranges
-                            if formula.startswith('+') or 'etc.' in formula:
-                                include_all_following = True
+                                # handle '+' ranges
+                                if formula.startswith('+') or 'etc.' in formula:
+                                    include_all_following = True
+                                    if '(−' in formula:
+                                        exclusion_started = True
+
+                                # handle exclusions
                                 if '(−' in formula:
                                     exclusion_started = True
+                                elif formula.startswith(')') and exclusion_started:
+                                    exclusion_started = False
 
-                            # handle exclusions
-                            if '(−' in formula:
-                                exclusion_started = True
-                            elif formula.startswith(')') and exclusion_started:
-                                exclusion_started = False
+                                # handle '-' ranges
+                                elif formula.startswith('-'):
+                                    next_siglum_ends = True
 
-                            # handle '-' ranges
-                            elif formula.startswith('-'):
-                                next_siglum_ends = True
+                                # use ',' to delimit the need to add individual sigla or add ranges
+                                if ',' in formula:
+                                    if starting_siglum and not exclusion_started:
 
-                            # use ',' to delimit the need to add individual sigla or add ranges
-                            if ',' in formula:
-                                if starting_siglum and not exclusion_started:
-
-                                    # the "get_witness_ids" function will handle:
-                                    # '-' ranges
-                                    # '+' ranges
-                                    # exclusions
-                                    # individual sigla
-                                    textual_variant.witnesses.extend(
-                                        get_witness_ids(
-                                            witnesses,
-                                            witness_groups,
-                                            starting_siglum,
-                                            ending_witness_siglum=ending_siglum,
-                                            include_all_following=include_all_following,
-                                            excluding_sigla=excluding_sigla + note_exclusions
+                                        # the "get_witness_ids" function will handle:
+                                        # '-' ranges
+                                        # '+' ranges
+                                        # exclusions
+                                        # individual sigla
+                                        textual_variant.witnesses.extend(
+                                            get_witness_ids(
+                                                witnesses,
+                                                witness_groups,
+                                                starting_siglum,
+                                                ending_witness_siglum=ending_siglum,
+                                                include_all_following=include_all_following,
+                                                excluding_sigla=excluding_sigla + note_exclusions
+                                            )
                                         )
-                                    )
 
-                                    starting_siglum = None
-                                    ending_siglum = None
-                                    include_all_following = False
-                                    excluding_sigla = []
+                                        starting_siglum = None
+                                        ending_siglum = None
+                                        include_all_following = False
+                                        excluding_sigla = []
 
                     # handle any further additions of sigla at the end of the formula
                     if starting_siglum:
@@ -1616,6 +1761,17 @@ def perform_variant_transform(corpus, note, variant):
                 # ellipsis in lemma only
                 elif ellipsis in lemma:
                     lemma_delimiters = lemma.split(ellipsis)
+                    lemma_start_index = original_text.find(lemma_delimiters[0])
+
+                    if lemma_start_index > -1:
+                        lemma_search_cursor = lemma_start_index + len(lemma_delimiters[0])
+                        lemma_end_index = original_text[lemma_search_cursor:].find(lemma_delimiters[1])
+
+                        if lemma_end_index > -1:
+                            lemma_end_index += lemma_search_cursor + len(lemma_delimiters[1])
+                            lemma = original_text[lemma_start_index:lemma_end_index]
+
+                    '''
                     lemma_parts = []
                     adding_lemma_parts = False
                     for word in original_text.split():
@@ -1627,8 +1783,9 @@ def perform_variant_transform(corpus, note, variant):
                             break
                         elif adding_lemma_parts:
                             lemma_parts.append(word)
-
+                    
                     lemma = " ".join(lemma_parts)
+                    '''
 
                 # replacement/insertion w/ lemma
                 if not result and lemma in original_text:
@@ -1684,6 +1841,23 @@ def perform_variant_transform(corpus, note, variant):
                 result = original_text.replace(lemma, "")
 
     if original_text and result:
+        line_words = original_text.split()
+        variant_words = result.split()
+        matcher = difflib.SequenceMatcher(None, line_words, variant_words)
+
+        diffed_html = []
+        for diff_type, a_start, a_end, b_start, b_end in matcher.get_opcodes():
+            if diff_type == 'equal':
+                diffed_html.append(' '.join(line_words[a_start:a_end]))
+            elif diff_type in ['replace', 'insert']:
+                segment = ' '.join(variant_words[b_start:b_end])
+                diffed_html.append(f'<span class="difference">{segment}</span>')
+            elif diff_type == 'delete':
+                diffed_html.append('<span class="difference"> </span>')
+
+        result = ' '.join(diffed_html)
+
+        '''
         differ = difflib.Differ()
         differences = list(differ.compare(original_text, result))
         difference_started = False
@@ -1711,6 +1885,7 @@ def perform_variant_transform(corpus, note, variant):
 
         if difference_started:
             result += "</span>"
+        '''
 
     if not result:
         return None, False
@@ -1971,6 +2146,9 @@ COMMENTARY NOTE INGESTION
                     )
 
             else:
+                note.line_label = note_data.get('line_label', '')
+                note.subject_matter = note_data.get('subject_matter', '')
+                note.save()
                 report += "Commentary note {0} missing label or lemma\n\n".format(note.xml_id)
 
             if 'unhandled' in note_data:
@@ -2060,10 +2238,20 @@ def handle_commentary_tag(tag, data={}):
                 html += "".join([handle_commentary_tag(child, data) for child in tag.children])
                 html += '''</sup>'''
 
+            elif tag['rend'] == 'subscript':
+                html += '''<sub>'''
+                html += "".join([handle_commentary_tag(child, data) for child in tag.children])
+                html += '''</sub>'''
+
             elif tag['rend'] == 'smcaps':
                 html += '''<span style="font-variant: small-caps;">'''
                 html += "".join([handle_commentary_tag(child, data) for child in tag.children])
                 html += '''</span>'''
+
+            elif tag['rend'] == 'bold':
+                html += '''<b>'''
+                html += "".join([handle_commentary_tag(child, data) for child in tag.children])
+                html += '''</b>'''
 
         elif tag.name == 'ptr' and _contains(tag.attrs, ['targType', 'target']):
             target = tag['target'].replace('#', '')
@@ -2227,10 +2415,14 @@ def mark_commentary_lemma(corpus, play, note):
             lemma_span = corpus.get_content('PlayTag')
             lemma_span.play = play.id
             lemma_span.name = 'comspan'
-            lemma_span.classes = "commentary-lemma-{0}".format(slugify(note.xml_id))
+            lemma_span.classes = "commentary-lemma-{0}".format(note.xml_id.replace('.', '--'))
             lemma_span.start_location = starting_location
             lemma_span.end_location = ending_location
             lemma_span.save(do_indexing=False, do_linking=False)
+
+            # the following bit of code is intended to address a situation that arises where
+            # commentary tags are inserted into a line such that it creates an overlap problem.
+            handle_overlapping_tags(corpus, play, lemma_span)
 
         else:
             report += "-----------------------------------------------\n"
@@ -2335,7 +2527,6 @@ def handle_paratext_tag(tag, pt, pt_data):
         'docImprint': 'p:doc-imprint',
         'byline': 'p:byline',
         'docAuthor': 'span:doc-author',
-        'lb': 'br',
         'div': 'div',
         'signed': 'div:signed',
         'lg': 'i:mt-2',
@@ -2345,6 +2536,7 @@ def handle_paratext_tag(tag, pt, pt_data):
         'speaker': 'span:speaker',
         'trailer': 'div:trailer',
         'label': 'b:label',
+        'app': 'span:apparatus',
         'figure': 'div:figure',
         'salute': 'span:salute',
         'abbr': 'dt:abbr',
@@ -2361,7 +2553,7 @@ def handle_paratext_tag(tag, pt, pt_data):
     }
 
     silent = [
-        'app', 'appPart', 'lem', 'wit', 'rdgDesc',
+        'appPart', 'lem', 'wit', 'rdgDesc',
         'rdg', 'rs', 'epigraph',
         'body', 'foreign', 'cit',
     ]
@@ -2532,6 +2724,9 @@ def handle_paratext_tag(tag, pt, pt_data):
                 html += handle_paratext_tag(child, pt, pt_data)
             html += '</span>'
 
+        elif tag.name == "lb":
+            html += "<br />"
+
         elif tag.name == "graphic" and 'url' in tag.attrs:
             img_path = tag['url']
             if classes:
@@ -2545,7 +2740,7 @@ def handle_paratext_tag(tag, pt, pt_data):
                 img_path
             )
 
-        elif tag.name == "name":
+        elif tag.name in ["name", "editor"]:
             classes.append("name")
 
             attributes += ' class="{0}"'.format(
@@ -2882,11 +3077,11 @@ def render_lines_html(corpus, play, starting_line_no=None, ending_line_no=None):
     tags = corpus.get_content('PlayTag', {'play': play.id}, exclude=['play'])
 
     if not starting_line_no is None:
-        lines = lines.filter(Q(line_number__gte=starting_line_no) & Q(line_number__lte=ending_line_no))
+        lines = lines.filter(Q(line_number__gte=starting_line_no) & Q(line_number__lt=ending_line_no + 1))
         tags = tags.filter(
             (
-                (Q(start_location__gte=starting_line_no) & Q(start_location__lte=ending_line_no)) |
-                (Q(end_location__gte=starting_line_no) & Q(end_location__lte=ending_line_no))
+                (Q(start_location__gte=starting_line_no) & Q(start_location__lt=ending_line_no + 1)) |
+                (Q(end_location__gte=starting_line_no) & Q(end_location__lt=ending_line_no + 1))
             ) |
             (
                 Q(start_location__lt=starting_line_no) &
@@ -2900,29 +3095,28 @@ def render_lines_html(corpus, play, starting_line_no=None, ending_line_no=None):
     taggings = {}
     for tag in tags:
         if tag.start_location not in taggings:
-            taggings[tag.start_location] = {'open': [], 'close': []}
+            taggings[tag.start_location] = {'open': [], 'close': [], 'empty': []}
         if tag.end_location not in taggings:
-            taggings[tag.end_location] = {'open': [], 'close': []}
+            taggings[tag.end_location] = {'open': [], 'close': [], 'empty': []}
 
         open_html = tag.label.replace('[', '<').replace(']', '>')
         close_html = "</{0}>".format(open_html[1:open_html.index(" ")])
 
         if tag.start_location == tag.end_location:
-            if 'empty' not in taggings[tag.start_location]:
-                taggings[tag.start_location]['empty'] = []
             taggings[tag.start_location]['empty'].append({
                 'html': open_html + close_html,
-                'id': str(tag.id)
+                'id': str(tag.id),
+                'sibling_tag': tag.sibling_tag
             })
 
         else:
             taggings[tag.start_location]['open'].append({
                 'html': open_html,
-                'id': str(tag.id)
+                'id': str(tag.id),
             })
             taggings[tag.end_location]['close'].insert(0, {
                 'html': close_html,
-                'id': str(tag.id)
+                'id': str(tag.id),
             })
 
     del tags
@@ -2954,11 +3148,32 @@ def render_lines_html(corpus, play, starting_line_no=None, ending_line_no=None):
     del lines
     taggings.clear()
 
+def remove_tag_from_list(tag_list, tag_id):
+    if tag_id:
+        return [t for t in tag_list if t['id'] != tag_id]
+    return tag_list
 
 def place_tags(location, line, taggings, open_tags):
     if location in taggings:
+        # handle any self-closing tags that occur before existing tags
+        placed_empty_tag_id = None
+        for empty_tag in taggings[location]['empty']:
+            if empty_tag['sibling_tag'] is None:
+                line.rendered_html += empty_tag['html']
+                placed_empty_tag_id = empty_tag['id']
+        taggings[location]['empty'] = remove_tag_from_list(taggings[location]['empty'], placed_empty_tag_id)
+
+        # handle closing tags
         for closing_tag in taggings[location]['close']:
+            placed_empty_tag_id = None
+            for empty_tag in taggings[location]['empty']:
+                if empty_tag['sibling_tag'] == closing_tag['id']:
+                    line.rendered_html += empty_tag['html']
+                    placed_empty_tag_id = empty_tag['id']
+            taggings[location]['empty'] = remove_tag_from_list(taggings[location]['empty'], placed_empty_tag_id)
+
             line.rendered_html += closing_tag['html']
+
             remove_tag_index = -1
             for tag_index in range(0, len(open_tags)):
                 if open_tags[tag_index]['id'] == closing_tag['id']:
@@ -2967,13 +3182,21 @@ def place_tags(location, line, taggings, open_tags):
             if remove_tag_index > -1:
                 open_tags.pop(remove_tag_index)
 
+        # handle opening tags
         for opening_tag in taggings[location]['open']:
             line.rendered_html += opening_tag['html']
             open_tags.append(opening_tag)
 
-        if 'empty' in taggings[location]:
+            placed_empty_tag_id = None
             for empty_tag in taggings[location]['empty']:
-                line.rendered_html += empty_tag['html']
+                if empty_tag['sibling_tag'] == opening_tag['id']:
+                    line.rendered_html += empty_tag['html']
+                    placed_empty_tag_id = empty_tag['id']
+            taggings[location]['empty'] = remove_tag_from_list(taggings[location]['empty'], placed_empty_tag_id)
+
+        # handle any remaining self-closing tags
+        for empty_tag in taggings[location]['empty']:
+            line.rendered_html += empty_tag['html']
 
 
 def time_it(timer_name, stop=False):

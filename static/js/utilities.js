@@ -142,7 +142,7 @@ var navMap = {
         'title': "BIBLIOGRAPHY",
         'title_plural': "BIBLIOGRAPHY",
         'scroll_anchor': false,
-        'filter_play': false,
+        'filter_play': true,
     },
     'siglum': {
         'content_type': 'Reference',
@@ -151,7 +151,7 @@ var navMap = {
         'title': "COLLATED EDITION",
         'title_plural': "COLLATED EDITIONS",
         'scroll_anchor': false,
-        'filter_play': false,
+        'filter_play': true,
     },
     'note_cn': {
         'content_type': 'Commentary',
@@ -183,24 +183,32 @@ var navMap = {
 }
 function navigate_to(navType, xmlID, link=null) { navigateTo(navType, xmlID, link) }
 function navigateTo(navType, xmlID, link=null) {
+    // clean up xml id
+    xmlID = xmlID.replace(/#/g, '')
+
     // handle navigation to playlines
     if (navType === 'lb') {
         let startID = xmlID
-        let endID = null
-        if (startID.includes(' ')) {
-            let idParts = startID.split(' ')
-            startID = idParts[0]
-            endID = idParts[1]
-        }
+        let tlns = []
+        let lineEndpointSuffix = ''
 
-        let lineEndpointSuffix = `${startID}/`
-        if (endID) lineEndpointSuffix += `${endID}/`
+        if (startID.includes(' ')) {
+            tlns = startID.split(' ')
+            if (tlns.length === 2) {
+                lineEndpointSuffix = `${tlns[0]}/${tlns[1]}/`
+            } else {
+                lineEndpointSuffix = `?tlns=${tlns.join(',')}`
+            }
+        } else lineEndpointSuffix = `${startID}/`
 
         fetch(window.nvs.endpoints.lineRange + lineEndpointSuffix)
             .then(res => res.json())
             .then(data => {
                 if (data.length) {
-                    let linesLabel = data.length === 1 ? `Line ${data[0].line_label}` : `Lines ${data[0].line_label}-${data[data.length - 1].line_label}`;
+                    let linesLabel = `Line ${data[0].line_label}`
+                    if (tlns.length === 2) linesLabel = `Lines ${data[0].line_label}-${data[data.length - 1].line_label}`
+                    else if (tlns.length > 2) linesLabel = `Lines ${data.map(l => l.line_label).join(', ')}`
+
                     let linesHTML = '';
                     let lineTemplate = (line) =>
                         `<div class="row gx-0 ref-row">
@@ -217,7 +225,7 @@ function navigateTo(navType, xmlID, link=null) {
                     data.forEach(line => { linesHTML += lineTemplate(line) })
 
                     let controls = `
-                        <a href="${window.nvsPlayViewerURL}#${startID}-row" target="_blank"><img src="/static/img/controls/Modal-NEWTAB.svg"
+                        <a href="${window.nvs.playViewerURL}#${startID}-row" target="_blank"><img src="/static/img/controls/Modal-NEWTAB.svg"
                             class="ref-modal-control"
                             border="0"
                         ></a>`
@@ -231,10 +239,22 @@ function navigateTo(navType, xmlID, link=null) {
             return
         }
 
-        if (!xmlID.startsWith('s_')) xmlID = `s_${xmlID.toLowerCase().replace('&', '')}`
+        let xmlIDOptions = []
+        if (!xmlID.startsWith('s_')){
+            if (xmlID.includes('&')) {
+                xmlIDOptions.push(`s_${xmlID.toLowerCase().replace('&', 'and')}`)
+                xmlIDOptions.push(`s_${xmlID.toLowerCase().replace('&', 'and')}_${window.nvs.play}`)
+            }
+            xmlIDOptions.push(`s_${xmlID.toLowerCase().replace('&', '')}`)
+            xmlIDOptions.push(`s_${xmlID.toLowerCase().replace('&', '')}_${window.nvs.play}`)
+        }
 
-        if(!(xmlID in window.nvs.witnesses)) {
-            xmlID = `${xmlID}_${window.nvs.play}`
+        for (let x = 0; x < xmlIDOptions.length; x++) {
+            let xmlIDOption = xmlIDOptions[x]
+            if (xmlIDOption in window.nvs.witnesses) {
+                xmlID = xmlIDOption
+                break
+            }
         }
 
         if (xmlID in window.nvs.witnesses) {
@@ -249,6 +269,26 @@ function navigateTo(navType, xmlID, link=null) {
             let controls = `<a href="${biblioURL}" target="_blank"><i class="ref-modal-control new-tab"></i></a>`
             displayNavModal(title, window.nvs.witnesses[xmlID].bibliographic_entry, link, controls)
         }
+    } else if (navType === 'note_tn' && window.nvs.playViewer) {
+        let firstTN = xmlID
+        if (firstTN.includes(' ')) firstTN = firstTN.split(' ')[0]
+
+        fetch(`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/TextualNote/?f_xml_id=${firstTN}&only=lines.xml_id`)
+            .then(resp => resp.json())
+            .then(searchData => {
+                console.log(searchData)
+                if (searchData.records && searchData.records.length) {
+                    if (searchData.records[0].lines && searchData.records[0].lines.length) {
+                        let textualNoteLineID = searchData.records[0].lines[0].xml_id
+                        window.nvs.playViewer.navigateTo(textualNoteLineID, true, function() {
+                            console.log('navigated to tn')
+                        })
+                    }
+                }
+            })
+    } else if (navType === 'url') {
+        if (!xmlID.startsWith('http')) xmlID = `https://${xmlID}`
+        window.open(xmlID, '_blank').focus()
     } else {
         if (!navMap.hasOwnProperty(navType)) navType = 'anchor'
 
@@ -257,7 +297,7 @@ function navigateTo(navType, xmlID, link=null) {
             page: 1,
             'page-size': xmlIDs.length,
             only: 'id',
-        };
+        }
 
         if (navMap[navType]['filter_play']) {
             searchParams['f_play.prefix'] = window.nvs.play
@@ -265,7 +305,7 @@ function navigateTo(navType, xmlID, link=null) {
 
         let contentType = navMap[navType]['content_type']
         let searchField = navMap[navType]['xml_id_field']
-        searchParams[`t_${searchField}`] = xmlIDs.join('__')
+        searchParams[`f_${searchField}${xmlIDs.length > 1 ? '|' : ''}`] = xmlIDs.join('__')
 
         let endpointParams = new URLSearchParams()
         Object.keys(searchParams).forEach(key => endpointParams.set(key, searchParams[key]))
@@ -276,7 +316,7 @@ function navigateTo(navType, xmlID, link=null) {
                 if (searchData.records && searchData.records.length) {
                     let ids = searchData.records.map(record => record.id)
                     populateNavContents(navType, ids, [], xmlIDs[0], link)
-                } else if (navType == 'div') {
+                } else if (navType === 'div') {
                     navigateTo('anchor', xmlID, link)
                 }
             })
@@ -299,7 +339,7 @@ function populateNavContents(navType, ids, contents=[], firstXMLid=null, link=nu
                     let controls = '';
                     let navContent = '';
 
-                    contents.map(function(content, contentIndex) {
+                    contents.forEach((content, contentIndex) => {
                         if (navContent === '') navContent += '<a name="nav-content-start"></a>'
                         else navContent += '<br><br>'
 
@@ -351,7 +391,9 @@ function populateNavContents(navType, ids, contents=[], firstXMLid=null, link=nu
                             } else {
                                 paratextURL = `/${paratextSectionMap[content.section]}/${window.nvs.play}/`
                             }
-                            paratextURL += `#paratext-${content.id}`;
+
+                            if (navMap[navType].scroll_anchor) paratextURL += `#${firstXMLid}`
+                            else paratextURL += `#paratext-${content.id}`
 
                             if (!controls) {
                                 controls += `<a href="${paratextURL}" target="_blank"><i class="ref-modal-control new-tab"></i></a>`

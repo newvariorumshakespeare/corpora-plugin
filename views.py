@@ -1,20 +1,11 @@
-import time
 import re
-import asyncio
-from django.shortcuts import render, HttpResponse, redirect
-from asgiref.sync import sync_to_async
-from django.http import Http404
-from django.contrib.auth.decorators import login_required
-from django.utils.text import slugify
-from corpus import *
+import json
+from django.shortcuts import render, HttpResponse
+from django.conf import settings
 from mongoengine.queryset.visitor import Q
-from manager.utilities import _get_context, get_scholar_corpus, _contains, _contains_any, parse_uri, build_search_params_from_dict
-from importlib import reload
-from plugins.nvs import tasks
-from rest_framework.decorators import api_view
-from math import floor
 from PIL import Image, ImageDraw
-from elasticsearch_dsl import A
+from manager.utilities import _get_context, get_scholar_corpus, _contains, _contains_any, parse_uri, build_search_params_from_dict
+from corpus import get_corpus
 
 
 # TEMPORARY FIX FOR SOFT LAUNCH
@@ -24,6 +15,7 @@ editors = {
     'lr': "Richard Knowles, Kevin Donovan, with Paula Glatzer; GENERAL EDITORS Paul Werstine and Eric Rasmussen"
 }
 
+
 def splash(request):
     return render(
         request,
@@ -31,144 +23,6 @@ def splash(request):
         {}
     )
 
-'''
-def legacy_playviewer(request, corpus_id=None, play_prefix=None):
-    start_time = time.time()
-
-    nvs_page = "variorum-viewer"
-    site_request = False
-    corpora_url = 'https://' if settings.USE_SSL else 'http://'
-    corpora_url += settings.ALLOWED_HOSTS[0]
-    if not corpus_id and hasattr(request, 'corpus_id'):
-        corpus_id = request.corpus_id
-        site_request = True
-
-    on_mobile = False
-    user_agent = request.META['HTTP_USER_AGENT']
-    if _contains_any(user_agent, ['Mobile', 'Opera Mini', 'Android']):
-        on_mobile = True
-
-    corpus = get_corpus(corpus_id)
-    play = corpus.get_content('Play', {'prefix': play_prefix})[0]
-    nvs_session = get_nvs_session(request, play_prefix, reset='reset' in request.GET)
-
-    # HANDLE GET PARAMS
-    act_scene = request.GET.get('scene', nvs_session['filter']['act_scene'])
-    character = request.GET.get('character', nvs_session['filter']['character'])
-
-    # BUILD LINES
-    lines = []
-    session_changed = False
-
-    if 'play_id' not in nvs_session or nvs_session['play_id'] != str(play.id):
-        nvs_session['play_id'] = str(play.id)
-        session_changed = True
-    if nvs_session['filter']['character'] != character:
-        nvs_session['filter']['character'] = character
-        nvs_session['filter']['character_lines'] = []
-        session_changed = True
-    if nvs_session['filter']['act_scene'] != act_scene:
-        nvs_session['filter']['act_scene'] = act_scene
-        session_changed = True
-
-    if session_changed:
-        nvs_session['is_filtered'] = character != 'all' or act_scene != 'all'
-        nvs_session['filter']['no_results'] = False
-
-        filter_session_lines_by_character(corpus, play, nvs_session)
-        set_nvs_session(request, nvs_session, play_prefix)
-
-    lines = get_session_lines(corpus, nvs_session)
-
-    # LINE NOTE MAP
-    line_note_map = {}
-    note_results = corpus.search_content(
-        'TextualNote',
-        page_size=10000,
-        fields_filter={
-            'play.id': str(play.id)
-        },
-        fields_sort=[{'lines.line_number': {'order': 'asc'}}],
-        only=['id', 'xml_id', 'lines.xml_id']
-    )
-    if note_results and 'records':
-        for note in note_results['records']:
-            for line in note['lines']:
-                if line['xml_id'] not in line_note_map:
-                    line_note_map[line['xml_id']] = [{
-                        'id': note['id'],
-                        'xml_id': note['xml_id']
-                    }]
-                else:
-                    line_note_map[line['xml_id']].append({
-                        'id': note['id'],
-                        'xml_id': note['xml_id']
-                    })
-
-    # COMMENTARY IDS
-    comm_ids = []
-    comm_search = {
-        'content_type': 'Commentary',
-        'page': 1,
-        'page_size': 10000,
-        'fields_filter': {
-            'play.id': str(play.id)
-        },
-        'fields_sort': [
-            {'lines.line_number': {'order': 'asc'}},
-            {'xml_id': {'order': 'asc'}}
-        ],
-        'only': ['id', 'xml_id'],
-    }
-    comm_results = corpus.search_content(**comm_search)
-    for comm_result in comm_results['records']:
-        comm_ids.append({'xml_id': comm_result['xml_id'], 'id': comm_result['id']})
-
-    # CHARACTERS
-    characters = []
-    char_search = {
-        'page-size': 0,
-        'f_play.id': str(play.id),
-        'a_terms_chars': 'speaking.xml_id,speaking.label.raw',
-    }
-    char_search_params = build_search_params_from_dict(char_search)
-    char_results = corpus.search_content('Speech', **char_search_params)
-    if char_results and 'aggregations' in char_results['meta'] and 'chars' in char_results['meta']['aggregations']:
-        for char_info, num_speeches in char_results['meta']['aggregations']['chars'].items():
-            char_id, char_name = char_info.split('|||')
-            characters.append({
-                'xml_id': char_id,
-                'name': char_name,
-                'speeches': num_speeches
-            })
-
-    # WITNESSES
-    witnesses, wit_counter, witness_centuries = get_nvs_witnesses(corpus, play)
-
-    print(time.time() - start_time)
-
-    return render(
-        request,
-        'playviewer.html',
-        {
-            'site_request': site_request,
-            'on_mobile': on_mobile,
-            'corpora_url': corpora_url,
-            'corpus_id': corpus_id,
-            'lines': lines,
-            'characters': characters,
-            'comm_ids': comm_ids,
-            'line_note_map': line_note_map,
-            'play': play,
-            'editors': editors[play_prefix],
-            'witnesses': json.dumps(witnesses),
-            'witness_centuries': witness_centuries,
-            'witness_count': wit_counter,
-            'nvs_session': nvs_session,
-            'nvs_page': nvs_page
-        }
-    )
-'''
 
 def playviewer(request, corpus_id=None, play_prefix=None):
     site_request = False
@@ -260,6 +114,7 @@ def get_lines_by_range(corpus, play_id, high, low):
         'line_number__lte': high
     }).exclude('play', 'witness_locations').order_by('line_number')
 
+
 def paratext(request, corpus_id=None, play_prefix=None, section=None):
     corpora_url = 'https://' if settings.USE_SSL else 'http://'
     corpora_url += settings.ALLOWED_HOSTS[0]
@@ -343,7 +198,7 @@ def paratext(request, corpus_id=None, play_prefix=None, section=None):
             'corpus_id': corpus_id,
             'site_request': site_request,
             'nvs_page': nvs_page,
-            'corpora_url': corpora_url,
+            'corpora_host': corpora_url,
             'play': play,
             'witnesses': json.dumps(witnesses),
             'section': section,
@@ -412,7 +267,6 @@ async def witness_meter(request, witness_flags, height, width, inactive_color_he
                 )
 
                 start_y += 4
-
 
         response = HttpResponse(content_type="image/png")
         img.save(response, 'PNG')
@@ -806,15 +660,20 @@ def api_lines(request, corpus_id=None, play_prefix=None, starting_line_id=None, 
     if corpus_id and play_prefix:
         corpus = get_corpus(corpus_id)
         play = corpus.get_content('Play', {'prefix': play_prefix})[0]
+        tlns = request.GET.get('tlns', [])
+        if tlns:
+            tlns = tlns.split(',')
 
-        if starting_line_id:
+        if starting_line_id or tlns:
             all_lines = corpus.get_content('PlayLine', {'play': play.id}).order_by('line_number')
             started_collecting = False
             for line in all_lines:
-                if line.xml_id == starting_line_id or starting_line_id in line.alt_xml_ids:
+                if line.xml_id == starting_line_id or starting_line_id in line.alt_xml_ids or line.xml_id in tlns or [tln for tln in tlns if tln in line.alt_xml_ids]:
                     lines.append(line.to_dict())
                     if ending_line_id and not (line.xml_id == ending_line_id or ending_line_id in line.alt_xml_ids):
                         started_collecting = True
+                    elif tlns:
+                        pass
                     else:
                         break
                 elif line.xml_id == ending_line_id or ending_line_id in line.alt_xml_ids:
@@ -872,10 +731,10 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
                 break
 
         if edition_slot > -1:
-            play_lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_label', 'act', 'scene', 'text']).order_by('+line_number')
+            play_lines = corpus.get_content('PlayLine', {'play': play.id}, only=['xml_id', 'act', 'scene', 'text']).order_by('+line_number')
             for play_line in play_lines:
                 lines.append({
-                    'tlns': [play_line.line_label],
+                    'tlns': [play_line.xml_id],
                     'modified': False,
                     'text': play_line.text
                 })
@@ -885,7 +744,7 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
                 **build_search_params_from_dict({
                     'page-size': 10000,
                     'f_play.id': str(play.id),
-                    'only': 'lines.line_number,lines.line_label,witness_meter,variants.witness_meter,variants.variant',
+                    'only': 'lines.line_number,lines.line_xml_id,witness_meter,variants.witness_meter,variants.variant',
                     's_lines.line_number': 'asc'
                 })
             )
@@ -901,7 +760,7 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
 
                                 for line in tn['lines']:
                                     line_nos.append(line['line_number'])
-                                    tlns.append(line['line_label'])
+                                    tlns.append(line['xml_id'])
 
                                 first_line_no = line_nos[0]
 

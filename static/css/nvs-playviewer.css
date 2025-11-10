@@ -17,7 +17,7 @@
     --nvs-yellow-gray: #3b371c;
     --nvs-dark-blue: #2a69a1;
     --nvs-light-blue: #6c9ecc;
-    --nvs-lightest-blue: rgb(235, 244, 252);
+    --nvs-lightest-blue: #EBF4FC;
     --nvs-primary-orange: #CC5F38;
     --nvs-secondary-orange: #F1B06E;
     --nvs-burnt-orange: #d87448;
@@ -542,10 +542,23 @@ body.mobile #playtext-col::-webkit-scrollbar-thumb {
     font-size: 12px;
 }
 
+.line-label-link {
+    color: var(--nvs-mid-gray);
+    font-family: inherit;
+    font-size: inherit;
+}
+
 body.mobile .play-label {
     border-left: unset;
     border-right: unset;
 }
+
+.indent1em { padding-left: 1em; }
+.indent2em { padding-left: 2em; }
+.indent3em { padding-left: 3em; }
+.indent4em { padding-left: 4em; }
+.indent5em { padding-left: 5em; }
+.indent55em { padding-left: 5.5em; }
 
 .play-words {
     padding-top: 10px;
@@ -579,8 +592,11 @@ comspan.highlight {
     border-bottom: solid 1px var(--nvs-dark-yellow);
     cursor: pointer;
 }
+comspan.highlight.continuation {
+    background-color: var(--nvs-lightest-blue);
+}
 
-span.castlist:not(:empty) {
+castlist.castlist:not(:empty) {
     width: 100%;
 }
 h3.heading {
@@ -593,58 +609,73 @@ h3.heading {
     text-align: center;
 }
 
-span.castgroup {
+castgroup.castgroup {
     margin-left: 10px;
     margin-right: 5px;
 }
 
-span.role {
+role.role {
     font-weight: bold;
 }
 
-span.roledesc {
+roledesc.roledesc {
     font-style: italic;
     display: inline-block;
     margin-left: 5px;
 }
 
-span.stage {
+stage.stage {
     font-style: italic;
     margin-right: auto !important;
     margin-left: 10px !important;
 }
 
-span.speaker-abbreviation {
+speaker.speaker-abbreviation {
     font-style: italic;
     display: inline-block;
     margin-right: 10px;
     margin-left: 10px;
 }
 
-span.foreign, span.entity {
+foreign.foreign, name.entity, .italicized {
+    font-style: italic;
+}
+
+.align-center {
+    text-align: center;
+    display: block!important;
+    background-color: inherit;
+    border-bottom: inherit;
+}
+
+.align-right {
+    float: right;
+}
+
+.rend-italic {
     font-style: italic;
 }
 
 /* LINEATION MARKERS */
-span.open-bracket-marker, span.close-bracket-marker, span.open-half-bracket-marker, span.close-half-bracket-marker, span.asterix-marker, span.pipe-marker {
+playlinemarker.open-bracket-marker, playlinemarker.close-bracket-marker, playlinemarker.open-half-bracket-marker, playlinemarker.close-half-bracket-marker, playlinemarker.asterix-marker, playlinemarker.pipe-marker {
     color: var(--nvs-mid-gray);
 }
-span.open-bracket-marker::after {
+playlinemarker.open-bracket-marker::after {
     content: "[";
 }
-span.close-bracket-marker::after {
+playlinemarker.close-bracket-marker::after {
     content: "]";
 }
-span.open-half-bracket-marker::after {
+playlinemarker.open-half-bracket-marker::after {
     content: "⸢";
 }
-span.close-half-bracket-marker::after {
+playlinemarker.close-half-bracket-marker::after {
     content: "⸣";
 }
-span.asterix-marker::after {
+playlinemarker.asterix-marker::after {
     content: "*";
 }
-span.pipe-marker::after {
+playlinemarker.pipe-marker::after {
     content: "|";
 }
 
@@ -750,6 +781,10 @@ span.difference {
 
 .comm-block a {
     color: var(--nvs-dark-blue);
+}
+
+.comm-block b {
+    background-color: var(--nvs-lightest-blue);
 }
 
 .actscene-indicator {
@@ -1033,6 +1068,7 @@ mark {
     font-family: 'HalyardTextBook';
     max-height: calc(40vh);
     overflow-y: scroll;
+    overscroll-behavior: contain;
 }
 
 .ref-modal-content .comm-heading {

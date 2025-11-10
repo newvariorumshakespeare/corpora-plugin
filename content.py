@@ -545,6 +545,21 @@ REGISTRY = [
                 "inherited": False
             },
             {
+                "name": "css_classes",
+                "label": "CSS Classes",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "keyword",
+                "choices": [],
+                "cross_reference_type": "",
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
                 "name": "witness_meter",
                 "label": "Witness Meter",
                 "indexed": False,
@@ -653,6 +668,25 @@ REGISTRY = [
                 "type": "decimal",
                 "choices": [],
                 "cross_reference_type": "",
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
+                "name": "sibling_tag",
+                "label": "Sibling Tag",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": False,
+                "type": "keyword",
+                "choices": [],
+                "cross_reference_type": "",
+                "has_intensity": False,
+                "language": None,
+                "autocomplete": False,
+                "synonym_file": None,
                 "indexed_with": [],
                 "unique_with": [],
                 "stats": {},
@@ -2275,7 +2309,7 @@ class ParaText(Content):
     @property
     def full_html(self):
         if not hasattr(self, '_full_html'):
-            html = '<a name="paratext-{0}" class="anchor"></a>'.format(self.id)
+            html = '<a id="paratext-{0}" name="paratext-{0}" class="anchor"></a>'.format(self.id)
             html += '<h2 class="section-heading level-{0}">{1}</h2>'.format(
                 self.level,
                 self.title

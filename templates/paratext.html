@@ -8,6 +8,23 @@
 <style>
     :root {
         --sideBar: 400px;
+        --nvs-background-color: #FFFFFF;
+        --nvs-lightest-gray: #F2F2F2;
+        --nvs-light-gray: #E6E6E6;
+        --nvs-lighter-gray: #cfcfcf;
+        --nvs-mid-gray: #828282;
+        --nvs-yellow-gray: #3b371c;
+        --nvs-dark-blue: #2a69a1;
+        --nvs-light-blue: #6c9ecc;
+        --nvs-lightest-blue: rgb(235, 244, 252);
+        --nvs-primary-orange: #CC5F38;
+        --nvs-secondary-orange: #F1B06E;
+        --nvs-burnt-orange: #d87448;
+        --nvs-light-orange: #F9EFE4;
+        --nvs-dark-yellow: #F0E438;
+        --nvs-light-yellow: #f9f1d9;
+        --nvs-light-beige: #FBF5F1;
+        --nvs-dark-beige: #EBE4DD;
     }
 
     html {
@@ -37,7 +54,7 @@
         font-weight: 500;
         margin-top: 10px;
         margin-bottom: 10px;
-        line-height: 22px;
+        /*line-height: 22px;*/
     }
     .paratext h1 {
         font-family: "Halyard Text", sans-serif;
@@ -98,16 +115,23 @@
         margin: 10px 0 10px 30px;
         font-size: 15px;
         line-height: 20px;
-        text-align: left;
-        padding-left: 120px;
-        position: relative;
+        display: flex;
+        flex-direction: row;
+        gap: 3px;
     }
     .pt_textual_note > .ref-lb:first-child {
-        position: absolute;
-        top: 0;
-        left: 0;
+        flex: 0 0 120px;
+        padding-right: 15px;
     }
+    .pt_textual_note > .apparatus:first-child {
+        margin-left: 120px;
+    }
+    .apparatus .under-caret {
+        font-size: 24px;
+    }
+
     .ref-lb,
+    .ref-note_cn,
     .ref {
         color: var(--blue);
         text-decoration: underline;
@@ -126,7 +150,7 @@
         text-decoration: underline;
         font-weight: 700;
         font-variant-numeric: normal;
-        font-size: 14px;
+        /*font-size: 14px;*/
         cursor: pointer;
     }
     .witness-list {
@@ -153,6 +177,9 @@
         text-decoration: none;
     }
 
+    .name {
+        text-transform: capitalize;
+    }
     .name, .author, .editor, .note-toggler {
         color: var(--blue);
         font-weight: 700;
@@ -229,10 +256,18 @@
     .paratext li {
         margin: 10px 0;
     }
+
     dt, dd {
         display: inline-block;
         margin: 0;
     }
+    dt.abbr {
+        vertical-align: top;
+    }
+    dd.expan {
+        max-width: 500px;
+    }
+
     .paratext li > dt:first-child {
       min-width: 100px;
     }
@@ -269,14 +304,14 @@
     .rend-indent7em { margin-left: 70px; }
     .rend-indent8em { margin-left: 80px; }
     .rend-indent10em { margin-left: 100px; }
-    .rend-indent15em { margin-left: 150px; }
+    .rend-indent15em, .rend-indent125em { margin-left: 150px; }
     .rend-italic { font-style: italic; }
     .rend-bold { font-weight: 700; }
     .rend-aligncenter, .rend-aligncenter p { text-align: center !important; }
     .rend-alignleft, .rend-alignleft p { text-align: left !important; }
     .rend-alignright, .rend-alignright p { text-align: right !important; }
     .rend-allcaps { text-transform: uppercase; }
-    .rend_smcaps { font-variant: small-caps; font-weight: bold; }
+    .rend_smcaps, .rend-smcaps, .siglum { font-variant: small-caps; font-weight: bold; }
 
     .type-marginalia.nvs-seg, .note-margin {
         float: right;
@@ -392,7 +427,7 @@
         margin-left: -15px;
     }
 
-    .no-gutters {
+    .no-gutters, .gx-0 {
         margin-right: 0;
         margin-left: 0;
     }
@@ -425,17 +460,36 @@
         max-width: 8.333333%;
     }
 
+    /********************/
+    /* REF MODAL STYLES */
+    /********************/
+
+    #nav-modal-label {
+        font-family: 'Baskerville', serif;
+        font-variant-numeric: oldstyle-nums;
+    }
+
+    #nav-modal-body {
+        font-family: 'FormulaSerial';
+        overflow-y: scroll;
+        max-height: calc(80vh);
+    }
+
     .ref-modal {
         position: absolute;
         max-width: calc(40vw);
         z-index: 500;
     }
 
-    .arrow-right, .arrow-left {
+    .ref-modal .tab-pane {
+        padding: 10px;
+    }
+
+    .arrow-right, .arrow-left, .arrow-top, .arrow-none {
         background-color: #FFFFFF;
         position: relative;
         box-sizing: border-box;
-        border: 1px solid #828282;
+        border: 1px solid var(--nvs-mid-gray);
         box-shadow: 0px 3px 3px 0 rgba(0, 0, 0, 0.4);
     }
 
@@ -447,7 +501,7 @@
         float: right;
     }
 
-    .arrow-right:after, .arrow-right:before, .arrow-left:after, .arrow-left:before {
+    .arrow-right:after, .arrow-right:before, .arrow-left:after, .arrow-left:before, .arrow-top:after, .arrow-top:before {
         content: " ";
         width: 0;
         height: 0;
@@ -460,6 +514,11 @@
         left: 100%;
     }
 
+    .arrow-top:after, .arrow-top:before {
+        top: -15px;
+        left: 15px;
+    }
+
     .arrow-right:after {
         border-top: 15px solid transparent;
         border-right: none;
@@ -470,7 +529,7 @@
     .arrow-right:before {
         border-top: 17px solid transparent;
         border-right: none;
-        border-left: 16px solid #828282;
+        border-left: 16px solid var(--nvs-mid-gray);
         border-bottom: 16px solid transparent;
         margin-top: -2px;
     }
@@ -485,10 +544,26 @@
     .arrow-left:before {
         border-top: 17px solid transparent;
         border-left: none;
-        border-right: 16px solid #828282;
+        border-right: 16px solid var(--nvs-mid-gray);
         border-bottom: 16px solid transparent;
         margin-top: -2px;
         margin-left: -1px;
+    }
+
+    .arrow-top:after {
+        border-top: none;
+        border-right: 15px solid transparent;
+        border-left: 15px solid transparent;
+        border-bottom: 15px solid white;
+        margin-left: 1px;
+    }
+
+    .arrow-top:before {
+        border-top: none;
+        border-right: 16px solid transparent;
+        border-left: 16px solid transparent;
+        border-bottom: 16px solid var(--nvs-mid-gray);
+        top: -16px;
     }
 
     .ref-modal-header {
@@ -501,7 +576,7 @@
     }
 
     .ref-subtitle-marker {
-        background-color: #2a69a1;
+        background-color: var(--nvs-dark-blue);
         width: 13px;
         height: 13px;
         display: inline-block;
@@ -513,7 +588,39 @@
     .ref-modal-control {
         cursor: pointer;
         height: 20px;
+        width: 20px;
+        display: inline-block;
         margin-left: 5px;
+        text-decoration: none;
+        color: var(--nvs-mid-gray);
+    }
+
+    .ref-modal-control:hover {
+        text-decoration: none;
+    }
+
+    .ref-modal-control.new-tab {
+        background-image: url('/static/img/controls/Modal-NEWTAB.svg');
+    }
+
+    .ref-modal-control.new-tab:hover {
+        background-image: url('/static/img/controls/Modal-NEWTAB-all-ROLL.svg');
+    }
+
+    .ref-modal-control.go-to {
+        background-image: url('/static/img/controls/Modal-GOTO.svg');
+    }
+
+    .ref-modal-control.go-to:hover {
+        background-image: url('/static/img/controls/Modal-GOTO-ALL-ROLL.svg');
+    }
+
+    .ref-modal-control.close {
+        background-image: url('/static/img/controls/Modal-CLOSE.svg');
+    }
+
+    .ref-modal-control.close:hover {
+        background-image: url('/static/img/controls/Modal-CLOSE-all-ROLL.svg');
     }
 
     .ref-modal-content {
@@ -524,23 +631,21 @@
         overscroll-behavior: contain;
     }
 
-    .ref-modal-content a.anchor[name] {
-        display: inline-block;
-        scroll-margin-top: 20px;
+    .ref-modal-content .comm-heading {
+        cursor: unset;
     }
 
-    .ref-modal-content .anchor[name]:before {
-        padding-top: 0;
-        margin-top: 0;
+    .ref-modal-content .comm-heading:hover {
+        color: #000000;
     }
 
     .ref-row {
         width: calc(40vw);
-        border-top: solid 1px #cfcfcf;
+        border-top: solid 1px var(--nvs-lighter-gray);
     }
 
     .ref-row:last-child {
-        border-bottom: solid 1px #cfcfcf;
+        border-bottom: solid 1px var(--nvs-lighter-gray);
     }
 
     .play-words {
@@ -648,78 +753,35 @@
 <script src="{% static 'js/jquery-3.3.1.min.js' %}"></script>
 <script src="{% static 'js/popper.min.js' %}"></script>
 <script src="{% static 'js/bootstrap.min.js' %}"></script>
-<script src="{% static 'js/corpora.js' %}"></script>
+<!--<script src="{% static 'js/corpora.js' %}"></script>-->
+<script src="{% static 'js/utilities.js' %}"></script>
 <script type="application/javascript">
-    let corpora;
-    let corpus_id = "{{ corpus_id }}";
-    let corpora_url = "{{ corpora_url }}";
-    let play_prefix = "{{ play.prefix }}";
-    let play_id = "{{ play.id }}";
-    let witnesses = {{ witnesses|safe }};
-    let playviewer_url = {% if site_request %}`/edition/${play_prefix}/`{% else %}`/corpus/${corpus_id}/play-viewer/${play_prefix}/`{% endif %};
-    let paratext_prefix = {% if site_request %}''{% else %}`/corpus/${corpus_id}/paratext-viewer/${play_prefix}/`{% endif %};
-    let lines_endpoint = {% if site_request %}`${window.location.protocol}//${window.location.host}/lines/${play_prefix}/`{% else %}`/api/corpus/${corpus_id}/nvs-lines/${play_prefix}/`{% endif %};
-    let ref_modal_counter = 0;
-
-    let nav_map = {
-        'lb': {
-            'content_type': 'PlayLine',
-            'xml_id_field': 'xml_id',
-            'content_field': 'rendered_html',
-            'title': 'LINE',
-            'title_plural': 'LINES',
-            'scroll_anchor': false,
-            'filter_play': true,
-        },
-        'bibl': {
-            'content_type': 'Reference',
-            'xml_id_field': 'document.siglum',
-            'content_field': 'bibliographic_entry',
-            'title': "BIBLIOGRAPHY",
-            'title_plural': "BIBLIOGRAPHY",
-            'scroll_anchor': false,
-            'filter_play': false,
-        },
-        'siglum': {
-            'content_type': 'Reference',
-            'xml_id_field': 'document.siglum',
-            'content_field': 'bibliographic_entry',
-            'title': "COLLATED EDITION",
-            'title_plural': "COLLATED EDITIONS",
-            'scroll_anchor': false,
-            'filter_play': false,
-        },
-        'note_cn': {
-            'content_type': 'Commentary',
-            'xml_id_field': 'xml_id',
-            'content_field': 'contents',
-            'title': "COMMENTARY",
-            'title_plural': "COMMENTARY",
-            'scroll_anchor': false,
-            'filter_play': true,
-        },
-        'div': {
-            'content_type': 'ParaText',
-            'xml_id_field': 'xml_id',
-            'content_field': 'html_content',
-            'title': "APPENDIX",
-            'title_plural': "APPENDIX",
-            'scroll_anchor': true,
-            'filter_play': true,
-        },
-        'anchor': {
-            'content_type': 'ParaText',
-            'xml_id_field': 'child_xml_ids',
-            'content_field': 'html_content',
-            'title': "APPENDIX",
-            'title_plural': "APPENDIX",
-            'scroll_anchor': true,
-            'filter_play': true,
-        }
-    };
+    window.nvs = {
+        corporaHost: '{{ corpora_host }}',
+        corpusID: '{{ corpus_id }}',
+        play: '{{ play.prefix }}',
+        playViewer: null,
+        playViewerURL: {% if site_request %}`/edition/{{ play.prefix }}/`{% else %}`/corpus/{{ corpus_id }}/play-viewer/{{ play.prefix }}/`{% endif %},
+        paratextPrefix: {% if site_request %}''{% else %}`/corpus/{{ corpus_id }}/paratext-viewer/{{ play.prefix }}/`{% endif %},
+        staticPath: '/static',
+        witnesses: null,
+        witnessCount: null,
+        witnessCenturies: null
+    }
+    window.nvs.endpoints = {
+        line: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/PlayLine/`,
+        lineRange: {% if site_request %}`${window.location.protocol}//${window.location.host}/lines/${window.nvs.play}/`{% else %}`/api/corpus/${window.nvs.corpusID}/nvs-lines/${window.nvs.play}/`{% endif %},
+        commentary: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/Commentary/`,
+        note: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/TextualNote/`,
+        search: {% if site_request %}`${window.location.protocol}//${window.location.host}/search/${window.nvs.play}/`{% else %}`/api/corpus/${window.nvs.corpusID}/nvs-search/${window.nvs.play}/`{% endif %},
+        speech: `${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/Speech/`,
+        witness: {% if site_request %}`${window.location.protocol}//${window.location.host}/witnesses/${window.nvs.play}/`{% else %}`${window.nvs.corporaHost}/api/corpus/${window.nvs.corpusID}/nvs-witnesses/${window.nvs.play}/`{% endif %},
+        witnessMeter: {% if site_request %}`/witnessmeter/`{% else %}`/nvs/witness-meter/`{% endif %},
+        minimap: {% if site_request %}`/minimap/${window.nvs.play}/`{% else %}`/corpus/${window.nvs.corpusID}/play-minimap/${window.nvs.play}/`{% endif %}
+    }
 
     $(document).ready(function() {
-        corpora = new Corpora({'csrf_token': "{{ csrf_token }}"{% if site_request %},'host': '{{ corpora_url }}'{% endif %}});
+        //corpora = new Corpora({'csrf_token': "{{ csrf_token }}"{% if site_request %},'host': '{{ corpora_url }}'{% endif %}});
 
         // Place statement about digital edition of NVS before textual note section
         let textual_note_explanation = $('#textual_note_explanation_start');
@@ -762,7 +824,7 @@
             let graphic = $(this);
             let repo_name = graphic.data('repo-name');
             let path = graphic.data('path');
-            let src = `${corpora_url}/repo-file/${corpus_id}/${repo_name}/?path=${path}`;
+            let src = `${window.nvs.corporaHost}/repo-file/${window.nvs.corpusID}/${repo_name}/?path=${path}`;
             graphic.attr('src', src);
         });
 
@@ -789,326 +851,11 @@
         })
         $('.note-toggler').tooltip()
 
+        // fix problem where under-caret too small inside textual notes
+        $('.pt_textual_note .apparatus').each(function() {
+            let app = $(this)
+            app.html(app.html().replaceAll('‸', '<span class="under-caret">‸</span>'))
+        })
     })
-
-    function romanize (num) {
-        if (isNaN(num))
-            return num;
-        let digits = String(+num).split(""),
-            key = ["","C","CC","CCC","CD","D","DC","DCC","DCCC","CM",
-                "","X","XX","XXX","XL","L","LX","LXX","LXXX","XC",
-                "","I","II","III","IV","V","VI","VII","VIII","IX"],
-            roman = "",
-            i = 3;
-        while (i--)
-            roman = (key[+digits.pop() + (i * 10)] || "") + roman;
-        return Array(+digits.join("") + 1).join("M") + roman;
-    }
-
-    function navigate_to(nav_type, xml_id, link=null) {
-        xml_id = xml_id.replace(/#/g, '');
-        if (nav_type === 'lb') {
-            let start_id = xml_id;
-            let end_id = null;
-            if (start_id.includes(' ')) {
-                let id_parts = start_id.split(' ');
-                start_id = id_parts[0];
-                end_id = id_parts[1];
-            }
-
-            let line_endpoint_suffix = `${start_id}/`;
-            if (end_id) { line_endpoint_suffix += `${end_id}/` }
-
-            corpora.make_request(
-                lines_endpoint + line_endpoint_suffix,
-                'GET',
-                {},
-                function(data) {
-                    if (data.length) {
-                        let lines_label = data.length === 1 ? `Line ${data[0].line_label}` : `Lines ${data[0].line_label}-${data[data.length - 1].line_label}`;
-                        let lines_html = '';
-                        let line_template = (line) =>
-                            `<div class="row no-gutters ref-row">
-                                <div class="col-sm-10 m-0 p-0 play-words">
-                                    ${line.text}
-                                </div>
-                                <div class="col-sm-1 m-0 p-1 play-label d-flex justify-content-center">
-                                    ${line.line_label}
-                                </div>
-                                <div class="col-sm-1 m-0 p-1 bg-nvs-lightest-gray actscene-indicator d-flex justify-content-center">
-                                    ${romanize(line.act)},${line.scene}
-                                </div>
-                            </div>`;
-                        data.map(line => { lines_html += line_template(line); });
-
-                        let controls = `
-                            <a href="${playviewer_url}#${start_id}-row" target="_blank"><img src="{% static 'img/controls/Modal-NEWTAB.svg' %}"
-                                class="ref-modal-control"
-                                border="0"
-                            ></a>`;
-                        display_nav_modal(lines_label, lines_html, link, controls);
-                    }
-                }
-            );
-        } else if (nav_type === 'siglum'){
-            if (!xml_id.startsWith('s_')) xml_id = `s_${xml_id.toLowerCase()}`
-
-            if (!Object.keys(witnesses).includes(xml_id)) { xml_id = `${xml_id}_${play_prefix}` }
-
-            if (xml_id in witnesses) {
-                let title = 'Collated Edition';
-                if (witnesses[xml_id].bibliographic_entry.includes('<br /><br />')) title += 's';
-                display_nav_modal(title, witnesses[xml_id].bibliographic_entry, link);
-            }
-        } else if (nav_type === 'url') {
-            if (!xml_id.startsWith('http')) xml_id = `https://${xml_id}`
-            window.open(xml_id, '_blank').focus()
-        } else {
-            if (!nav_map.hasOwnProperty(nav_type)) nav_type = 'anchor';
-
-            let xml_ids = xml_id.split(' ');
-            let search_params = {
-                page: 1,
-                'page-size': xml_ids.length,
-                only: 'id',
-                operator: xml_ids.length > 1 ? 'or' : 'and'
-            };
-
-            if (nav_map[nav_type]['filter_play']) {
-                search_params['f_play.id'] = play_id;
-            }
-
-            let content_type = nav_map[nav_type]['content_type'];
-            let search_field = nav_map[nav_type]['xml_id_field'];
-            search_params[`t_${search_field}`] = xml_ids.join('__');
-
-            corpora.list_content(corpus_id, content_type, search_params, function (search_data) {
-                if (search_data.hasOwnProperty('records') && search_data.records.length === xml_ids.length) {
-                    let ids = search_data.records.map(record => record.id);
-                    populate_nav_contents(nav_type, ids, [], xml_ids[0], link);
-                } else if (nav_type === 'div') {
-                    navigate_to('anchor', xml_id, link)
-                }
-            });
-        }
-    }
-
-    function populate_nav_contents(nav_type, ids, contents=[], first_xml_id=null, link=null) {
-        if (ids.length > 0) {
-            let content_type = nav_map[nav_type]['content_type'];
-
-            corpora.get_content(corpus_id, content_type, ids[0], function(content_data) {
-                contents.push(content_data);
-                ids.shift();
-
-                if (ids.length > 0) {
-                    populate_nav_contents(nav_type, ids, contents, first_xml_id, link);
-                } else {
-                    let nav_title = nav_map[nav_type]['title'];
-                    if (contents.length > 1) { nav_title = nav_map[nav_type]['title_plural']; }
-                    let controls = '';
-                    let nav_content = '';
-
-                    contents.map(function(content, content_index) {
-                        if (nav_content === '') nav_content += '<a name="nav-content-start"></a>';
-                        else nav_content += '<br><br>';
-
-                        if (nav_type === 'note_cn') {
-                            nav_content += `
-                                <div class="comm-heading">
-                                    <span class="comm-indicator">n. ${content.line_label}:</span> ${content.subject_matter}
-                                </div>
-                            `;
-                        } else if (nav_type === 'bibl' && first_xml_id && !controls) {
-                            let biblio_url = paratext_prefix;
-                            if (first_xml_id.startsWith('b_')) {
-                                if (biblio_url) {
-                                    biblio_url += `Bibliography/#${first_xml_id}`;
-                                } else {
-                                    biblio_url = `/bibliography/${play_prefix}/#${first_xml_id}`;
-                                }
-                            } else if (first_xml_id.startsWith('pw_') || first_xml_id.startsWith('s_')) {
-                                if (biblio_url) {
-                                    biblio_url += `Front Matter/#${first_xml_id}`;
-                                } else {
-                                    biblio_url = `/front/${play_prefix}/#${first_xml_id}`;
-                                }
-                            }
-                            controls += `<a href="${biblio_url}" target="_blank"><i class="ref-modal-control new-tab"></i></a>`;
-                        } else if (['anchor', 'div'].includes(nav_type)) {
-                            if (content_index === 0) {
-                                nav_title = `
-                                    <span>
-                                        ${content.section}
-                                        <br/>
-                                        <div class="ref-subtitle-marker">&nbsp;</div>
-                                        <span class="text-nvs-dark-blue">
-                                            ${content.title}
-                                        </span>
-                                    </span>
-                                `;
-                            }
-
-                            let paratext_url = ''
-                            let paratext_section_map = {
-                                'Front Matter': 'front',
-                                'Appendix': 'appendix',
-                                'Bibliography': 'bibliography'
-                            }
-
-                            if (paratext_prefix.length) {
-                                paratext_url = `${paratext_prefix}${content.section}/`;
-                            } else {
-                                paratext_url = `/${paratext_section_map[content.section]}/${play_prefix}/`;
-                            }
-                            paratext_url += `#paratext-${content.id}`;
-
-                            if (!controls) {
-                                controls += `<a href="${paratext_url}" target="_blank"><i class="ref-modal-control new-tab"></i></a>`;
-                            }
-                        }
-
-                        nav_content += content[nav_map[nav_type]['content_field']];
-                    });
-
-                    let modal_id = display_nav_modal(nav_title, nav_content, link, controls);
-                    if (nav_map[nav_type].scroll_anchor) {
-                        setTimeout(delayed_scroll.bind(null, first_xml_id, true, modal_id), 2000)
-                    }
-                }
-            });
-        }
-    }
-
-    function display_nav_modal(title, content, link, controls='') {
-        let modal_id = '';
-        let modal_el = null;
-
-        if (link) {
-            modal_id = `ref-modal-${ref_modal_counter}`;
-            let link_rect = link.getBoundingClientRect();
-            let arrow_side = 'right';
-            if (link_rect.x <= window.innerWidth / 2) {
-                arrow_side = 'left'
-            }
-            $('body').append(`
-                <div
-                    id="${modal_id}"
-                    class="ref-modal"
-                >
-                    <div class="arrow-${arrow_side}">
-                        <div class="ref-modal-header d-flex justify-content-between">
-                            <span id="${modal_id}-header" class="w-100">
-                                ${title}
-                            </span>
-                            <span style="white-space: nowrap;">
-                                ${controls}
-                                <img src="{% static 'img/controls/Modal-CLOSE.svg' %}" id="${modal_id}-close-button" class="ref-modal-control" data-modal-id="${modal_id}" aria-label="Close" />
-                            </span>
-                        </div>
-                        <div class="ref-modal-content">${content}</div>
-                    </div>
-                </div>
-            `);
-            modal_el = $(`#${modal_id}`);
-            if (arrow_side === 'right') {
-                modal_el.css('top', `${link_rect.top + window.pageYOffset - 20}px`);
-                modal_el.css('left', `${link_rect.left - (modal_el.width() + 20)}px`);
-            } else {
-                modal_el.css('top', `${link_rect.top + window.pageYOffset - 20}px`);
-                modal_el.css('left', `${link_rect.right + 20}px`);
-            }
-
-            $(`#${modal_id}-close-button`).click(function() {
-                let close_modal_id = $(this).data('modal-id');
-                $(`#${close_modal_id}`).remove();
-            });
-
-            make_draggable(modal_el[0]);
-            ref_modal_counter += 1;
-        }
-        else {
-            $('#nav-modal-label').html(title);
-            $('#nav-modal-body').html(content);
-            $('#nav-modal').modal();
-        }
-
-        return modal_id;
-    }
-
-    function make_draggable(elmnt) {
-        var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-        if (document.getElementById(elmnt.id + "-header")) {
-            // if present, the header is where you move the DIV from:
-            document.getElementById(elmnt.id + "-header").onmousedown = dragMouseDown;
-            document.getElementById(elmnt.id + "-header").ontouchstart = dragMouseDown;
-        } else {
-            // otherwise, move the DIV from anywhere inside the DIV:
-            elmnt.onmousedown = dragMouseDown;
-            elmnt.ontouchstart = dragMouseDown;
-        }
-
-        function dragMouseDown(e) {
-            e = e || window.event;
-            e.preventDefault();
-
-            // get the mouse cursor position at startup:
-            pos3 = e.clientX;
-            pos4 = e.clientY;
-            document.onmouseup = closeDragElement;
-            document.ontouchend = closeDragElement;
-            // call a function whenever the cursor moves:
-            document.onmousemove = elementDrag;
-            document.ontouchmove = elementDrag;
-        }
-
-        function elementDrag(e) {
-            e = e || window.event;
-            if (e.type === "touchmove") {
-                pos1 = pos3 - e.touches[0].clientX;
-                pos2 = pos4 - e.touches[0].clientY;
-                pos3 = e.touches[0].clientX;
-                pos4 = e.touches[0].clientY;
-            } else {
-                e.preventDefault();
-                // calculate the new cursor position:
-                pos1 = pos3 - e.clientX;
-                pos2 = pos4 - e.clientY;
-                pos3 = e.clientX;
-                pos4 = e.clientY;
-            }
-
-            // set the element's new position:
-            elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
-            elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
-        }
-
-        function closeDragElement() {
-            // stop moving when mouse button is released:
-            document.onmouseup = null;
-            document.onmousemove = null;
-            document.ontouchend = null;
-            document.ontouchmove = null;
-        }
-    }
-
-    function delayed_scroll(anchor, smooth=true, parent=null) {
-        let scroll_opts = { behavior: 'smooth'};
-        if (!smooth) scroll_opts = null;
-
-        let id_selector = `${parent ? '#' + parent + ' ' : ''}#${anchor}`;
-        let anchor_selector = `${parent ? '#' + parent + ' ' : ''}a[name=${anchor}]`;
-
-        let target = $(id_selector)
-        if (!target.length) target = $(anchor_selector)
-
-        if (parent) {
-            parent = $(`#${parent} .ref-modal-content`)
-            parent.scrollTop(
-                target.offset().top - parent.offset().top + parent.scrollTop() - 10
-            )
-        }
-        else target[0].scrollIntoView(scroll_opts);
-    }
 </script>
 {% endblock %}
