@@ -1,6 +1,6 @@
-import { NoteManager } from "./notemanager.js"
-import { CommentaryViewer } from "./commviewer.js"
-import { SearchManager } from "./searchmanager.js"
+import { NoteManager } from "note-manager"
+import { CommentaryViewer } from "commentary-viewer"
+import { SearchManager } from "search-manager"
 
 
 export class PlayViewer {

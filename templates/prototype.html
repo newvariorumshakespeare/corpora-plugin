@@ -50,9 +50,19 @@
 
         <script src="/static/js/bootstrap5.min.js" type="application/javascript"></script>
         <script src="/static/js/mark.min.js" type="application/javascript"></script>
-        <script src="/static/js/utilities.js" type="application/javascript"></script>
+        <script src="/static/js/utilities.js?no-cache={% no_cache_suffix %}" type="application/javascript"></script>
+        <script type="importmap">
+            {
+              "imports": {
+                "play-viewer": "/static/js/playviewer/playviewer.js?no-cache={% no_cache_suffix %}",
+                "note-manager": "/static/js/playviewer/notemanager.js?no-cache={% no_cache_suffix %}",
+                "commentary-viewer": "/static/js/playviewer/commviewer.js?no-cache={% no_cache_suffix %}",
+                "search-manager": "/static/js/playviewer/searchmanager.js?no-cache={% no_cache_suffix %}"
+              }
+            }
+        </script>
         <script type="module">
-            import { PlayViewer } from '/static/js/playviewer/playviewer.js'
+            import { PlayViewer } from 'play-viewer'
 
 
             window.nvs = {
