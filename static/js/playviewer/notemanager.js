@@ -73,6 +73,12 @@ export class NoteManager {
 
             img.setAttribute('height', height)
             img.src = `${window.nvs.endpoints.witnessMeter}${img.dataset.witness_indicators}/${Math.floor(height)}/${Math.floor(width)}/${inactive_color}/0/`
+
+            if (!img.hasAttribute('alt')) {
+                // set image alt text
+                let sigla = this.getSiglaFromIndicators(img.dataset.witness_indicators, true)
+                img.setAttribute('alt', `Indicating textual variants across ${sigla.length} editions.`)
+            }
         }
         else if (isVariantMeter) img.classList.add('d-none')
         if (!img.dataset.events_rigged) {
@@ -198,20 +204,32 @@ export class NoteManager {
         this.drawWitnessHeaderAndBackground()
     }
 
-    displayVariantEditions(meter) {
-        let witSigla = Object.keys(window.nvs.witnesses)
+    getSiglaFromIndicators(indicators, countOnly=false) {
+        let witSigla = []
         let sigla = []
-        for (let slot = 0; slot < meter.dataset.witness_indicators.length - 1; slot++) {
-            let indicator = meter.dataset.witness_indicators.charAt(slot)
+
+        if (!countOnly && window.nvs.witnesses !== null) witSigla = Object.keys(window.nvs.witnesses)
+
+        for (let slot = 0; slot < indicators.length - 1; slot++) {
+            let indicator = indicators.charAt(slot)
             if (indicator !== '0') {
-                for (let sigIndex = 0; sigIndex < witSigla.length; sigIndex++) {
-                    if (window.nvs.witnesses[witSigla[sigIndex]].slots.includes(slot) && !sigla.includes(witSigla[sigIndex])) {
-                        sigla.push(witSigla[sigIndex])
-                        break
+                if (countOnly) sigla.push(indicator)
+                else {
+                    for (let sigIndex = 0; sigIndex < witSigla.length; sigIndex++) {
+                        if (window.nvs.witnesses[witSigla[sigIndex]].slots.includes(slot) && !sigla.includes(witSigla[sigIndex])) {
+                            sigla.push(witSigla[sigIndex])
+                            break
+                        }
                     }
                 }
             }
         }
+
+        return sigla
+    }
+
+    displayVariantEditions(meter) {
+        let sigla = this.getSiglaFromIndicators(meter.dataset.witness_indicators)
 
         if (sigla.length) {
             let title = "Collated Editions for Variant";
