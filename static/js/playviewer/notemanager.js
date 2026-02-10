@@ -21,7 +21,7 @@ export class NoteManager {
                         let variant_words = variant.variant;
                         if (!variant_words) {
                             if (variant.description === null) {
-                                variant_words = `<span class="variant-note">Due to the site being in beta, an error occurred when parsing this variant.</span>`
+                                variant_words = `<span class="variant-note">An error occurred when parsing this variant.</span>`
                             } else {
                                 description_displayed = true
                                 variant_words = `<span class="variant-note">${variant.description}</span>`

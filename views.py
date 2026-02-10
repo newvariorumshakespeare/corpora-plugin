@@ -1,10 +1,19 @@
 import re
 import json
+import difflib
+from time import sleep
 from django.shortcuts import render, HttpResponse
+from django.http import Http404
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from mongoengine.queryset.visitor import Q
 from PIL import Image, ImageDraw
-from manager.utilities import _get_context, get_scholar_corpus, _contains, _contains_any, parse_uri, build_search_params_from_dict
+from manager.utilities import (
+    _get_context, get_scholar_corpus, _contains, _clean,
+    _contains_any, parse_uri, build_search_params_from_dict,
+    scholar_has_privilege,
+)
+from manager.tasks import run_job
 from corpus import get_corpus
 
 
@@ -225,9 +234,13 @@ async def witness_meter(request, witness_flags, height, width, inactive_color_he
             '9': '#8f2d13',
             'x': '#2a69a1'
         }
+        background_color = (255, 0, 0, 0)
+        if 'bg-color' in request.GET:
+            background_color = '#' + request.GET['bg-color']
+
         selectively_quoted_width = 20 + int(label_buffer)
         indicator_width = (width - selectively_quoted_width) / (len(witness_flags) - 1)
-        img = Image.new('RGBA', (width, height), (255, 0, 0, 0))
+        img = Image.new('RGBA', (width, height), background_color)
         draw = ImageDraw.Draw(img)
 
         for flag_index in range(0, len(witness_flags) - 1):
@@ -649,6 +662,124 @@ def tools_data_extraction(request, corpus_id=None):
             'nvs_page': nvs_page
         }
     )
+
+@login_required
+def collator(request, corpus_id, play_prefix):
+    response = _get_context(request)
+    corpus, role = get_scholar_corpus(corpus_id, response['scholar'])
+    page_title = "Line Collator"
+    edited_siglum = None
+    edited_tln = None
+
+    corpora_url = 'https://' if settings.USE_SSL else 'http://'
+    corpora_url += settings.ALLOWED_HOSTS[0]
+
+    if corpus and scholar_has_privilege('Contributor', role):
+        play_id = None
+        play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+        if play:
+            play_id = str(play.id)
+            page_title += f" > {play.title}"
+
+        if request.method == 'POST':
+            for key, val in request.POST.items():
+                print(f"{key}: {val}")
+
+            # ADD A NEW WITNESS
+            if _contains(request.POST, ['add-witness-document-id', 'add-witness-type']):
+                new_witness_document_id = _clean(request.POST, 'add-witness-document-id')
+                new_witness_type = _clean(request.POST, 'add-witness-type')
+                doc = corpus.get_content('Document', new_witness_document_id)
+
+                if doc:
+                    new_witness = corpus.get_content('Reference', {'play': play.id, 'document': doc.id}, single_result=True)
+
+                    if not new_witness:
+                        new_witness = corpus.get_content('Reference')
+                        new_witness.play = play.id
+                        new_witness.document = doc.id
+                        new_witness.ref_type = 'primary_witness'
+
+                        if new_witness_type == 'occasionally_collated':
+                            new_witness.type = 'occasional_witness'
+
+                        new_witness.save()
+                        response['messages'].append(f'Witness {doc.siglum_label} added!')
+
+                    else:
+                        response['errors'].append("A witness already exists for this document.")
+
+            # IMPORT COPY TEXT
+            if 'import-copy-text-witness' in request.POST:
+                siglum = _clean(request.POST, 'import-copy-text-witness')
+                doc = corpus.get_content('Document', {'siglum': siglum}, single_result=True)
+                if doc:
+                    run_job(corpus.queue_local_job(
+                        content_type="Play",
+                        content_id=str(play.id),
+                        task_name="Import Copy Text",
+                        parameters={
+                            'siglum': siglum,
+                        }
+                    ))
+
+
+            # MAKE COLLATION LINES
+            if 'add-lines-method' in request.POST:
+                if request.POST['add-lines-method'] == 'trans-project' and 'add-lines-trans-project' in request.POST:
+                    trans_project_id = _clean(request.POST, 'add-lines-trans-project')
+                    run_job(corpus.queue_local_job(
+                        content_type="Play",
+                        content_id=str(play.id),
+                        task_name="Make Collation Lines",
+                        parameters={
+                            'method': 'transcription_project',
+                            'transcription_project_id': trans_project_id,
+                        }
+                    ))
+
+            # EDIT COLLATION LINE
+            if _contains(request.POST, ['edit-collation-line-siglum', 'edit-collation-line-tln']):
+                siglum = _clean(request.POST, 'edit-collation-line-siglum')
+                tln = _clean(request.POST, 'edit-collation-line-tln')
+                doc = corpus.get_content('Document', {'siglum': siglum}, single_result=True)
+                collation_line = corpus.get_content('CollationLine', {'witness': doc.id, 'tln': tln}, single_result=True)
+                collation_line.html = None
+
+                # EDIT TEXT
+                if 'edit-collation-line-text' in request.POST:
+                    text = request.POST['edit-collation-line-text']
+                    collation_line.text = text
+                    collation_line.save()
+                    edited_siglum = siglum
+                    edited_tln = tln
+
+                if 'edit-collation-line-new-tln' in request.POST:
+                    new_tln = _clean(request.POST, 'edit-collation-line-new-tln')
+                    collation_line.tln = new_tln
+                    collation_line.save()
+                    edited_siglum = siglum
+                    edited_tln = new_tln
+                    sleep(2) # give elasticsearch time to index new lineation
+
+        return render(
+            request,
+            'collator.html',
+            {
+                'site_request': False,
+                'page_title': page_title,
+                'corpora_host': corpora_url,
+                'corpus_id': corpus_id,
+                'play_prefix': play_prefix,
+                'play_id': play_id,
+                'edited_siglum': edited_siglum,
+                'edited_tln': edited_tln,
+                'role': role,
+                'popup': True
+            }
+        )
+    else:
+        raise Http404("You are not authorized to view this page.")
 
 
 def api_lines(request, corpus_id=None, play_prefix=None, starting_line_id=None, ending_line_id=None):
@@ -1079,6 +1210,81 @@ def api_witnesses(request, corpus_id=None, play_prefix=None):
     )
 
 
+def api_diff(request, corpus_id=None, play_prefix=None):
+    diff_result = {
+        'line_found': False,
+        'has_variant': False,
+        'diff_type': '',
+        'html': '',
+        'text': '',
+        'image': ''
+    }
+
+    if corpus_id and play_prefix and request.method == 'POST' and _contains(request.POST, ['copy-text', 'tln', 'siglum', 'doc-id']):
+        corpus = get_corpus(corpus_id)
+        line_words = request.POST['copy-text']
+        tln = _clean(request.POST, 'tln')
+        siglum = _clean(request.POST, 'siglum')
+        doc_id = _clean(request.POST, 'doc-id')
+
+        variant_line = corpus.get_content('CollationLine', {
+            'witness': doc_id,
+            'tln': tln
+        }, single_result=True)
+        if variant_line:
+            diff_result['line_found'] = True
+
+            # sanity check coordinates/dimensions
+            for metric in ['x_coordinate', 'y_coordinate', 'width', 'height']:
+                if variant_line[metric] < 0:
+                    if metric in ['x_coordinate', 'y_coordinate']:
+                        variant_line[metric] = 0
+                    else:
+                        variant_line[metric] = -variant_line[metric]
+
+            image_region = f"{variant_line['x_coordinate']},{variant_line['y_coordinate']},{variant_line['width']},{variant_line['height']}"
+            diff_result['image'] = f"{variant_line['image']}/{image_region}/"
+
+            if variant_line.html:
+                diff_result['html'] = variant_line.html
+            else:
+                def normalize_string(string):
+                    normalized = string.lower()
+                    return normalized
+
+                normalized_variant_words = normalize_string(variant_line.text)
+                normalized_line_words = normalize_string(line_words)
+
+                matcher = difflib.SequenceMatcher(None, normalized_line_words, normalized_variant_words)
+
+                diffed_html = []
+                for diff_type, a_start, a_end, b_start, b_end in matcher.get_opcodes():
+                    diff_result['diff_type'] = diff_type
+                    if diff_type == 'equal':
+                        diffed_html.append(''.join(line_words[a_start:a_end]))
+                    else:
+                        diff_result['has_variant'] = True
+                        diff_key = f"{tln}-{diff_type}-{b_start}-{b_end}"
+
+                        if diff_type in ['replace', 'insert']:
+                            segment = ''.join(variant_line.text[b_start:b_end])
+                            diffed_html.append(f'<span class="difference {diff_type}" data-tln="{tln}" data-siglum="{siglum}" data-diff_key="{diff_key}-{segment}">{segment}</span>')
+                        elif diff_type == 'delete':
+                            segment = ''.join(line_words[a_start:a_end])
+                            diffed_html.append(f'<span class="difference {diff_type}" data-tln="{tln}" data-siglum="{siglum}" data-diff_key="{diff_key}-{segment}"></span>')
+
+                diff_result['html'] = ''.join(diffed_html)
+                variant_line.html = diff_result['html']
+                variant_line.save(_do_indexing=False, do_linking=False)
+
+            diff_result['text'] = variant_line['text']
+
+    return HttpResponse(
+        json.dumps(diff_result),
+        content_type='application/json'
+    )
+
+
 def progressive_search(corpus, search_params, fields, query, search_type):
     if len(fields) > 1:
         search_params['operator'] = "or"
@@ -1192,7 +1398,9 @@ def get_nvs_witnesses(corpus, play):
         witnesses[wit_ref.document.siglum] = {
             'slots': [wit_counter],
             'document_id': str(wit_ref.document.id),
+            'siglum_label': wit_ref.document.siglum_label,
             'bibliographic_entry': "{0} {1}".format(wit_ref.document.siglum_label, wit_ref.bibliographic_entry),
+            'published': wit_ref.document.pub_date,
             'occasional': False
         }
 
@@ -1210,6 +1418,7 @@ def get_nvs_witnesses(corpus, play):
             'slots': [wit_counter],
             'document_id': str(wit_ref.document.id),
             'bibliographic_entry': wit_ref.bibliographic_entry,
+            'published': wit_ref.document.pub_date,
             'occasional': True
         }
 
@@ -1217,6 +1426,7 @@ def get_nvs_witnesses(corpus, play):
     for collection in document_collections:
         slots = []
         bib_entry = ""
+        published = 0
 
         for reffed_doc in collection.referenced_documents:
             if reffed_doc.siglum in witnesses:
@@ -1224,6 +1434,8 @@ def get_nvs_witnesses(corpus, play):
                 if bib_entry:
                     bib_entry += "<br /><br />"
                 bib_entry += "{0}".format(witnesses[reffed_doc.siglum]['bibliographic_entry'])
+                if not published:
+                    published = reffed_doc.pub_date
 
         witnesses[collection.siglum] = {
             'slots': slots,

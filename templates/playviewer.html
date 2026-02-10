@@ -1155,7 +1155,7 @@
                         <div class="col-sm-12">
                             <ul class="nav">
                                 <li class="dropdown menu-shadow">
-                                    <a id="active-menu-item" class="dropdown-toggle edition-menu" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">NVS DIGITAL EDITIONS <span class="beta">(BETA)</span> {% include 'svg/arrow.svg' %}</a>
+                                    <a id="active-menu-item" class="dropdown-toggle edition-menu" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">NVS DIGITAL EDITIONS {% include 'svg/arrow.svg' %}</a>
                                     <ul class="dropdown-menu menu-shadow">
                                         <li class="dropdown-item">
                                             <div class="dropright">
@@ -2078,7 +2078,7 @@
         if (screen_size === "small") {
             display_nav_modal(
                 'Warning',
-                `Due to the site being in beta, this screen size is not currently supported.
+                `This screen size is not currently supported.
                 If you are using a mobile device, try rotating it into landscape orientation.`
             );
         } else {
@@ -2260,7 +2260,7 @@
                         let variant_words = variant.variant;
                         if (!variant_words) {
                             if (variant.description === null) {
-                                variant_words = `<span class="variant-note">Due to the site being in beta, an error occurred when parsing this variant.</span>`;
+                                variant_words = `<span class="variant-note">An error occurred when parsing this variant.</span>`;
                             } else {
                                 description_displayed = true;
                                 variant_words = `<span class="variant-note">${variant.description}</span>`;

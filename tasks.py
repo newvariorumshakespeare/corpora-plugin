@@ -17,14 +17,16 @@ from random import randint
 from math import floor
 from mongoengine.queryset.visitor import Q
 from .content import REGISTRY as NVS_CONTENT_TYPE_SCHEMA
+from .utilities import make_collation_lines_from_transcription_project
 from plugins.document.content import REGISTRY as DOCUMENT_REGISTRY
 from manager.utilities import _contains, _contains_any
+from manager.tasks import run_job
 from corpus import Job
 
 
 REGISTRY = {
     "Import NVS Data from TEI": {
-        "version": "1.2",
+        "version": "1.4",
         "jobsite_type": "HUEY",
         "track_provenance": True,
         "create_report": True,
@@ -81,6 +83,47 @@ REGISTRY = {
         },
         "module": 'plugins.nvs.tasks',
         "functions": ['perform_note_transforms']
+    },
+    "Make Collation Lines": {
+        "version": "0.1",
+        "jobsite_type": "HUEY",
+        "track_provenance": True,
+        "create_report": True,
+        "content_type": "Play",
+        "configuration": {
+            "parameters": {
+                "method": {
+                    "value": "",
+                    "type": "text",
+                    "label": "Collation Line Creation Method",
+                },
+                "transcription_project_id": {
+                    "value": "",
+                    "type": "text",
+                    "label": "ID for a Transcription Project",
+                },
+            },
+        },
+        "module": 'plugins.nvs.tasks',
+        "functions": ['make_collation_lines']
+    },
+    "Import Copy Text": {
+        "version": "0.1",
+        "jobsite_type": "HUEY",
+        "track_provenance": True,
+        "create_report": True,
+        "content_type": "Play",
+        "configuration": {
+            "parameters": {
+                "siglum": {
+                    "value": "",
+                    "type": "text",
+                    "label": "Siglum",
+                }
+            },
+        },
+        "module": 'plugins.nvs.tasks',
+        "functions": ['import_copy_text']
     }
 }
 
@@ -193,12 +236,6 @@ Ingestion Scope:    {4}
                 content_block.html = "Default content."
                 content_block.save()
 
-
-        time_it("Deleting Play Data")
-        deletion_report = delete_play_data(corpus, play_prefix, ingestion_scope)
-        time_it("Deleting Play Data", True)
-        job.report("Deleted existing play data:\n{0}".format(deletion_report))
-
         # pull down latest commits to play repo
         play_repo.pull(corpus)
 
@@ -258,6 +295,12 @@ Ingestion Scope:    {4}
                     break
 
             if include_files_exist:
+
+                time_it("Deleting Play Data")
+                deletion_report = delete_play_data(corpus, play_prefix, ingestion_scope)
+                time_it("Deleting Play Data", True)
+                job.report("Deleted stale play data:\n{0}".format(deletion_report))
+
                 line_id_map = {}  # to keep track of how xml_ids map to PlayLine ObjectIDs
                 ordered_line_ids = []  # PlayLine ObjectIDs in order, for building swaths of lines given start and end ids
 
@@ -1673,7 +1716,7 @@ def perform_variant_transform(corpus, note, variant):
     # the witnesses associated with this variant are intended to be global
     # witness exclusions for subsequent variants (the lemma for this note
     # matches the copy-text, therefore subsequent variants should exclude
-    # these witnesses.
+    # these witnesses).
     if variant.transform_type and variant.transform_type.strip() == 'lem':
         return None, True
 
@@ -1770,22 +1813,6 @@ def perform_variant_transform(corpus, note, variant):
                         if lemma_end_index > -1:
                             lemma_end_index += lemma_search_cursor + len(lemma_delimiters[1])
                             lemma = original_text[lemma_start_index:lemma_end_index]
-
-                    '''
-                    lemma_parts = []
-                    adding_lemma_parts = False
-                    for word in original_text.split():
-                        if strip_punct(word) == lemma_delimiters[0]:
-                            lemma_parts.append(word)
-                            adding_lemma_parts = True
-                        elif strip_punct(word) == lemma_delimiters[1]:
-                            lemma_parts.append(word)
-                            break
-                        elif adding_lemma_parts:
-                            lemma_parts.append(word)
-                    
-                    lemma = " ".join(lemma_parts)
-                    '''
 
                 # replacement/insertion w/ lemma
                 if not result and lemma in original_text:
@@ -3148,10 +3175,12 @@ def render_lines_html(corpus, play, starting_line_no=None, ending_line_no=None):
     del lines
     taggings.clear()
 
+
 def remove_tag_from_list(tag_list, tag_id):
     if tag_id:
         return [t for t in tag_list if t['id'] != tag_id]
     return tag_list
+
 
 def place_tags(location, line, taggings, open_tags):
     if location in taggings:
@@ -3197,6 +3226,54 @@ def place_tags(location, line, taggings, open_tags):
         # handle any remaining self-closing tags
         for empty_tag in taggings[location]['empty']:
             line.rendered_html += empty_tag['html']
+
+
+def make_collation_lines(job_id):
+    job = Job(job_id)
+    corpus = job.corpus
+    play = job.content
+    method = job.get_param_value('method')
+
+    if play:
+        if method == 'transcription_project':
+            make_collation_lines_from_transcription_project(
+                corpus,
+                play,
+                job.get_param_value('transcription_project_id'),
+            )
+
+    job.complete(status='complete')
+
+
+def import_copy_text(job_id):
+    job = Job(job_id)
+    corpus = job.corpus
+    play = job.content
+    siglum = job.get_param_value('siglum')
+    reindex = False
+
+    if play:
+        doc = corpus.get_content('Document', {'siglum': siglum}, single_result=True)
+        collation_lines = corpus.get_content('CollationLine', {
+            'play': play.id,
+            'witness': doc.id
+        }).order_by('order')
+
+        lines_processed = 0
+        total_lines = collation_lines.count()
+        for collation_line in collation_lines:
+            play_line = corpus.get_content('PlayLine')
+            play_line.xml_id = collation_line.tln
+            play_line.line_number = collation_line.order
+            play_line.text = collation_line.text
+            play_line.play = play.id
+            play_line.save()
+
+            lines_processed += 1
+            if lines_processed % 100 == 0:
+                job.set_status('running', percent_complete=int(lines_processed / total_lines * 100))
+
+    job.complete(status='complete')
 
 
 def time_it(timer_name, stop=False):
