@@ -104,6 +104,7 @@ class SmallHeader extends HTMLElement {
   <div class="container">
     <div class="small-header--row">
       <a class="logo" href="{% if site_request %}/{% else %}/corpus/{{ corpus_id }}/home/{% endif %}">
+        <span class="sr-only">Homepage</span>
         {% include 'svg/logo.svg' %}
         {% include 'svg/type.svg' %}
         {% include 'svg/logo-long-type.svg' %}

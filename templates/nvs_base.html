@@ -25,9 +25,10 @@
   {% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-
-{% include 'blocks/organisms/small-header.html' %}
-{% include 'blocks/organisms/large-header.html' %}
+<header>
+    {% include 'blocks/organisms/small-header.html' %}
+    {% include 'blocks/organisms/large-header.html' %}
+</header>
 
 <main class="nvs_base--main">
   {% block main %}

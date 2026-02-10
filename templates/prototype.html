@@ -24,16 +24,16 @@
         <large-header></large-header>
         <small-header></small-header>
 
-        <div id="main-container" class="container-fluid h-100">
+        <main id="main-container" role="main" class="container-fluid h-100">
             <!-- MAIN HEADER -->
             <div id="main-header" class="row">
                 <!-- NAV -->
                 <div class="col-sm-12">
                     <div class="row no-gutters pt-3">
                         <div class="col-sm-7 d-flex align-items-end">
-                            <div id="play-title">
-                              <a href="{% if site_request %}/{% else %}/corpus/{{ corpus_id }}/home/{% endif %}" style="color: #000000;">HOME</a> <img src="/static/svg/arrow.svg" class="right-chevron" /> {{ play.title }} <img src="/static/svg/arrow.svg" class="right-chevron" /> <span class="title-section" style="white-space: nowrap;">Variorum Reader</span>
-                            </div>
+                            <h1 id="play-title" class="p-0 m-0">
+                              <a href="{% if site_request %}/{% else %}/corpus/{{ corpus_id }}/home/{% endif %}" style="color: #000000;">HOME</a> <img src="/static/svg/arrow.svg" class="right-chevron" alt=">" aria-hidden="true" /> {{ play.title }} <img src="/static/svg/arrow.svg" class="right-chevron" alt=">" aria-hidden="true" /> <span class="title-section" style="white-space: nowrap;">Variorum Reader</span>
+                            </h1>
                         </div>
                         <div class="col-sm-5 byline-div d-flex align-items-end">
                             <div class="byline">
@@ -46,7 +46,7 @@
 
             <div id="playviewer-container"></div>
 
-        </div>
+        </main>
 
         <script src="/static/js/bootstrap5.min.js" type="application/javascript"></script>
         <script src="/static/js/mark.min.js" type="application/javascript"></script>

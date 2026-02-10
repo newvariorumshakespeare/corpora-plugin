@@ -123,6 +123,38 @@ function fetchWitnesses(callback=null) {
         if (callback !== null) callback()
     })
 }
+function sortTLNs(arr) {
+    return arr.sort((a, b) => {
+        // Remove the tln_/dpln_ prefix
+        const aStr = a.replace('tln_', '').replace('dpln_', '')
+        const bStr = b.replace('tln_', '').replace('dpln_', '')
+
+        // Parse each string to extract numeric value and suffix
+        const parseItem = (str) => {
+            // Match pattern: digits/decimals followed by optional letter
+            const match = str.match(/^([\d.]+)-?([a-z]?)$/)
+            if (match) {
+                return {
+                    numeric: parseFloat(match[1]),
+                    suffix: match[2] || ''
+                };
+            }
+            return {numeric: 0, suffix: ''}
+        }
+
+        const aParsed = parseItem(aStr)
+        const bParsed = parseItem(bStr)
+
+        // First, compare by numeric value
+        if (aParsed.numeric !== bParsed.numeric) {
+            return aParsed.numeric - bParsed.numeric
+        }
+
+        // If numeric values are equal, compare by suffix alphabetically
+        // Empty string will naturally come before any letter
+        return aParsed.suffix.localeCompare(bParsed.suffix);
+    })
+}
 
 // for navigating/displaying lines, bibliographic refs, appendix locations, etc.
 var navMap = {
