@@ -89,14 +89,16 @@ export class CommentaryViewer {
             <div class="d-flex flex-column w-100">
                 <div id="commStatement" class="row">
                     <div class="col-sm-12">
-                            The commentary notes for this digital variorum edition were completed by [insert names here]
-                            in [insert date/s here]. They reflect the variorum editor's compilation of criticism (and
-                            occasional assessment of that criticism) published up to [insert date here]. We are beginning
-                            work to update these commentary notes and indeed the digital variorum edition more broadly.
-                        
-                        <button id="commStatementDismissButton" type="button" class="close" aria-label="Dismiss">
-                            Dismiss
-                        </button>
+                        The commentary notes for this digital variorum edition were completed by [insert names here]
+                        in [insert date/s here]. They reflect the variorum editor's compilation of criticism (and
+                        occasional assessment of that criticism) published up to [insert date here]. We are beginning
+                        work to update these commentary notes and indeed the digital variorum edition more broadly.
+                            
+                        <div>
+                            <button id="commStatementDismissButton" type="button" class="close" aria-label="Dismiss">
+                                Dismiss
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="d-flex flex-row align-items-start"><div id="commFrameTop" class="d-flex flex-column w-100"></div></div>
