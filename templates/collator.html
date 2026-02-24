@@ -77,6 +77,8 @@
             z-index: 10;
         }
 
+        .small-caps { font-variant: small-caps; }
+
         /* Top-left cell needs higher z-index to stay above both */
         .grid-row:first-child .grid-col:first-child {
           z-index: 3;
@@ -323,7 +325,7 @@
                     <tr id="collation-grid-siglum-row-${siglum}" class="grid-row">
                         <th scope="row" class="grid-left-header">
                             <div id="collation-grid-header-${siglum}" class="d-flex w-100 flex-row justify-content-end align-items-center">
-                                <span id="collation-grid-header-label-${siglum}" class="ms-auto">${wit.siglum_label}</span>
+                                <span id="collation-grid-header-label-${siglum}" class="ms-auto small-caps">${wit.siglum_label}</span>
                             </div>
                         </th>
                     </tr>
