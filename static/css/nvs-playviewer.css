@@ -753,6 +753,20 @@ span.difference {
     display: flex;
 }
 
+#commStatement {
+    position: sticky;
+    top: 0;
+    color: #000000;
+    background-color: var(--nvs-light-yellow);
+    font-family: 'HalyardTextBook';
+    font-size: clamp(13px, 1.2vw, 16px);
+    font-variant-numeric: oldstyle-nums;
+    z-index: 50;
+}
+#commStatementDismissButton {
+    margin: 10px 0;
+}
+
 .comm-heading {
     background-color: var(--nvs-dark-yellow);
     font-family: 'Baskerville', serif;
