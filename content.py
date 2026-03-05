@@ -71,6 +71,25 @@ REGISTRY = [
                 "inherited": False
             },
             {
+                "name": "headnote",
+                "label": "Headnote",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "text",
+                "choices": [],
+                "cross_reference_type": "",
+                "has_intensity": False,
+                "language": "english",
+                "autocomplete": False,
+                "synonym_file": None,
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
                 "name": "status",
                 "label": "Status",
                 "indexed": False,

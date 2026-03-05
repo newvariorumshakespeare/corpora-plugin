@@ -87,20 +87,6 @@ export class CommentaryViewer {
     buildSkeleton() {
         this.commFrame.innerHTML = `
             <div class="d-flex flex-column w-100">
-                <div id="commStatement" class="row">
-                    <div class="col-sm-12">
-                        The commentary notes for this digital variorum edition were completed by [insert names here]
-                        in [insert date/s here]. They reflect the variorum editor's compilation of criticism (and
-                        occasional assessment of that criticism) published up to [insert date here]. We are beginning
-                        work to update these commentary notes and indeed the digital variorum edition more broadly.
-                            
-                        <div>
-                            <button id="commStatementDismissButton" type="button" class="close" aria-label="Dismiss">
-                                Dismiss
-                            </button>
-                        </div>
-                    </div>
-                </div>
                 <div class="d-flex flex-row align-items-start"><div id="commFrameTop" class="d-flex flex-column w-100"></div></div>
                 <div class="d-flex flex-row align-items-end flex-grow-1"><div id="commFrameUp" class="d-flex flex-column-reverse w-100" style="min-height: 1000px;"></div></div>
                 <div class="d-flex flex-row align-items-start" style="min-height: 40px;"><div id="commFrameFocus" class="d-flex flex-column w-100"></div></div>
@@ -108,11 +94,6 @@ export class CommentaryViewer {
                 <div class="d-flex flex-row align-items-end"><div id="commFrameBottom" class="d-flex flex-column-reverse w-100"></div></div>
             </div>
         `
-
-        // rig up dismissible caveat lector
-        getEl('commStatementDismissButton').addEventListener('click', (e) => {
-            getEl('commStatement').classList.add('d-none')
-        })
 
         this.commFrameTop = getEl('commFrameTop')
         this.commFrameUp = getEl('commFrameUp')
