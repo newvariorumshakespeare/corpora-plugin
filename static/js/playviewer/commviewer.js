@@ -94,6 +94,7 @@ export class CommentaryViewer {
                 <div class="d-flex flex-row align-items-end"><div id="commFrameBottom" class="d-flex flex-column-reverse w-100"></div></div>
             </div>
         `
+
         this.commFrameTop = getEl('commFrameTop')
         this.commFrameUp = getEl('commFrameUp')
         this.commFrameFocus = getEl('commFrameFocus')
