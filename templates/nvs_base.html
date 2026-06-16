@@ -8,8 +8,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="shortcut icon" type="image/png" href="{% static 'img/favicon.ico' %}"/>
   <link rel="stylesheet" href="{% static 'css/nvs.css' %}?no-cache={% no_cache_suffix %}">
-  <!-- Plausible.io (for site analytics) -->
-  <script defer data-domain="newvariorumshakespeare.org" src="https://plausible.io/js/plausible.js"></script>
+
+    <!-- Web Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EGHPFTKEWG"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-EGHPFTKEWG');
+    </script>
 
   <style>
     @font-face {

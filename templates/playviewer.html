@@ -16,7 +16,14 @@
         <!--<link href="{% static 'css/nvs.css' %}" rel="stylesheet">-->
 
         <!-- Web Analytics -->
-        <script defer data-domain="newvariorumshakespeare.org" src="https://plausible.io/js/plausible.js"></script>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-EGHPFTKEWG"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-EGHPFTKEWG');
+        </script>
 
         <!--<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">-->
         <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
