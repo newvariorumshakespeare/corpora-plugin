@@ -284,17 +284,22 @@ export class NoteManager {
 
     registerNotes(notes) {
         notes.forEach(note => {
+            let noteLineNos = []
             note.lines.forEach(line => {
                 if (line.xml_id in window.nvs.playViewer.lines) {
                     window.nvs.playViewer.lines[line.xml_id].notes.push(note.xml_id)
+                    noteLineNos.push(window.nvs.playViewer.lines[line.xml_id].line_number)
                 }
             })
 
             note.line_range = ''
             if (note.lines.length > 1) {
-                let startLineEl = getEl(`${note.lines[0].xml_id}-row`)
-                let endLineEl = getEl(`${note.lines[note.lines.length - 1].xml_id}-row`)
-                note.line_range = `<span class='text-muted'>${startLineEl.dataset.line_label}-${endLineEl.dataset.line_label}: </span>`;
+                // check to ensure this is a contiguous set of lines
+                if(noteLineNos.every((n, i) => i === 0 || n === noteLineNos[i - 1] + 1)) {
+                    let startLineEl = getEl(`${note.lines[0].xml_id}-row`)
+                    let endLineEl = getEl(`${note.lines[note.lines.length - 1].xml_id}-row`)
+                    note.line_range = `<span class='text-muted'>${startLineEl.dataset.line_label}-${endLineEl.dataset.line_label}: </span>`;
+                }
             }
             delete note.lines
             this.notes[note.xml_id] = note
