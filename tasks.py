@@ -1365,6 +1365,12 @@ TEXTUAL NOTES INGESTION
                 report += "Error finding lines for textual note {0}: {1}\n\n".format(textual_note.xml_id, line_err_msg)
 
             if textual_note.lines and not line_err_msg:
+                # register line label in event of multiple lines
+                if len(textual_note.lines) > 1:
+                    note_line_label = note.find('label')
+                    if note_line_label:
+                        textual_note.line_label = note_line_label.get_text()
+
                 note_lemma = None
                 if note.app.find('lem', recursive=False):
                     note_lemma = tei_to_html(note.app.lem)
@@ -2821,21 +2827,30 @@ def get_line_ids(xml_id_start, xml_id_end, line_id_map, ordered_line_ids):
     line_ids = []
     err_msg = ""
 
-    if xml_id_start and xml_id_end and len(xml_id_start.split()) == len(xml_id_end.split()):
+    if xml_id_start and xml_id_end and len(xml_id_start.split()) >= len(xml_id_end.split()):
         starts = xml_id_start.split()
         ends = xml_id_end.split()
 
         for pair_index in range(0, len(starts)):
-            start_xml_id = starts[pair_index].replace('#', '')
-            end_xml_id = ends[pair_index].replace('#', '')
-            if _contains(line_id_map, [start_xml_id, end_xml_id]) and line_id_map[start_xml_id] and line_id_map[end_xml_id]:
-                start_id_index = ordered_line_ids.index(line_id_map[start_xml_id][0])
-                end_id_index = ordered_line_ids.index(line_id_map[end_xml_id][-1])
+            if pair_index < len(starts) and pair_index < len(ends):
+                start_xml_id = starts[pair_index].replace('#', '')
+                end_xml_id = ends[pair_index].replace('#', '')
+                if _contains(line_id_map, [start_xml_id, end_xml_id]) and line_id_map[start_xml_id] and line_id_map[end_xml_id]:
+                    start_id_index = ordered_line_ids.index(line_id_map[start_xml_id][0])
+                    end_id_index = ordered_line_ids.index(line_id_map[end_xml_id][-1])
 
-                if start_id_index < end_id_index:
-                    line_ids += ordered_line_ids[start_id_index:end_id_index + 1]
-            else:
-                err_msg += "Lines with XML IDs {0} and/or {1} not found!".format(start_xml_id, end_xml_id)
+                    if start_id_index < end_id_index:
+                        line_ids += ordered_line_ids[start_id_index:end_id_index + 1]
+                else:
+                    err_msg += "Lines with XML IDs {0} and/or {1} not found!".format(start_xml_id, end_xml_id)
+
+            # situations where spare individual lines are listed after the line range pairs
+            elif pair_index < len(starts):
+                line_xml_id = starts[pair_index].replace('#', '')
+                if line_xml_id in line_id_map:
+                    line_ids += line_id_map[line_xml_id]
+                else:
+                    err_msg += f"Line with XML ID {line_xml_id} not found!"
 
     elif xml_id_start:
         xml_ids = xml_id_start.replace('#', '').split()
