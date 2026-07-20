@@ -866,18 +866,19 @@ PLAY TEXT INGESTION
         lines = corpus.get_content('PlayLine', {'play': play.id}, only=['id', 'xml_id', 'alt_xml_ids'])
         lines = lines.order_by('line_number')
         for line in lines:
-            ordered_line_ids.append(str(line.id))
+            line_to_register = str(line.id)
+            ordered_line_ids.append(line_to_register)
 
             if line.xml_id not in line_id_map:
-                line_id_map[line.xml_id] = [str(line.id)]
-            else:
-                line_id_map[line.xml_id].append(str(line.id))
+                line_id_map[line.xml_id] = [line_to_register]
+            elif line_to_register not in line_id_map[line.xml_id]:
+                line_id_map[line.xml_id].append(line_to_register)
 
             for alt_xml_id in line.alt_xml_ids:
                 if alt_xml_id not in line_id_map:
-                    line_id_map[alt_xml_id] = [str(line.id)]
-                else:
-                    line_id_map[alt_xml_id].append(str(line.id))
+                    line_id_map[alt_xml_id] = [line_to_register]
+                elif line_to_register not in line_id_map[alt_xml_id]:
+                    line_id_map[alt_xml_id].append(line_to_register)
 
         # register virtual line info in line_id_map
         links = lines_tei.find_all('link')
@@ -891,6 +892,7 @@ PLAY TEXT INGESTION
                 for target in targets:
                     if target in line_id_map:
                         line_id_map[xml_id] += line_id_map[target]
+                        line_id_map[xml_id] = list(set(line_id_map[xml_id]))
 
         # output line_id_map and ordered_line_ids for debugging or standalone textual/commentary note ingestion
         with open(corpus.path + '/files/{0}_line_id_map.json'.format(play.prefix), 'w', encoding='utf-8') as line_info_out:
