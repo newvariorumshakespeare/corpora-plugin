@@ -2897,6 +2897,10 @@ def get_line_ids(xml_id_start, xml_id_end, line_id_map, ordered_line_ids):
 
                     if start_id_index < end_id_index:
                         line_ids += ordered_line_ids[start_id_index:end_id_index + 1]
+
+                    # in case the start and end index are the same
+                    elif start_id_index == end_id_index:
+                        line_ids.append(ordered_line_ids[start_id_index])
                 else:
                     err_msg += "Lines with XML IDs {0} and/or {1} not found!".format(start_xml_id, end_xml_id)
 
