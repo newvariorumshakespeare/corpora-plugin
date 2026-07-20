@@ -1720,6 +1720,16 @@ def perform_variant_transform(corpus, note, variant):
     result = ""
     original_text = ""
     embed_pipes = False
+    debug = False
+
+    # below is an example of how to enable debugging for a single note
+    '''
+    if note.xml_id == 'tn_0207':
+        debug = True
+    '''
+
+    if debug:
+        print(f"----------- Debugging Textual Note {note.xml_id} -----------")
 
     # Handle variants of type 'lem,' which are interpreted here to mean that
     # the witnesses associated with this variant are intended to be global
@@ -1738,6 +1748,9 @@ def perform_variant_transform(corpus, note, variant):
         original_text = stitch_lines(note.lines, embed_pipes=embed_pipes)
 
     if original_text:
+        if debug:
+            print(f"Original text: {original_text}")
+
         ellipsis = ' .\xa0.\xa0. '
         swung_dash = ' ~ '
         under_carrot = '‸'
@@ -1746,6 +1759,10 @@ def perform_variant_transform(corpus, note, variant):
         if variant.lemma and variant.transform and variant.transform_type:
             lemma = strip_tags(variant.lemma).replace(double_under_carrot, '').replace(under_carrot, '')
             transform = strip_tags(variant.transform).replace('| ', '').replace(double_under_carrot, '').replace(under_carrot, '')
+
+            if debug:
+                print(f"Lemma: {lemma}")
+                print(f"Transform: {transform}")
 
             if variant.transform_type in ["replace", "insert", "insert_before"]:
                 # TODO:
@@ -1762,6 +1779,9 @@ def perform_variant_transform(corpus, note, variant):
 
                 # replace using ellipsis and swung dash
                 if variant.transform_type == "replace" and _contains(lemma, [ellipsis]) and _contains(variant.transform, [ellipsis, swung_dash]):
+                    if debug:
+                        print("Transform type: replace using ellipsis and swung dash.")
+
                     result = original_text
 
                     lemmas = lemma.split(ellipsis)
@@ -1787,6 +1807,9 @@ def perform_variant_transform(corpus, note, variant):
 
                 # replace using swung_dash only
                 elif variant.transform_type == "replace" and swung_dash in variant.transform:
+                    if debug:
+                        print("Transform type: replace using swung dash only.")
+
                     no_punct_lemma = lemma
                     for punct in punctuation:
                         no_punct_lemma = no_punct_lemma.replace(punct, '')
@@ -1803,6 +1826,9 @@ def perform_variant_transform(corpus, note, variant):
 
                 # replace using ellipsis
                 elif variant.transform_type == "replace" and ellipsis in lemma and ellipsis in variant.transform:
+                    if debug:
+                        print("Transform type: replace using ellipsis in lemma and transform.")
+
                     lemmas = lemma.split(ellipsis)
                     transforms = transform.split(ellipsis)
                     if len(lemmas) == len(transforms):
@@ -1812,6 +1838,9 @@ def perform_variant_transform(corpus, note, variant):
 
                 # ellipsis in lemma only
                 elif ellipsis in lemma:
+                    if debug:
+                        print("Transform type: replace with ellipsis in lemma only.")
+
                     lemma_delimiters = lemma.split(ellipsis)
                     lemma_start_index = original_text.find(lemma_delimiters[0])
 
@@ -1826,9 +1855,15 @@ def perform_variant_transform(corpus, note, variant):
                 # replacement/insertion w/ lemma
                 if not result and lemma in original_text:
                     if variant.transform_type == "replace":
+                        if debug:
+                            print("Transform type: simple replacement of lemma with transform.")
+
                         result = original_text.replace(lemma, transform, 1)
                     # insert after lemma
                     elif variant.transform_type == "insert":
+                        if debug:
+                            print("Transform type: insertion of transform after lemma.")
+
                         result = "{0} {1} {2}".format(
                             original_text[:original_text.find(lemma) + len(lemma)].strip(),
                             transform,
@@ -1836,6 +1871,9 @@ def perform_variant_transform(corpus, note, variant):
                         )
                     # insert before lemma
                     elif variant.transform_type == "insert_before":
+                        if debug:
+                            print("Transform type: insertion of transform before lemma.")
+
                         result = "{0} {1} {2}".format(
                             original_text[:original_text.find(lemma)].strip(),
                             transform,
@@ -1844,17 +1882,29 @@ def perform_variant_transform(corpus, note, variant):
 
         # replace line altogether
         elif not variant.lemma and variant.transform_type == 'replace' and variant.transform:
+            if debug:
+                print("Transform type: replacement of entire line with lemma.")
+
             result = strip_tags(variant.transform)
 
         # insertions sans lemma
         elif not variant.lemma and variant.transform and variant.transform_type == "insert":
+            if debug:
+                print("Transform type: insertion of transform after entire line.")
+
             result = "{0} {1}".format(original_text, strip_tags(variant.transform))
         elif not variant.lemma and variant.transform and variant.transform_type == "insert_before":
+            if debug:
+                print("Transform type: insertion of transform after before entire line.")
+
             result = "{0} {1}".format(strip_tags(variant.transform), original_text)
 
         # simple omission
         elif variant.lemma and not variant.transform and strip_tags(variant.description).lower() == "om.":
             lemma = strip_tags(variant.lemma)
+
+            if debug:
+                print("Transform type: omitting lemma from line.")
 
             if ellipsis in lemma:
                 lemma_delimiters = lemma.split(ellipsis)
@@ -1877,6 +1927,9 @@ def perform_variant_transform(corpus, note, variant):
                 result = original_text.replace(lemma, "")
 
     if original_text and result:
+        if debug:
+            print(f"Result: {result}")
+
         line_words = original_text.split()
         variant_words = result.split()
         matcher = difflib.SequenceMatcher(None, line_words, variant_words)
