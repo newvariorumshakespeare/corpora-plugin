@@ -1404,10 +1404,11 @@ TEXTUAL NOTES INGESTION
 
                     if note_lemma:
                         textual_variant.lemma = note_lemma
-                    else:
-                        lem_tag = variant.find('lem')
-                        if lem_tag:
-                            textual_variant.lemma = tei_to_html(lem_tag)
+
+                    # see if a variant has its own lemma to override note level lemma
+                    lem_tag = variant.find('lem')
+                    if lem_tag:
+                        textual_variant.lemma = tei_to_html(lem_tag)
 
                     starting_siglum = None
                     ending_siglum = None
