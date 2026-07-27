@@ -746,7 +746,7 @@ export class PlayViewer {
 
         let noteParams = this.getEndpointParams({
             'r_lines.line_number': `${startLineNo}to${endLineNo}`,
-            only: 'xml_id,lines.line_number,lines.xml_id,variants,witness_meter',
+            only: 'xml_id,lines.line_number,lines.xml_id,line_label,variants,witness_meter',
             'page-size': 1000
         }, 'note')
 

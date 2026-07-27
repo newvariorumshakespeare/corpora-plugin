@@ -866,18 +866,19 @@ PLAY TEXT INGESTION
         lines = corpus.get_content('PlayLine', {'play': play.id}, only=['id', 'xml_id', 'alt_xml_ids'])
         lines = lines.order_by('line_number')
         for line in lines:
-            ordered_line_ids.append(str(line.id))
+            line_to_register = str(line.id)
+            ordered_line_ids.append(line_to_register)
 
             if line.xml_id not in line_id_map:
-                line_id_map[line.xml_id] = [str(line.id)]
-            else:
-                line_id_map[line.xml_id].append(str(line.id))
+                line_id_map[line.xml_id] = [line_to_register]
+            elif line_to_register not in line_id_map[line.xml_id]:
+                line_id_map[line.xml_id].append(line_to_register)
 
             for alt_xml_id in line.alt_xml_ids:
                 if alt_xml_id not in line_id_map:
-                    line_id_map[alt_xml_id] = [str(line.id)]
-                else:
-                    line_id_map[alt_xml_id].append(str(line.id))
+                    line_id_map[alt_xml_id] = [line_to_register]
+                elif line_to_register not in line_id_map[alt_xml_id]:
+                    line_id_map[alt_xml_id].append(line_to_register)
 
         # register virtual line info in line_id_map
         links = lines_tei.find_all('link')
@@ -891,6 +892,7 @@ PLAY TEXT INGESTION
                 for target in targets:
                     if target in line_id_map:
                         line_id_map[xml_id] += line_id_map[target]
+                        line_id_map[xml_id] = list(set(line_id_map[xml_id]))
 
         # output line_id_map and ordered_line_ids for debugging or standalone textual/commentary note ingestion
         with open(corpus.path + '/files/{0}_line_id_map.json'.format(play.prefix), 'w', encoding='utf-8') as line_info_out:
@@ -1365,6 +1367,12 @@ TEXTUAL NOTES INGESTION
                 report += "Error finding lines for textual note {0}: {1}\n\n".format(textual_note.xml_id, line_err_msg)
 
             if textual_note.lines and not line_err_msg:
+                # register line label in event of multiple lines
+                if len(textual_note.lines) > 1:
+                    note_line_label = note.find('label')
+                    if note_line_label:
+                        textual_note.line_label = note_line_label.get_text()
+
                 note_lemma = None
                 if note.app.find('lem', recursive=False):
                     note_lemma = tei_to_html(note.app.lem)
@@ -1396,10 +1404,11 @@ TEXTUAL NOTES INGESTION
 
                     if note_lemma:
                         textual_variant.lemma = note_lemma
-                    else:
-                        lem_tag = variant.find('lem')
-                        if lem_tag:
-                            textual_variant.lemma = tei_to_html(lem_tag)
+
+                    # see if a variant has its own lemma to override note level lemma
+                    lem_tag = variant.find('lem')
+                    if lem_tag:
+                        textual_variant.lemma = tei_to_html(lem_tag)
 
                     starting_siglum = None
                     ending_siglum = None
@@ -1711,6 +1720,16 @@ def perform_variant_transform(corpus, note, variant):
     result = ""
     original_text = ""
     embed_pipes = False
+    debug = False
+
+    # below is an example of how to enable debugging for a single note
+    '''
+    if note.xml_id == 'tn_0207':
+        debug = True
+    '''
+
+    if debug:
+        print(f"----------- Debugging Textual Note {note.xml_id} -----------")
 
     # Handle variants of type 'lem,' which are interpreted here to mean that
     # the witnesses associated with this variant are intended to be global
@@ -1729,6 +1748,9 @@ def perform_variant_transform(corpus, note, variant):
         original_text = stitch_lines(note.lines, embed_pipes=embed_pipes)
 
     if original_text:
+        if debug:
+            print(f"Original text: {original_text}")
+
         ellipsis = ' .\xa0.\xa0. '
         swung_dash = ' ~ '
         under_carrot = '‸'
@@ -1737,6 +1759,10 @@ def perform_variant_transform(corpus, note, variant):
         if variant.lemma and variant.transform and variant.transform_type:
             lemma = strip_tags(variant.lemma).replace(double_under_carrot, '').replace(under_carrot, '')
             transform = strip_tags(variant.transform).replace('| ', '').replace(double_under_carrot, '').replace(under_carrot, '')
+
+            if debug:
+                print(f"Lemma: {lemma}")
+                print(f"Transform: {transform}")
 
             if variant.transform_type in ["replace", "insert", "insert_before"]:
                 # TODO:
@@ -1753,6 +1779,9 @@ def perform_variant_transform(corpus, note, variant):
 
                 # replace using ellipsis and swung dash
                 if variant.transform_type == "replace" and _contains(lemma, [ellipsis]) and _contains(variant.transform, [ellipsis, swung_dash]):
+                    if debug:
+                        print("Transform type: replace using ellipsis and swung dash.")
+
                     result = original_text
 
                     lemmas = lemma.split(ellipsis)
@@ -1778,6 +1807,9 @@ def perform_variant_transform(corpus, note, variant):
 
                 # replace using swung_dash only
                 elif variant.transform_type == "replace" and swung_dash in variant.transform:
+                    if debug:
+                        print("Transform type: replace using swung dash only.")
+
                     no_punct_lemma = lemma
                     for punct in punctuation:
                         no_punct_lemma = no_punct_lemma.replace(punct, '')
@@ -1794,6 +1826,9 @@ def perform_variant_transform(corpus, note, variant):
 
                 # replace using ellipsis
                 elif variant.transform_type == "replace" and ellipsis in lemma and ellipsis in variant.transform:
+                    if debug:
+                        print("Transform type: replace using ellipsis in lemma and transform.")
+
                     lemmas = lemma.split(ellipsis)
                     transforms = transform.split(ellipsis)
                     if len(lemmas) == len(transforms):
@@ -1803,6 +1838,9 @@ def perform_variant_transform(corpus, note, variant):
 
                 # ellipsis in lemma only
                 elif ellipsis in lemma:
+                    if debug:
+                        print("Transform type: replace with ellipsis in lemma only.")
+
                     lemma_delimiters = lemma.split(ellipsis)
                     lemma_start_index = original_text.find(lemma_delimiters[0])
 
@@ -1817,9 +1855,15 @@ def perform_variant_transform(corpus, note, variant):
                 # replacement/insertion w/ lemma
                 if not result and lemma in original_text:
                     if variant.transform_type == "replace":
+                        if debug:
+                            print("Transform type: simple replacement of lemma with transform.")
+
                         result = original_text.replace(lemma, transform, 1)
                     # insert after lemma
                     elif variant.transform_type == "insert":
+                        if debug:
+                            print("Transform type: insertion of transform after lemma.")
+
                         result = "{0} {1} {2}".format(
                             original_text[:original_text.find(lemma) + len(lemma)].strip(),
                             transform,
@@ -1827,6 +1871,9 @@ def perform_variant_transform(corpus, note, variant):
                         )
                     # insert before lemma
                     elif variant.transform_type == "insert_before":
+                        if debug:
+                            print("Transform type: insertion of transform before lemma.")
+
                         result = "{0} {1} {2}".format(
                             original_text[:original_text.find(lemma)].strip(),
                             transform,
@@ -1835,17 +1882,29 @@ def perform_variant_transform(corpus, note, variant):
 
         # replace line altogether
         elif not variant.lemma and variant.transform_type == 'replace' and variant.transform:
+            if debug:
+                print("Transform type: replacement of entire line with lemma.")
+
             result = strip_tags(variant.transform)
 
         # insertions sans lemma
         elif not variant.lemma and variant.transform and variant.transform_type == "insert":
+            if debug:
+                print("Transform type: insertion of transform after entire line.")
+
             result = "{0} {1}".format(original_text, strip_tags(variant.transform))
         elif not variant.lemma and variant.transform and variant.transform_type == "insert_before":
+            if debug:
+                print("Transform type: insertion of transform after before entire line.")
+
             result = "{0} {1}".format(strip_tags(variant.transform), original_text)
 
         # simple omission
         elif variant.lemma and not variant.transform and strip_tags(variant.description).lower() == "om.":
             lemma = strip_tags(variant.lemma)
+
+            if debug:
+                print("Transform type: omitting lemma from line.")
 
             if ellipsis in lemma:
                 lemma_delimiters = lemma.split(ellipsis)
@@ -1868,6 +1927,9 @@ def perform_variant_transform(corpus, note, variant):
                 result = original_text.replace(lemma, "")
 
     if original_text and result:
+        if debug:
+            print(f"Result: {result}")
+
         line_words = original_text.split()
         variant_words = result.split()
         matcher = difflib.SequenceMatcher(None, line_words, variant_words)
@@ -2821,21 +2883,34 @@ def get_line_ids(xml_id_start, xml_id_end, line_id_map, ordered_line_ids):
     line_ids = []
     err_msg = ""
 
-    if xml_id_start and xml_id_end and len(xml_id_start.split()) == len(xml_id_end.split()):
+    if xml_id_start and xml_id_end and len(xml_id_start.split()) >= len(xml_id_end.split()):
         starts = xml_id_start.split()
         ends = xml_id_end.split()
 
         for pair_index in range(0, len(starts)):
-            start_xml_id = starts[pair_index].replace('#', '')
-            end_xml_id = ends[pair_index].replace('#', '')
-            if _contains(line_id_map, [start_xml_id, end_xml_id]) and line_id_map[start_xml_id] and line_id_map[end_xml_id]:
-                start_id_index = ordered_line_ids.index(line_id_map[start_xml_id][0])
-                end_id_index = ordered_line_ids.index(line_id_map[end_xml_id][-1])
+            if pair_index < len(starts) and pair_index < len(ends):
+                start_xml_id = starts[pair_index].replace('#', '')
+                end_xml_id = ends[pair_index].replace('#', '')
+                if _contains(line_id_map, [start_xml_id, end_xml_id]) and line_id_map[start_xml_id] and line_id_map[end_xml_id]:
+                    start_id_index = ordered_line_ids.index(line_id_map[start_xml_id][0])
+                    end_id_index = ordered_line_ids.index(line_id_map[end_xml_id][-1])
 
-                if start_id_index < end_id_index:
-                    line_ids += ordered_line_ids[start_id_index:end_id_index + 1]
-            else:
-                err_msg += "Lines with XML IDs {0} and/or {1} not found!".format(start_xml_id, end_xml_id)
+                    if start_id_index < end_id_index:
+                        line_ids += ordered_line_ids[start_id_index:end_id_index + 1]
+
+                    # in case the start and end index are the same
+                    elif start_id_index == end_id_index:
+                        line_ids.append(ordered_line_ids[start_id_index])
+                else:
+                    err_msg += "Lines with XML IDs {0} and/or {1} not found!".format(start_xml_id, end_xml_id)
+
+            # situations where spare individual lines are listed after the line range pairs
+            elif pair_index < len(starts):
+                line_xml_id = starts[pair_index].replace('#', '')
+                if line_xml_id in line_id_map:
+                    line_ids += line_id_map[line_xml_id]
+                else:
+                    err_msg += f"Line with XML ID {line_xml_id} not found!"
 
     elif xml_id_start:
         xml_ids = xml_id_start.replace('#', '').split()
