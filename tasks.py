@@ -5,6 +5,7 @@ import difflib
 import logging
 import traceback
 import html as html_lib
+from lxml import etree
 from timeit import default_timer as timer
 from copy import deepcopy
 from dateutil.relativedelta import relativedelta
@@ -543,6 +544,14 @@ def delete_play_data(corpus, play_prefix, ingestion_scope):
 
     return report
 
+def parse_tei_xml(tei_file_path):
+    with open(tei_file_path, "rb") as tei_in:
+        tree = etree.fromstring(
+            tei_in.read(),
+            etree.XMLParser(resolve_entities=True, load_dtd=True, no_network=True),
+        )
+
+        return BeautifulSoup(etree.tostring(tree, encoding="utf-8"), "xml")
 
 def parse_front_file(corpus, play, front_file_path):
     report = '''
@@ -550,14 +559,16 @@ def parse_front_file(corpus, play, front_file_path):
 FRONT MATTER INGESTION
 ##########################################################\n'''
 
-    with open(front_file_path, 'r') as tei_in:
-        tei_text = tei_in.read()
-        text_replacements = extract_text_replacements(tei_in)
+    #with open(front_file_path, 'r') as tei_in:
+    #    tei_text = tei_in.read()
+    #    text_replacements = extract_text_replacements(tei_in)
+    #
+    #    for text, replacement in text_replacements.items():
+    #        tei_text = tei_text.replace(text, replacement)
+    #
+    #    front_tei = BeautifulSoup(tei_text, "xml")
 
-        for text, replacement in text_replacements.items():
-            tei_text = tei_text.replace(text, replacement)
-
-        front_tei = BeautifulSoup(tei_text, "xml")
+    front_tei = parse_tei_xml(front_file_path)
 
     # list for tracking unhandled tags:
     unhandled = []
@@ -792,14 +803,16 @@ PLAY TEXT INGESTION
     line_id_map = {}
     ordered_line_ids = []
 
-    with open(playtext_file_path, 'r') as tei_in:
-        tei_text = tei_in.read()
-        text_replacements = extract_text_replacements(tei_in)
+    #with open(playtext_file_path, 'r') as tei_in:
+    #    tei_text = tei_in.read()
+    #    text_replacements = extract_text_replacements(tei_in)
+    #
+    #    for text, replacement in text_replacements.items():
+    #        tei_text = tei_text.replace(text, replacement)
+    #
+    #    lines_tei = BeautifulSoup(tei_text, "xml")
 
-        for text, replacement in text_replacements.items():
-            tei_text = tei_text.replace(text, replacement)
-
-        lines_tei = BeautifulSoup(tei_text, "xml")
+    lines_tei = parse_tei_xml(playtext_file_path)
 
     # retrieve basetext document
     basetext = corpus.get_content("Document", {'siglum': basetext_siglum})[0]
@@ -1311,14 +1324,17 @@ TEXTUAL NOTES INGESTION
         # open textualnotes xml, read raw text into tei_text,
         # and perform special text replacements before feeding
         # into BeautifulSoup
-        with open(textualnotes_file_path, 'r') as tei_in:
-            tei_text = tei_in.read()
-            text_replacements = extract_text_replacements(tei_in)
 
-            for text, replacement in text_replacements.items():
-                tei_text = tei_text.replace(text, replacement)
+        #with open(textualnotes_file_path, 'r') as tei_in:
+        #    tei_text = tei_in.read()
+        #    text_replacements = extract_text_replacements(tei_in)
+        #
+        #    for text, replacement in text_replacements.items():
+        #        tei_text = tei_text.replace(text, replacement)
+        #
+        #    notes_tei = BeautifulSoup(tei_text, "xml")
 
-            notes_tei = BeautifulSoup(tei_text, "xml")
+        notes_tei = parse_tei_xml(textualnotes_file_path)
 
         all_sigla = []
 
@@ -1988,14 +2004,16 @@ def parse_bibliography(corpus, play, bibliography_file_path):
 BIBLIOGRAPHY INGESTION
 ##########################################################\n'''
 
-    with open(bibliography_file_path, 'r') as tei_in:
-        tei_text = tei_in.read()
-        text_replacements = extract_text_replacements(tei_in)
+    #with open(bibliography_file_path, 'r') as tei_in:
+    #    tei_text = tei_in.read()
+    #    text_replacements = extract_text_replacements(tei_in)
+    #
+    #    for text, replacement in text_replacements.items():
+    #        tei_text = tei_text.replace(text, replacement)
+    #
+    #    bib_tei = BeautifulSoup(tei_text, "xml")
 
-        for text, replacement in text_replacements.items():
-            tei_text = tei_text.replace(text, replacement)
-
-        bib_tei = BeautifulSoup(tei_text, "xml")
+    bib_tei = parse_tei_xml(bibliography_file_path)
 
     play.bibliographic_sources = []
     unhandled = []
@@ -2063,6 +2081,7 @@ def handle_bibl_tag(corpus, bibl, unhandled, xml_id=None, date='', siglum_label=
         if doc_data['unhandled']:
             unhandled.extend(doc_data['unhandled'])
 
+        doc.siglum_label = doc_data['siglum_label']
         doc.save()
 
     return doc, doc_data['bibliographic_entry']
@@ -2179,14 +2198,17 @@ COMMENTARY NOTE INGESTION
         # open commentary xml, read raw text into tei_text,
         # and perform special text replacements before feeding
         # into BeautifulSoup
-        with open(commentary_file_path, 'r') as tei_in:
-            tei_text = tei_in.read()
-            text_replacements = extract_text_replacements(tei_in)
 
-            for text, replacement in text_replacements.items():
-                tei_text = tei_text.replace(text, replacement)
+        #with open(commentary_file_path, 'r') as tei_in:
+        #    tei_text = tei_in.read()
+        #    text_replacements = extract_text_replacements(tei_in)
+        #
+        #    for text, replacement in text_replacements.items():
+        #        tei_text = tei_text.replace(text, replacement)
+        #
+        #    comm_tei = BeautifulSoup(tei_text, "xml")
 
-            comm_tei = BeautifulSoup(tei_text, "xml")
+        comm_tei = parse_tei_xml(commentary_file_path)
 
         note_tags = comm_tei.find_all('note', attrs={'type': 'commentary'})
         unhandled = []
@@ -2532,14 +2554,17 @@ APPENDIX INGESTION
         # open xml, read raw text into tei_text,
         # and perform special text replacements before feeding
         # into BeautifulSoup
-        with open(appendix_file_path, 'r') as tei_in:
-            tei_text = tei_in.read()
-            text_replacements = extract_text_replacements(tei_in)
 
-            for text, replacement in text_replacements.items():
-                tei_text = tei_text.replace(text, replacement)
+        #with open(appendix_file_path, 'r') as tei_in:
+        #    tei_text = tei_in.read()
+        #    text_replacements = extract_text_replacements(tei_in)
+        #
+        #    for text, replacement in text_replacements.items():
+        #        tei_text = tei_text.replace(text, replacement)
+        #
+        #    app_tei = BeautifulSoup(tei_text, "xml")
 
-            app_tei = BeautifulSoup(tei_text, "xml")
+        app_tei = parse_tei_xml(appendix_file_path)
 
         unhandled = []
         unhandled += create_appendix_divs(corpus, play, repo_name, app_tei, None, 1)
