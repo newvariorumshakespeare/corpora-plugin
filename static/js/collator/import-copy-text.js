@@ -14,7 +14,7 @@ class CopyTextImporter {
                     <div class="modal-dialog modal-xl" role="document">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title" id="import-copy-text-modal-label">Import Copy Text</h5>
+                                <h5 class="modal-title" id="import-copy-text-modal-label">Import Base Text</h5>
                                 <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
                                 </button>
                             </div>

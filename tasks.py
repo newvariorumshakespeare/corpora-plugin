@@ -3330,17 +3330,11 @@ def place_tags(location, line, taggings, open_tags):
 
 def make_collation_lines(job_id):
     job = Job(job_id)
-    corpus = job.corpus
-    play = job.content
     method = job.get_param_value('method')
 
-    if play:
+    if job.corpus and job.content and method:
         if method == 'transcription_project':
-            make_collation_lines_from_transcription_project(
-                corpus,
-                play,
-                job.get_param_value('transcription_project_id'),
-            )
+            make_collation_lines_from_transcription_project(job)
 
     job.complete(status='complete')
 
@@ -3371,7 +3365,7 @@ def import_copy_text(job_id):
 
             lines_processed += 1
             if lines_processed % 100 == 0:
-                job.set_status('running', percent_complete=int(lines_processed / total_lines * 100))
+                job.set_status('running', percent_complete=int( (lines_processed / total_lines) * 100))
 
     job.complete(status='complete')
 

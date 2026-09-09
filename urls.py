@@ -17,6 +17,7 @@ urlpatterns = [
     path('corpus/<str:corpus_id>/play-minimap/<str:play_prefix>/', nvs_views.play_minimap),
     path('corpus/<str:corpus_id>/paratext-viewer/<str:play_prefix>/<str:section>/', nvs_views.paratext),
     path('nvs/witness-meter/<str:witness_flags>/<str:height>/<str:width>/<str:inactive_color_hex>/<str:label_buffer>/', nvs_views.witness_meter),
+
     path('api/corpus/<str:corpus_id>/nvs-search/<str:play_prefix>/', nvs_views.api_search),
     path('api/corpus/<str:corpus_id>/nvs-lines/<str:play_prefix>/', nvs_views.api_lines),
     path('api/corpus/<str:corpus_id>/nvs-lines/<str:play_prefix>/<str:starting_line_id>/', nvs_views.api_lines),
@@ -26,4 +27,5 @@ urlpatterns = [
 
     path('corpus/<str:corpus_id>/collator/<str:play_prefix>/', nvs_views.collator),
     path('api/corpus/<str:corpus_id>/diff/<str:play_prefix>/', nvs_views.api_diff),
+    path('api/corpus/<str:corpus_id>/play/<str:play_prefix>/witness/<str:siglum>/collation-status/', nvs_views.api_witness_collation_status),
 ]
