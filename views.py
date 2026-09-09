@@ -14,7 +14,7 @@ from manager.utilities import (
     scholar_has_privilege,
 )
 from manager.tasks import run_job
-from corpus import get_corpus
+from corpus import get_corpus, Job
 
 
 # TEMPORARY FIX FOR SOFT LAUNCH
@@ -707,7 +707,7 @@ def collator(request, corpus_id, play_prefix):
                         response['messages'].append(f'Witness {doc.siglum_label} added!')
 
                     else:
-                        response['errors'].append("A witness already exists for this document.")
+                        response['errors'].append("This witness already exists for the current collation project.")
 
             # IMPORT COPY TEXT
             if 'import-copy-text-witness' in request.POST:
@@ -727,16 +727,25 @@ def collator(request, corpus_id, play_prefix):
             # MAKE COLLATION LINES
             if 'add-lines-method' in request.POST:
                 if request.POST['add-lines-method'] == 'trans-project' and 'add-lines-trans-project' in request.POST:
+
                     trans_project_id = _clean(request.POST, 'add-lines-trans-project')
-                    run_job(corpus.queue_local_job(
-                        content_type="Play",
-                        content_id=str(play.id),
-                        task_name="Make Collation Lines",
-                        parameters={
-                            'method': 'transcription_project',
-                            'transcription_project_id': trans_project_id,
-                        }
-                    ))
+                    trans_project = corpus.get_content('TranscriptionProject', trans_project_id)
+                    if trans_project:
+                        doc = trans_project.document
+                        witness = corpus.get_content('Reference', {'play': play.id, 'document': doc.id}, single_result=True)
+                        if witness:
+                            job_id = corpus.queue_local_job(
+                                content_type="Play",
+                                content_id=str(play.id),
+                                task_name="Make Collation Lines",
+                                parameters={
+                                    'method': 'transcription_project',
+                                    'transcription_project_id': trans_project_id,
+                                }
+                            )
+                            witness.collation_status = f"Importing: {job_id}"
+                            witness.save()
+                            run_job(job_id)
 
             # EDIT COLLATION LINE
             if _contains(request.POST, ['edit-collation-line-siglum', 'edit-collation-line-tln']):
@@ -947,6 +956,37 @@ def api_edition_lines(request, corpus_id=None, play_prefix=None, siglum=None):
 
     return HttpResponse(
         json.dumps(lines),
+        content_type='application/json'
+    )
+
+
+def api_witness_collation_status(request, corpus_id, play_prefix, siglum):
+    status = 'None'
+    percent_complete = 0
+
+    corpus = get_corpus(corpus_id)
+
+    if corpus:
+        play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+
+        if play:
+            doc = corpus.get_content('Document', {'siglum': siglum}, single_result=True)
+
+            if doc:
+                witness = corpus.get_content('Reference', {'play': play.id, 'document': doc.id}, single_result=True)
+
+                if witness and witness.collation_status:
+                    status = witness.collation_status
+
+                    if status.startswith('Importing:'):
+                        job_id = status.split(' ')[1]
+                        status, percent_complete = Job.get_status(job_id)
+
+    return HttpResponse(
+        json.dumps({
+            'status': status,
+            'percent_complete': percent_complete,
+        }),
         content_type='application/json'
     )
 
@@ -1401,6 +1441,7 @@ def get_nvs_witnesses(corpus, play):
             'siglum_label': wit_ref.document.siglum_label,
             'bibliographic_entry': "{0} {1}".format(wit_ref.document.siglum_label, wit_ref.bibliographic_entry),
             'published': wit_ref.document.pub_date,
+            'collation_status': wit_ref.collation_status,
             'occasional': False
         }
 
@@ -1419,6 +1460,7 @@ def get_nvs_witnesses(corpus, play):
             'document_id': str(wit_ref.document.id),
             'bibliographic_entry': wit_ref.bibliographic_entry,
             'published': wit_ref.document.pub_date,
+            'collation_status': wit_ref.collation_status,
             'occasional': True
         }
 

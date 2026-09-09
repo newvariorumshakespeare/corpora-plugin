@@ -3,7 +3,7 @@ class WitnessImporter {
         this.onLoad = onLoad
         this.modal = $('#add-witness-modal')
         this.buildModal()
-        onLoad()
+        onLoad(this)
     }
 
     buildModal() {

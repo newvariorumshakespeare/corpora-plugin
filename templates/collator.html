@@ -84,6 +84,13 @@
           z-index: 3;
         }
 
+        .missing-siglum-status {
+            display: inline-block;
+            position: sticky;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
         span.play-line {
             white-space: nowrap;
             font-family: 'Baskerville', serif;
@@ -91,20 +98,20 @@
             font-size: 1.125rem;
         }
 
-        .difference {
+        .has-copy-text .difference {
             color: #FFFFFF;
             padding-left: 3px;
             padding-right: 3px;
         }
-        .difference.selected {
+        .has-copy-text .difference.selected {
             outline: 3px solid deeppink;
             outline-offset: 2px;
             border-radius: 50%;
         }
-        .difference.replace {
+        .has-copy-text .difference.replace {
             background-color: #e9702b;
         }
-        .difference.delete {
+        .has-copy-text .difference.delete {
             background-color: #6B0F1A;
             width: 2px;
             padding: 0!important;
@@ -112,7 +119,7 @@
             display: inline-block; /* Needed for width to work */
             height: 20px; /* Adjust to your desired height */
         }
-        .difference.delete::after {
+        .has-copy-text .difference.delete::after {
             content: '';
             position: absolute;
             width: 20px;
@@ -122,12 +129,12 @@
             left: 50%;
             transform: translateX(-50%); /* Center horizontally */
         }
-        .difference.omission {
+        .has-copy-text .difference.omission {
             background-color: #6B0F1A;
             display: inline-block;
             width: 100%;
         }
-        .difference.insert {
+        .has-copy-text .difference.insert {
             background-color: #008148;
         }
 
@@ -155,13 +162,35 @@
 {% endblock %}
 
 {% block modals %}
+    <!-- GET STARTED MODAL -->
+    <div class="modal fade" id="get-started-modal" tabindex="-1" role="dialog" aria-labelledby="add-witness-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="add-witness-modal-label">Get Started</h5>
+                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>An NVS collation project has not yet been created for this play. It's recommended that you commence
+                    by identifying the edition of the play that should serve as the base text for the diplomatic transcription
+                    editions will be collated against. To do so, click the button below:</p>
 
+                    <p><button id="get-started-add-witness-button" class="btn btn-sm control-panel-button">Add Witness</button></p>
 
+                    <p>Once this first witness has been added, click the "Import Base Text" button that will appear on
+                    the control panel to begin establishing the diplomatic transcription for this play.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block main %}
     <div class="container-fluid">
-
 
         <!-- COLLATION GRID -->
         <div id="collation-grid-container">
@@ -172,14 +201,12 @@
                         <!-- Populated by JS -->
                     </tr>
                     <tr id="collation-grid-copy-text-row" class="grid-row">
-                        <th scope="row" id="collation-grid-topmost" class="grid-left-header text-end">Copy Text</th>
+                        <th scope="row" id="collation-grid-topmost" class="grid-left-header text-end">Base Text</th>
                     </tr>
                 </thead>
                 <tbody id="collation-grid-body">
-
+                    <!-- Populated by JS -->
                 </tbody>
-
-                <!-- Populated by JS -->
             </table>
 
             <div id="control-panel">
@@ -268,7 +295,23 @@
                                     }
                                 })
                             }
-                            loadWitnessLines()
+
+                            if (window.nvs.copyTextEstablished) $('body').addClass('has-copy-text')
+
+                            if (Object.keys(window.nvs.witnesses).length) loadWitnessLines()
+                            else {
+                                getEl('collation-grid').classList.add('d-none')
+                                getEl('control-panel').classList.add('d-none')
+
+                                $('#get-started-add-witness-button').click(() => {
+                                    witnessImporter = new WitnessImporter((witnessImporter) => {
+                                        $('#get-started-modal').modal('hide')
+                                        witnessImporter.import()
+                                    })
+                                })
+
+                                $('#get-started-modal').modal('show')
+                            }
                         })
                     // end fetch
                 })
@@ -290,26 +333,30 @@
                 yearSiglaMap[wit.published] = xmlID
 
                 // build and fire off a request to find collation lines for this witness
-                witLineRequests.push(
-                    fetch(`${window.nvs.endpoints.collationLine}?f_play.id=${window.nvs.playID}&f_witness.siglum=${xmlID}&only=tln&s_order=asc&page-size=10000`)
-                        .then(results => results.json())
-                        .then(collationLines => {
-                            if (collationLines.records.length) {
-                                collationLines.records.forEach(line => {
-                                    if (!(line.tln in window.nvs.lines)) {
-                                        window.nvs.lines[line.tln] = {
-                                            'text': '',
+                if (wit.collation_status === 'Imported') {
+                    witLineRequests.push(
+                        fetch(`${window.nvs.endpoints.collationLine}?f_play.id=${window.nvs.playID}&f_witness.siglum=${xmlID}&only=tln&s_order=asc&page-size=10000`)
+                            .then(results => results.json())
+                            .then(collationLines => {
+                                if (collationLines.records.length) {
+                                    collationLines.records.forEach(line => {
+                                        if (!(line.tln in window.nvs.lines)) {
+                                            window.nvs.lines[line.tln] = {
+                                                'text': '',
+                                            }
                                         }
-                                    }
 
-                                    window.nvs.lines[line.tln][xmlID] = true
-                                })
-                            } else {
-                                missingWits.push(xmlID)
-                            }
-                        })
-                    // end fetch
-                )
+                                        window.nvs.lines[line.tln][xmlID] = true
+                                    })
+                                } else {
+                                    missingWits.push(xmlID)
+                                }
+                            })
+                        // end fetch
+                    )
+                } else {
+                    missingWits.push(xmlID)
+                }
             }
 
             // order the witnesses by date
@@ -318,8 +365,6 @@
             // build the witness rows
             window.nvs.orderedSigla.forEach(siglum => {
                 let wit = window.nvs.witnesses[siglum]
-
-                console.log(siglum)
 
                 gridBody.append(`
                     <tr id="collation-grid-siglum-row-${siglum}" class="grid-row">
@@ -342,12 +387,13 @@
                 .then(() => {
                     // handle sigla for which there are no lines
                     missingWits.forEach(missingWitSiglum => {
+                        // todo: move this button inside the line importer
                         let witHeader = $(`#collation-grid-header-${missingWitSiglum}`)
                         witHeader.prepend(`<button id="add-lines-${missingWitSiglum}-button" class="btn btn-sm btn-primary me-2">Import</button>`)
 
                         let witLinesImportButton = $(`#add-lines-${missingWitSiglum}-button`)
                         let witLinesImporter = new LinesImporter(
-                            window.nvs.witnesses[missingWitSiglum].document_id,
+                            missingWitSiglum,
                             () => {
                                 witLinesImportButton.click(() => {
                                     witLinesImporter.import()
@@ -369,7 +415,7 @@
 
                     if (window.nvs.tlns.includes(startingTLN)) tlnStartingIndex = window.nvs.tlns.indexOf(startingTLN)
 
-                    while(linesPlotted < window.nvs.maxLines) {
+                    while(linesPlotted < Math.min(window.nvs.maxLines, window.nvs.tlns.length)) {
                         let tln = window.nvs.tlns[tlnStartingIndex + linesPlotted]
                         let nextTLN = null
                         let text = window.nvs.lines[tln].text
@@ -390,21 +436,23 @@
                         `)
 
                         for (let siglum in window.nvs.witnesses) {
-                            let collationClass = 'ignore'
+                            if (!missingWits.includes(siglum)) {
+                                let collationClass = 'ignore'
 
-                            if (window.nvs.lines[tln][siglum]) collationClass = 'collate-me'
+                                if (window.nvs.lines[tln][siglum]) collationClass = 'collate-me'
 
-                            window.nvs.witnesses[siglum].row.append(`
-                                <td id="${siglum}-${tln}"
-                                    class="grid-col ${collationClass}"
-                                    data-siglum="${siglum}"
-                                    data-tln="${tln}"
-                                    ${endingTLN !== null ? `data-prev_tln="${endingTLN}"` : ''}
-                                    ${nextTLN !== null ? `data-next_tln="${nextTLN}"` : ''}>
-                                        ${collationClass === 'ignore' ? '<span class="difference omission">&nbsp;</span>' : '&nbsp;'}
-                                </td>
-                            `)
-                            window.nvs.allCells.add(`${siglum}-${tln}`)
+                                window.nvs.witnesses[siglum].row.append(`
+                                    <td id="${siglum}-${tln}"
+                                        class="grid-col ${collationClass}"
+                                        data-siglum="${siglum}"
+                                        data-tln="${tln}"
+                                        ${endingTLN !== null ? `data-prev_tln="${endingTLN}"` : ''}
+                                        ${nextTLN !== null ? `data-next_tln="${nextTLN}"` : ''}>
+                                            ${collationClass === 'ignore' ? '<span class="difference omission">&nbsp;</span>' : '&nbsp;'}
+                                    </td>
+                                `)
+                                window.nvs.allCells.add(`${siglum}-${tln}`)
+                            }
                         }
 
                         linesPlotted += 1

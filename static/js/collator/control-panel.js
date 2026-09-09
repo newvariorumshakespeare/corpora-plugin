@@ -13,7 +13,7 @@ class ControlPanel {
             <div class="row g-0 justify-content-between p-2" style="background-color:#6c9ecc; height: 40px;!important">
                 <div class="col">
                     <button id="add-witness-button" class="btn btn-sm control-panel-button" disabled>Add Witness</button>
-                    <button id="import-copytext-button" class="btn btn-sm control-panel-button" disabled>Import Copy Text</button>
+                    <button id="import-copytext-button" class="btn btn-sm control-panel-button" disabled>Import Base Text</button>
                     <button id="generate-tei-button" class="btn btn-sm control-panel-button">Generate TEI</button>
                 </div>
                 <div class="col">
