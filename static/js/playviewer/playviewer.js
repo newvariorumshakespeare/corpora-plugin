@@ -496,7 +496,7 @@ export class PlayViewer {
                 attempts += 1
             }
             if (this.placedLineNos.has(this.lines[lineID].line_number)) {
-                if (openVariants && this.lines[lineID].notes && this.lines[lineID].notes.length) {
+                if (openVariants && this.lines[lineID].notes && this.lines[lineID].notes.size) {
                     getCollapse(getEl(`${lineID}-variant-div`), {}, callback).show()
                 } else callback()
             } else {
@@ -511,7 +511,7 @@ export class PlayViewer {
         lines.forEach(line => {
             if (!(line.xml_id in this.lines)) {
                 this.lines[line.xml_id] = line
-                this.lines[line.xml_id]['notes'] = []
+                this.lines[line.xml_id]['notes'] = new Set()
                 this.lines[line.xml_id]['retirementTimer'] = null
                 linesToMarkAsRegistered.push({line_number: line.line_number, xml_id: line.xml_id})
             }

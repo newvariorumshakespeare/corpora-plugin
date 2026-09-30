@@ -8,7 +8,7 @@ export class NoteManager {
     placeNotes(lineID) {
         let line = window.nvs.playViewer.lines[lineID]
         let line_variant_div = getEl(`${lineID}-variant-div`)
-        let line_varients_html = ''
+        let line_variants_html = ''
 
         // make note/variant elements
         try {
@@ -29,26 +29,26 @@ export class NoteManager {
                         }
                         if (note.line_label) variant_words = `${note.line_label}: ${variant_words}`
 
-                        line_varients_html += `
-                        <div class="row gx-0 variant-row">
-                            <div class="col-sm-4 p-0 m-0">
-                                <div class="row gx-0">
-                                    <div id="variant-${variant.id}" class="col-sm-12 p-0 m-0 variant-witness-meter clickable${['xs', 'xm'].includes(this.currentBreakpoint) ? ' d-none' : ''}">
-                                        <img id="${lineID}-${variant.id}-witness-meter" height="15" width="100%" src="/static/img/blank-meter.png" data-witness_indicators="${variant.witness_meter}" data-line_id="${lineID}" />
+                        line_variants_html += `
+                            <div id="variant-row-${variant.id}" class="row gx-0 variant-row">
+                                <div class="col-sm-4 p-0 m-0">
+                                    <div class="row gx-0">
+                                        <div id="variant-${variant.id}" class="col-sm-12 p-0 m-0 variant-witness-meter clickable${['xs', 'xm'].includes(this.currentBreakpoint) ? ' d-none' : ''}">
+                                            <img id="${lineID}-${variant.id}-witness-meter" height="15" width="100%" src="/static/img/blank-meter.png" data-witness_indicators="${variant.witness_meter}" data-line_id="${lineID}" />
+                                        </div>
+                                    </div>
+                                    <div class="row gx-0">
+                                        <div class="col-sm-12 witness-formula" data-line_id="${lineID}" data-variant_id="${variant.id}">
+                                            ${variant.witness_formula}${variant.description && !description_displayed ? ' ' + variant.description : ''}
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="row gx-0">
-                                    <div class="col-sm-12 witness-formula" data-line_id="${lineID}" data-variant_id="${variant.id}">
-                                        ${variant.witness_formula}${variant.description && !description_displayed ? ' ' + variant.description : ''}
-                                    </div>
-                                </div>
+                                <div class="col-sm-8 p-0 m-0 variant-words align-self-center">${variant_words}</div>
                             </div>
-                            <div class="col-sm-8 p-0 m-0 variant-words align-self-center">${variant_words}</div>
-                        </div>
                         `
                     })
 
-                    line_variant_div.innerHTML = line_varients_html
+                    line_variant_div.innerHTML = line_variants_html
                 }
             })
         } catch(error) {
@@ -286,7 +286,7 @@ export class NoteManager {
         notes.forEach(note => {
             note.lines.forEach(line => {
                 if (line.xml_id in window.nvs.playViewer.lines) {
-                    window.nvs.playViewer.lines[line.xml_id].notes.push(note.xml_id)
+                    window.nvs.playViewer.lines[line.xml_id].notes.add(note.xml_id)
                 }
             })
 
