@@ -741,7 +741,8 @@ playlinemarker.pipe-marker::after {
 
 .variant-note {
     color: #070707;
-    font-style: italic;
+    /* most notes already have italics and this forces non-italicized parts of notes to be incorrect
+    font-style: italic; */
 }
 
 span.difference {

@@ -30,10 +30,10 @@ export class NoteManager {
                         if (note.line_label) variant_words = `${note.line_label}: ${variant_words}`
 
                         line_variants_html += `
-                            <div id="variant-row-${variant.id}" class="row gx-0 variant-row">
+                            <div class="row gx-0 variant-row" data-note_id="${note_id}" data-variant_id="${variant.id}">
                                 <div class="col-sm-4 p-0 m-0">
                                     <div class="row gx-0">
-                                        <div id="variant-${variant.id}" class="col-sm-12 p-0 m-0 variant-witness-meter clickable${['xs', 'xm'].includes(this.currentBreakpoint) ? ' d-none' : ''}">
+                                        <div class="col-sm-12 p-0 m-0 variant-witness-meter clickable${['xs', 'xm'].includes(this.currentBreakpoint) ? ' d-none' : ''}">
                                             <img id="${lineID}-${variant.id}-witness-meter" height="15" width="100%" src="/static/img/blank-meter.png" data-witness_indicators="${variant.witness_meter}" data-line_id="${lineID}" />
                                         </div>
                                     </div>
