@@ -476,14 +476,21 @@ export class PlayViewer {
             if (mostFrequentHeight >= this.minLineHeight) this.observedLineHeight = mostFrequentHeight
             else this.observedLineHeight = this.minLineHeight
 
+            let lowestVisibleLineNo = Math.min(...this.visibleLineNos)
+            let lowestLineID = null
+
+            // because changing line height will cause the page to reflow, we want to capture which
+            // topmost line was visible and navigate back to it after that reflow
+            if (lowestVisibleLineNo in this.lineNoIDMap) lowestLineID = this.lineNoIDMap[lowestVisibleLineNo]
             setCssVar('--nvs-play-row-min-height', `${this.observedLineHeight}px`)
+            if (lowestLineID) setTimeout(() => this.navigateTo(lowestLineID), 1000)
             return true
         }
         return false
     }
 
     async navigateTo(lineID, openVariants=false, callback=null) {
-        getEl(`${lineID}-row`).scrollIntoView({behavior: 'smooth'})
+        getEl(`${lineID}-row`).scrollIntoView({block: 'start', behavior: 'smooth'})
 
         if (callback !== null) {
             let attempts = 0
@@ -496,7 +503,7 @@ export class PlayViewer {
                 attempts += 1
             }
             if (this.placedLineNos.has(this.lines[lineID].line_number)) {
-                if (openVariants && this.lines[lineID].notes && this.lines[lineID].notes.length) {
+                if (openVariants && this.lines[lineID].notes && this.lines[lineID].notes.size) {
                     getCollapse(getEl(`${lineID}-variant-div`), {}, callback).show()
                 } else callback()
             } else {
@@ -511,7 +518,7 @@ export class PlayViewer {
         lines.forEach(line => {
             if (!(line.xml_id in this.lines)) {
                 this.lines[line.xml_id] = line
-                this.lines[line.xml_id]['notes'] = []
+                this.lines[line.xml_id]['notes'] = new Set()
                 this.lines[line.xml_id]['retirementTimer'] = null
                 linesToMarkAsRegistered.push({line_number: line.line_number, xml_id: line.xml_id})
             }
@@ -620,7 +627,16 @@ export class PlayViewer {
         actSceneFrame.innerHTML = actSceneHTML
         forElsMatching('.actscene-indicator', (el) => {
             el.onclick = (e) => {
-                getElWithQuery(`.play-row[data-actscene="${el.dataset.actscene}"]`).scrollIntoView({behavior: 'smooth'})
+                // because act/scene jumps are so large, we want to navigate intelligently by moving the screen
+                // to the area where the line will lazy load and then scroll to the location of the line once
+                // lines in that area have been placed
+                let targetRow = getElWithQuery(`.play-row[data-actscene="${el.dataset.actscene}"]`)
+                if (targetRow)
+                    this.navigateTo(
+                        targetRow.dataset.line_id,
+                        false,
+                        () => targetRow.scrollIntoView({block: 'start', behavior: 'smooth'})
+                    )
             }
         })
     }
