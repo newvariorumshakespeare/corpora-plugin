@@ -136,25 +136,27 @@ def make_collation_lines_from_transcription_project(job):
                                                     # make sure this segment's image is on the same page
                                                     if line_info['image'] == page_image:
 
-                                                        # calculate current furthermost x and y
-                                                        ending_x = line_info['x'] + line_info['width']
-                                                        ending_y = line_info['y'] + line_info['height']
+                                                        # make sure we've got good coordinate info for this line
+                                                        if _contains(line_info, ['x', 'y', 'width', 'height']):
+                                                            # calculate current furthermost x and y
+                                                            ending_x = line_info['x'] + line_info['width']
+                                                            ending_y = line_info['y'] + line_info['height']
 
-                                                        # calculate new image segment's furthermost x and y
-                                                        new_ending_x = page_line['x'] + page_line['width']
-                                                        new_ending_y = page_line['y'] + page_line['height']
+                                                            # calculate new image segment's furthermost x and y
+                                                            new_ending_x = page_line['x'] + page_line['width']
+                                                            new_ending_y = page_line['y'] + page_line['height']
 
-                                                        # make sure we've established the left and topmost x and y of the two
-                                                        if page_line['x'] < line_info['x']:
-                                                            line_info['x'] = page_line['x']
-                                                        if page_line['y'] < line_info['y']:
-                                                            line_info['y'] = page_line['y']
+                                                            # make sure we've established the left and topmost x and y of the two
+                                                            if page_line['x'] < line_info['x']:
+                                                                line_info['x'] = page_line['x']
+                                                            if page_line['y'] < line_info['y']:
+                                                                line_info['y'] = page_line['y']
 
-                                                        # make sure we set width and height according to the furthermost x and y of the two
-                                                        if new_ending_x > ending_x:
-                                                            line_info['width'] = new_ending_x - line_info['x']
-                                                        if new_ending_y > ending_y:
-                                                            line_info['height'] = new_ending_y - line_info['y']
+                                                            # make sure we set width and height according to the furthermost x and y of the two
+                                                            if new_ending_x > ending_x:
+                                                                line_info['width'] = new_ending_x - line_info['x']
+                                                            if new_ending_y > ending_y:
+                                                                line_info['height'] = new_ending_y - line_info['y']
 
                                                     # if this segment's image isn't on same page, mark as partial image
                                                     else:
