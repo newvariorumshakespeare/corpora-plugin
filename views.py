@@ -688,26 +688,29 @@ def collator(request, corpus_id, play_prefix):
             # ADD A NEW WITNESS
             if _contains(request.POST, ['add-witness-document-id', 'add-witness-type']):
                 new_witness_document_id = _clean(request.POST, 'add-witness-document-id')
-                new_witness_type = _clean(request.POST, 'add-witness-type')
-                doc = corpus.get_content('Document', new_witness_document_id)
 
-                if doc:
-                    new_witness = corpus.get_content('Reference', {'play': play.id, 'document': doc.id}, single_result=True)
+                if new_witness_document_id:
+                    new_witness_type = _clean(request.POST, 'add-witness-type')
+                    doc = corpus.get_content('Document', new_witness_document_id)
 
-                    if not new_witness:
-                        new_witness = corpus.get_content('Reference')
-                        new_witness.play = play.id
-                        new_witness.document = doc.id
-                        new_witness.ref_type = 'primary_witness'
+                    if doc:
+                        new_witness = corpus.get_content('Reference', {'play': play.id, 'document': doc.id}, single_result=True)
 
-                        if new_witness_type == 'occasionally_collated':
-                            new_witness.type = 'occasional_witness'
+                        if not new_witness:
+                            new_witness = corpus.get_content('Reference')
+                            new_witness.play = play.id
+                            new_witness.document = doc.id
+                            new_witness.ref_type = 'primary_witness'
 
-                        new_witness.save()
-                        response['messages'].append(f'Witness {doc.siglum_label} added!')
+                            if new_witness_type == 'occasionally_collated':
+                                new_witness.type = 'occasional_witness'
 
-                    else:
-                        response['errors'].append("This witness already exists for the current collation project.")
+                            new_witness.save()
+                            response['messages'].append(f'Witness {doc.siglum_label} added!')
+
+                        else:
+                            response['errors'].append("This witness already exists for the current collation project.")
+                response['errors'].append("Unable to locate the witness to add to this collation project.")
 
             # IMPORT COPY TEXT
             if 'import-copy-text-witness' in request.POST:
