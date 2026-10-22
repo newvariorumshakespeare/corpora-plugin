@@ -751,10 +751,7 @@
 {% endblock %}
 
 {% block js %}
-<script src="{% static 'js/jquery-3.3.1.min.js' %}"></script>
-<script src="{% static 'js/popper.min.js' %}"></script>
-<script src="{% static 'js/bootstrap.min.js' %}"></script>
-<!--<script src="{% static 'js/corpora.js' %}"></script>-->
+<script src="{% static 'js/bootstrap5.min.js' %}"></script>
 <script src="{% static 'js/nvs-utilities.js' %}?no-cache={% no_cache_suffix %}"></script>
 <script type="application/javascript">
     window.nvs = {
@@ -781,13 +778,11 @@
         minimap: {% if site_request %}`/minimap/${window.nvs.play}/`{% else %}`/corpus/${window.nvs.corpusID}/play-minimap/${window.nvs.play}/`{% endif %}
     }
 
-    $(document).ready(function() {
-        //corpora = new Corpora({'csrf_token': "{{ csrf_token }}"{% if site_request %},'host': '{{ corpora_url }}'{% endif %}});
-
+    document.addEventListener('DOMContentLoaded', () => {
         // Place statement about digital edition of NVS before textual note section
-        let textual_note_explanation = $('#textual_note_explanation_start');
-        if (textual_note_explanation.length) {
-            textual_note_explanation.prepend(`
+        let textual_note_explanation = document.getElementById('textual_note_explanation_start')
+        if (textual_note_explanation) {
+            textual_note_explanation.insertAdjacentHTML('afterbegin', `
                 <p class="digital-nvs-comment">
                     <b>Note</b>: In the section below you will find the original explanation for reading textual notes
                     as they appear throughout the
@@ -800,62 +795,47 @@
                     volume, watch our
                     <a href="{% if site_request %}/how-to/{% else %}/corpus/{{ corpus_id }}/how-to/{% endif %}#textual-notes-search" target="_blank">video tutorial</a>.
                     The original, print convention for textual notes is still used, however, in the
-                    <a href="{% if site_request %}/appendix/${play_prefix}/{% else %}/corpus/{{ corpus_id }}/paratext-viewer/${play_prefix}/Appendix/{% endif %}" target="_blank">Appendix</a>
+                    <a href="{% if site_request %}/appendix/${window.nvs.play}/{% else %}/corpus/{{ corpus_id }}/paratext-viewer/${window.nvs.play}/Appendix/{% endif %}" target="_blank">Appendix</a>
                     of this digital edition, particularly in the "Irregular, Doubtful, and Emended Accidentals" and
                     "Unadopted Conjectures" sections.
                 </p>
-            `);
+            `)
         }
 
         // Add credit to the MLA at end of Credits section
-        let section_headers = $('h2.level-1');
-        let found_credits = false;
-        section_headers.each(function() {
-            let header = $(this);
-            if (header.html() === 'Credits') found_credits = true;
+        let found_credits = false
+        document.querySelectorAll('h2.level-1').forEach(header => {
+            if (header.innerHTML === 'Credits') found_credits = true
             else if (found_credits) {
-                let notice = document.createElement('p');
-                notice.innerHTML = `With founding sponsorship from the Modern Language Association of America, exclusive publisher of the NVS, 1936-2019.`;
-                $(notice).insertBefore(header);
-                found_credits = false;
+                let notice = document.createElement('p')
+                notice.innerHTML = `With founding sponsorship from the Modern Language Association of America, exclusive publisher of the NVS, 1936-2019.`
+                header.before(notice)
+                found_credits = false
             }
-        });
+        })
 
-        $('img.graphic').each(function() {
-            let graphic = $(this);
-            let repo_name = graphic.data('repo-name');
-            let path = graphic.data('path');
-            let src = `${window.nvs.corporaHost}/repo-file/${window.nvs.corpusID}/${repo_name}/?path=${path}`;
-            graphic.attr('src', src);
-        });
+        document.querySelectorAll('img.graphic').forEach(graphic => {
+            let repo_name = graphic.dataset.repoName
+            let path = graphic.dataset.path
+            graphic.setAttribute('src', `${window.nvs.corporaHost}/repo-file/${window.nvs.corpusID}/${repo_name}/?path=${path}`)
+        })
 
-        $('.author.display_bookldash').each(function() {
-            let span = $(this);
-            span.html(`&mdash;&mdash;${span.html().endsWith('.') ? '.' : ''}`);
-        });
+        document.querySelectorAll('.author.display_bookldash').forEach(span => {
+            span.innerHTML = `&mdash;&mdash;${span.innerHTML.endsWith('.') ? '.' : ''}`
+        })
 
         // attempt to address marginal notes problem via tooltips
-        let margin_notes = $('.type-source.note-margin')
-        margin_notes.each(function() {
-            let note_html = this.outerHTML.replaceAll('-<br><br>', '').replaceAll('<br><br>', ' ')
-            let note = $(this)
-            let note_toggler = $(`
-                <span class="note-toggler far fa-sticky-note"
-                    data-toggle="tooltip"
-                    data-html="true"
-                    data-placement="top">
-                </span>
-            `)
-            note_toggler.attr('title', note_html)
-            note.after(note_toggler)
-            note.remove()
+        document.querySelectorAll('.type-source.note-margin').forEach(note => {
+            let note_html = note.outerHTML.replaceAll('-<br><br>', '').replaceAll('<br><br>', ' ')
+            let note_toggler = document.createElement('span')
+            note_toggler.className = 'note-toggler far fa-sticky-note'
+            note.replaceWith(note_toggler)
+            new bootstrap.Tooltip(note_toggler, {title: note_html, html: true, placement: 'top'})
         })
-        $('.note-toggler').tooltip()
 
         // fix problem where under-caret too small inside textual notes
-        $('.pt_textual_note .apparatus').each(function() {
-            let app = $(this)
-            app.html(app.html().replaceAll('‸', '<span class="under-caret">‸</span>'))
+        document.querySelectorAll('.pt_textual_note .apparatus').forEach(app => {
+            app.innerHTML = app.innerHTML.replaceAll('‸', '<span class="under-caret">‸</span>')
         })
     })
 </script>
