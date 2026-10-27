@@ -407,17 +407,11 @@ def home(request, corpus_id=None):
 
 def info_about(request, corpus_id=None):
     nvs_page = "info-about"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_about'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -425,7 +419,6 @@ def info_about(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
@@ -468,17 +461,11 @@ def info_contributors(request, corpus_id=None):
 
 def info_print_editions(request, corpus_id=None):
     nvs_page = "info-print-editions"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_print'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -486,7 +473,6 @@ def info_print_editions(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
@@ -536,17 +522,11 @@ def info_news(request, corpus_id=None):
 
 def info_how_to(request, corpus_id=None):
     nvs_page = "info-how-to"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_how_to'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -554,7 +534,6 @@ def info_how_to(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
@@ -562,17 +541,11 @@ def info_how_to(request, corpus_id=None):
 
 def info_faqs(request, corpus_id=None):
     nvs_page = "info-faqs"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_faqs'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -580,7 +553,6 @@ def info_faqs(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
@@ -588,17 +560,11 @@ def info_faqs(request, corpus_id=None):
 
 def tools_about(request, corpus_id=None):
     nvs_page = "tools-about"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'tools_about'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -606,62 +572,11 @@ def tools_about(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
 
 
-def tools_advanced_search(request, corpus_id=None):
-    nvs_page = "tools-advanced-search"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
-    site_request = False
-
-    if not corpus_id and hasattr(request, 'corpus_id'):
-        corpus_id = request.corpus_id
-        site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'tools_advanced_search'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
-
-    return render(
-        request,
-        'tools_advanced_search.html',
-        {
-            'corpus_id': corpus_id,
-            'site_request': site_request,
-            'content': dynamic_content,
-            'nvs_page': nvs_page
-        }
-    )
-
-
-def tools_data_extraction(request, corpus_id=None):
-    nvs_page = "tools-data-extraction"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
-    site_request = False
-
-    if not corpus_id and hasattr(request, 'corpus_id'):
-        corpus_id = request.corpus_id
-        site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'tools_data'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
-
-    return render(
-        request,
-        'tools_data.html',
-        {
-            'corpus_id': corpus_id,
-            'site_request': site_request,
-            'content': dynamic_content,
-            'nvs_page': nvs_page
-        }
-    )
 
 @login_required
 def collator(request, corpus_id, play_prefix):
@@ -1444,7 +1359,6 @@ def get_nvs_witnesses(corpus, play):
             'siglum_label': wit_ref.document.siglum_label,
             'bibliographic_entry': "{0} {1}".format(wit_ref.document.siglum_label, wit_ref.bibliographic_entry),
             'published': wit_ref.document.pub_date,
-            'collation_status': wit_ref.collation_status,
             'occasional': False
         }
 
@@ -1463,7 +1377,6 @@ def get_nvs_witnesses(corpus, play):
             'document_id': str(wit_ref.document.id),
             'bibliographic_entry': wit_ref.bibliographic_entry,
             'published': wit_ref.document.pub_date,
-            'collation_status': wit_ref.collation_status,
             'occasional': True
         }
 

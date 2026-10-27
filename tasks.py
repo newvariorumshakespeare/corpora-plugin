@@ -158,19 +158,7 @@ nvs_document_fields = [
         "label": "Siglum Label",
         "type": "keyword",
         "in_lists": True
-    },
-    {
-        "name": "bibliographic_entry",
-        "label": "Bibliographic Entry",
-        "type": "text",
-        "in_lists": True
-    },
-    {
-        "name": "bibliographic_entry_text",
-        "label": "Bibliographic Entry Text",
-        "in_lists": True,
-        "type": "keyword",
-    },
+    }
 ]
 
 nvs_document_types = {
@@ -218,24 +206,6 @@ Ingestion Scope:    {4}
         es_logger.setLevel(logging.ERROR)
 
         ensure_nvs_content_types(corpus)
-
-        content_block_handles = [
-            'info_about',
-            'info_contributors',
-            'info_print',
-            'info_how_to',
-            'info_faqs',
-            'tools_about',
-            'tools_advanced_search',
-            'tools_data'
-        ]
-        for handle in content_block_handles:
-            content_block = corpus.get_content('ContentBlock', {'handle': handle}, single_result=True)
-            if not content_block:
-                content_block = corpus.get_content('ContentBlock')
-                content_block.handle = handle
-                content_block.html = "Default content."
-                content_block.save()
 
         # pull down latest commits to play repo
         play_repo.pull(corpus)
@@ -457,7 +427,6 @@ def reset_nvs_content_types(corpus):
         'WitnessLocation',
         'Reference',
         'DocumentCollection',
-        'ContentBlock',
         'Play',
         'Document'
     ]
@@ -2579,7 +2548,6 @@ APPENDIX INGESTION
             traceback.format_exc()
         )
 
-    del app_tei
     return report
 
 

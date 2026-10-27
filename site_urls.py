@@ -11,8 +11,6 @@ urlpatterns = [
     path('how-to/', nvs_views.info_how_to),
     path('faqs/', nvs_views.info_faqs),
     path('tools/', nvs_views.tools_about),
-    path('advanced-search/', nvs_views.tools_advanced_search),
-    path('data/', nvs_views.tools_data_extraction),
     path('edition/<str:play_prefix>/', nvs_views.playviewer),
     path('minimap/<str:play_prefix>/', nvs_views.play_minimap),
     path('appendix/<str:play_prefix>/', nvs_views.paratext, {'section': 'Appendix'}),
