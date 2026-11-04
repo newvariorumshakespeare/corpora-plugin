@@ -18,7 +18,10 @@ from random import randint
 from math import floor
 from mongoengine.queryset.visitor import Q
 from .content import REGISTRY as NVS_CONTENT_TYPE_SCHEMA
-from .utilities import make_collation_lines_from_transcription_project
+from .utilities import (
+    assemble_witness_lines, bulk_delete_content,
+    STATUS_IMPORTING, STATUS_IMPORTED, STATUS_LINEATED, STATUS_ERROR
+)
 from plugins.document.content import REGISTRY as DOCUMENT_REGISTRY
 from manager.utilities import _contains, _contains_any
 from manager.tasks import run_job
@@ -86,41 +89,30 @@ REGISTRY = {
         "functions": ['perform_note_transforms']
     },
     "Make Collation Lines": {
-        "version": "0.1",
+        "version": "0.2",
         "jobsite_type": "HUEY",
         "track_provenance": True,
         "create_report": True,
-        "content_type": "Play",
+        "content_type": "Reference",
         "configuration": {
-            "parameters": {
-                "method": {
-                    "value": "",
-                    "type": "text",
-                    "label": "Collation Line Creation Method",
-                },
-                "transcription_project_id": {
-                    "value": "",
-                    "type": "text",
-                    "label": "ID for a Transcription Project",
-                },
-            },
+            "parameters": {},
         },
         "module": 'plugins.nvs.tasks',
         "functions": ['make_collation_lines']
     },
     "Import Copy Text": {
-        "version": "0.1",
+        "version": "0.3",
         "jobsite_type": "HUEY",
         "track_provenance": True,
         "create_report": True,
-        "content_type": "Play",
+        "content_type": "Corpus",
         "configuration": {
             "parameters": {
-                "siglum": {
+                "play_prefix": {
                     "value": "",
                     "type": "text",
-                    "label": "Siglum",
-                }
+                    "label": "Play Prefix",
+                },
             },
         },
         "module": 'plugins.nvs.tasks',
@@ -3297,45 +3289,248 @@ def place_tags(location, line, taggings, open_tags):
 
 
 def make_collation_lines(job_id):
+    # Turns the regions of a witness's transcription project into CollationLines, one per line of
+    # the witness, in reading order. See assemble_witness_lines for how segments are combined.
     job = Job(job_id)
-    method = job.get_param_value('method')
+    corpus = job.corpus
+    witness = job.content
 
-    if job.corpus and job.content and method:
-        if method == 'transcription_project':
-            make_collation_lines_from_transcription_project(job)
+    try:
+        job.set_status('running')
 
-    job.complete(status='complete')
+        problem = None
+        if not witness:
+            problem = "Unable to find the witness (Reference) for this job."
+        elif not witness.play or not witness.document:
+            problem = "This witness isn't associated with both a play and a document."
+        elif not witness.transcription_project:
+            problem = "This witness has no transcription project to make collation lines from."
+        elif witness.collation_status == STATUS_LINEATED:
+            problem = "This witness has already been lineated. Re-importing its lines would discard that work."
+
+        if problem:
+            fail_collation_job(job, witness, 'collation_status', problem)
+            return
+
+        witness.collation_status = f"{STATUS_IMPORTING}: {job_id}"
+        witness.save()
+
+        play = witness.play
+        trans_project = witness.transcription_project
+        is_base_text = bool(play.base_text) and play.base_text.id == witness.document.id
+
+        # clear out lines from any previous import
+        previous_line_count = bulk_delete_content(corpus, 'CollationLine', {'witness': witness.id})
+
+        assembled = assemble_witness_lines(corpus, trans_project, job)
+        lines = assembled['lines']
+
+        for order, line_info in enumerate(lines, start=1):
+            line = corpus.get_content('CollationLine')
+            line.witness = witness.id
+            line.play = play.id
+            line.tln = line_info['tln']
+            line.order = order
+            line.text = line_info['text']
+            line.images = line_info['images']
+            line.save()
+
+            if order % 100 == 0:
+                job.set_status('running', percent_complete=90 + int((order / len(lines)) * 10))
+
+        duplicate_regions = [
+            describe_region_issue(region, line['duplicate_tln'])
+            for line in lines if line.get('duplicate_tln') for region in line['regions']
+        ]
+        lines_without_tln = len([line for line in lines if not line['tln']])
+        bad_ids = [
+            f"{region['raw_id']!r} (page {region['ref_no']})"
+            for line in lines for region in line['regions']
+            if not region['tln'] and str(region['raw_id'] or '').strip()
+        ]
+
+        report = f'''
+##########################################################
+COLLATION LINES FOR {witness.document.siglum} ({play.title})
+##########################################################
+Transcription project:  {trans_project.name}
+Base text:              {'yes' if is_base_text else 'no'}
+Previous lines deleted: {previous_line_count}
+Lines created:          {len(lines)}
+Lines with a TLN:       {len(lines) - lines_without_tln}
+Lines without a TLN:    {lines_without_tln}
+Segmented lines:        {len([line for line in lines if len(line['regions']) > 1])}
+Lines using raw OCR:    {len([line for line in lines if not all(r['has_transcription'] for r in line['regions'])])}
+Empty regions skipped:  {len(assembled['empty_regions'])}
+'''
+        if assembled['untranscribed_pages']:
+            report += f"\nPages never opened in Transcribe ({len(assembled['untranscribed_pages'])}): {', '.join(assembled['untranscribed_pages'])}\n"
+        if assembled['incomplete_pages']:
+            report += f"\nPages not marked complete ({len(assembled['incomplete_pages'])}): {', '.join(assembled['incomplete_pages'])}\n"
+        if assembled['unparseable_pages']:
+            report += f"\nPages whose transcription data couldn't be read: {', '.join(assembled['unparseable_pages'])}\n"
+        if bad_ids:
+            report += f"\nIDs that aren't TLNs ({len(bad_ids)}): {', '.join(bad_ids[:50])}\n"
+        if duplicate_regions:
+            report += "\nRegions sharing a TLN (only the first line in reading order keeps it; the others were imported without one, to be aligned in the Lineator):\n\n"
+            report += '\n'.join(duplicate_regions) + '\n'
+
+        job.report(report)
+        witness.collation_status = STATUS_IMPORTED
+        job.complete(status='complete')
+
+    except Exception:
+        fail_collation_job(job, witness, 'collation_status', traceback.format_exc())
 
 
 def import_copy_text(job_id):
+    # Creates the copy text (one PlayLine per line of the base text, with the line's TLN as its
+    # xml_id) from the CollationLines of the play's base text. Lines with a missing or duplicate
+    # TLN are imported anyway under a placeholder TLN, since PlayLine xml_ids must be unique within
+    # a play, and every region behind them is listed in the job report so that transcribers have
+    # a list of what to fix. The base text's line gets the placeholder too, so the base text stays
+    # aligned line for line with its copy text (and a placeholder renamed in the Lineator carries
+    # it along). From here on, editorial interventions happen on the PlayLines, and other
+    # witnesses are lineated against them.
     job = Job(job_id)
     corpus = job.corpus
-    play = job.content
-    siglum = job.get_param_value('siglum')
-    reindex = False
+    play_prefix = job.get_param_value('play_prefix')
+    play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True) if play_prefix else None
+    started_creating = False
 
-    if play:
-        doc = corpus.get_content('Document', {'siglum': siglum}, single_result=True)
-        collation_lines = corpus.get_content('CollationLine', {
-            'play': play.id,
-            'witness': doc.id
-        }).order_by('order')
+    try:
+        job.set_status('running')
 
-        lines_processed = 0
-        total_lines = collation_lines.count()
-        for collation_line in collation_lines:
+        problems = []
+        base_witness = None
+        base_lines = []
+        if not play:
+            problems.append(f"Unable to find a play with the prefix {play_prefix!r}.")
+        elif not play.base_text:
+            problems.append("No base text has been declared for this play.")
+        else:
+            base_witness = corpus.get_content('Reference', {
+                'play': play.id,
+                'document': play.base_text.id
+            }, single_result=True)
+
+            if not base_witness:
+                problems.append(f"{play.base_text.siglum} is the base text, but it isn't a witness for this play.")
+            elif base_witness.collation_status not in [STATUS_IMPORTED, STATUS_LINEATED]:
+                problems.append(f"The lines for {play.base_text.siglum} haven't been imported from its transcription project yet.")
+            else:
+                base_lines = list(corpus.get_content('CollationLine', {'witness': base_witness.id}).order_by('order'))
+                if not base_lines:
+                    problems.append(f"{play.base_text.siglum} has no collation lines.")
+
+            existing_play_lines = corpus.get_content('PlayLine', {'play': play.id}).count()
+            if existing_play_lines:
+                problems.append(f"{play.title} already has {existing_play_lines} PlayLines. Delete them before importing a new copy text.")
+
+        if problems:
+            fail_collation_job(job, play, 'copy_text_status', ' '.join(problems))
+            return
+
+        play.copy_text_status = f"{STATUS_IMPORTING}: {job_id}"
+        play.save()
+
+        lines_without_tln = len([line for line in base_lines if not line.tln])
+        used_tlns = set()
+        placeholders = []
+        started_creating = True
+        for line_number, base_line in enumerate(base_lines, start=1):
+            xml_id = base_line.tln
+            if not xml_id:
+                xml_id = f"tln_unassigned_{line_number}"
+            elif xml_id in used_tlns:
+                copy_number = 2
+                while f"{base_line.tln}_duplicate_{copy_number}" in used_tlns:
+                    copy_number += 1
+                xml_id = f"{base_line.tln}_duplicate_{copy_number}"
+
+            if xml_id != base_line.tln:
+                placeholders.append(f"PlayLine {line_number} given the placeholder TLN {xml_id}: {base_line.text}")
+                base_line.tln = xml_id
+                base_line.collation_xml = None
+                base_line.save()
+            used_tlns.add(xml_id)
+
             play_line = corpus.get_content('PlayLine')
-            play_line.xml_id = collation_line.tln
-            play_line.line_number = collation_line.order
-            play_line.text = collation_line.text
+            play_line.xml_id = xml_id
+            play_line.line_number = line_number
+            play_line.text = base_line.text
             play_line.play = play.id
             play_line.save()
 
-            lines_processed += 1
-            if lines_processed % 100 == 0:
-                job.set_status('running', percent_complete=int( (lines_processed / total_lines) * 100))
+            if line_number % 100 == 0:
+                job.set_status('running', percent_complete=int((line_number / len(base_lines)) * 90))
 
-    job.complete(status='complete')
+        # list every region of the base text that still needs a transcriber's attention
+        assembled = assemble_witness_lines(corpus, base_witness.transcription_project)
+        region_issues = []
+        for line in assembled['lines']:
+            for region in line['regions']:
+                region_issues.append(describe_region_issue(region, line.get('duplicate_tln')))
+        for region in assembled['empty_regions']:
+            region_issues.append(describe_region_issue(region, None))
+        region_issues = [issue for issue in region_issues if issue]
+
+        duplicate_tlns = len({line['duplicate_tln'] for line in assembled['lines'] if line.get('duplicate_tln')})
+
+        report = f'''
+##########################################################
+COPY TEXT FOR {play.title} FROM {play.base_text.siglum}
+##########################################################
+Transcription project:  {base_witness.transcription_project.name}
+PlayLines created:      {len(base_lines)}
+Lines without a TLN:    {lines_without_tln}
+Duplicated TLNs:        {duplicate_tlns}
+Placeholder TLNs:       {len(placeholders)}
+Regions with problems:  {len(region_issues)}
+'''
+        if placeholders:
+            report += "\nPlayLines given placeholder TLNs (fix the TLN in Transcribe or the Lineator):\n\n"
+            report += '\n'.join(placeholders) + '\n'
+        if region_issues:
+            report += "\nRegions to fix in Transcribe (as the transcription project stands now):\n\n"
+            report += '\n'.join(region_issues) + '\n'
+
+        job.report(report)
+        play.copy_text_status = STATUS_IMPORTED
+        play.save()
+        job.complete(status='complete')
+
+    except Exception:
+        # don't leave a partial copy text behind, since it would block the next attempt (any
+        # PlayLines are this job's, since it refuses to start when the play already has some)
+        if started_creating:
+            bulk_delete_content(corpus, 'PlayLine', {'play': play.id})
+        fail_collation_job(job, play, 'copy_text_status', traceback.format_exc())
+
+
+def describe_region_issue(region, duplicate_tln):
+    issues = []
+    if not region['tln']:
+        issues.append("without TLN")
+    if not region['has_transcription']:
+        issues.append("with no transcription")
+    if duplicate_tln:
+        issues.append(f"with duplicate TLN ({duplicate_tln})")
+
+    if issues:
+        return f"Region {' and '.join(issues)} found: {region['text'] or '[empty region]'} (page {region['ref_no']})"
+    return None
+
+
+def fail_collation_job(job, content, status_field, message):
+    # the status gets a short summary and the full message goes to the job report
+    if content:
+        summary = message.strip().splitlines()[-1]
+        if len(summary) > 150:
+            summary = f"{summary[:150]}... (see job report)"
+        setattr(content, status_field, f"{STATUS_ERROR}: {summary}")
+        content.save()
+    job.complete(status='error', error_msg=message)
 
 
 def time_it(timer_name, stop=False):

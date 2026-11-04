@@ -1,0 +1,14 @@
+{% if status == 'Importing' %}
+    <span class="badge text-bg-info">Importing {{ percent|default:0 }}%</span>
+{% elif status == 'Interrupted' %}
+    <span class="badge text-bg-warning" title="The job stopped before finishing">Interrupted</span>
+{% elif status == 'Imported' %}
+    <span class="badge text-bg-success">Imported</span>
+{% elif status == 'Lineated' %}
+    <span class="badge text-bg-primary">Lineated</span>
+{% elif status %}
+    <span class="badge text-bg-danger" title="{{ status }}">Error</span>
+    <div class="small text-danger">{{ status|cut:"Error: " }}</div>
+{% else %}
+    <span class="text-muted">Not imported</span>
+{% endif %}
