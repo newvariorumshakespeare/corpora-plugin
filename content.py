@@ -2106,7 +2106,7 @@ REGISTRY = [
                 "unique": False,
                 "multiple": False,
                 "in_lists": True,
-                "type": "number",
+                "type": "decimal",
                 "choices": [],
                 "cross_reference_type": "",
                 "has_intensity": False,
