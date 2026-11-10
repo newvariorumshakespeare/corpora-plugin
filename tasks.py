@@ -439,7 +439,7 @@ def ensure_nvs_content_types(corpus):
 
     if nvs_doc_schema:
         nvs_doc_schema['fields'] += nvs_document_fields
-        nvs_doc_schema['templates']['Label']['template'] = "{{ Document.siglum|safe }}"
+        nvs_doc_schema['templates']['Label']['template'] = "{{ Document.siglum|safe|striptags }}"
 
         doc_schema_ensured = True
         if 'Document' in corpus.content_types:
@@ -1312,6 +1312,12 @@ TEXTUAL NOTES INGESTION
         for witness_group in witness_groups:
             all_sigla.append(strip_tags(witness_group.siglum_label).lower())
 
+        # occasional witnesses are only used to place witness ranges that begin or end w/ one
+        occasional_witnesses = [
+            ref.document for ref in
+            corpus.get_content("Reference", {'play': play.id, 'ref_type': 'occasional_witness'})
+        ]
+
         with open(corpus.path + '/files/' + play.prefix + '_sigla.json', 'w', encoding='utf-8') as sigla_out:
             json.dump(all_sigla, sigla_out)
 
@@ -1333,6 +1339,10 @@ TEXTUAL NOTES INGESTION
             textual_note.play = play.id
             textual_note.xml_id = note['xml:id']
             textual_note.witness_meter = "0" * (len(witnesses) + 1)
+
+            if 'target' not in note.attrs:
+                report += f"Error: Missing target attribute for textual note {textual_note.xml_id}!\n\n"
+                continue
 
             textual_note.lines, line_err_msg = get_line_ids(
                 note['target'],
@@ -1356,7 +1366,7 @@ TEXTUAL NOTES INGESTION
 
                 current_color = 1
                 note_exclusions = []
-                note_exclusion_formula = ''
+                cited_witnesses = []  # every witness cited so far in this note, for "etc."
                 variants = note.app.find_all('appPart')
 
                 for variant in variants:
@@ -1387,96 +1397,29 @@ TEXTUAL NOTES INGESTION
                     if lem_tag:
                         textual_variant.lemma = tei_to_html(lem_tag)
 
-                    starting_siglum = None
-                    ending_siglum = None
-                    next_siglum_ends = False
-                    include_all_following = False
-                    exclusion_started = False
-                    excluding_sigla = []
-
-                    textual_variant.witness_formula = ""
-                    for child in variant.wit.children:
-                        if child.name == 'siglum':
-                            siglum_label = strip_tags(tei_to_html(child)).replace(';', '')
-                            textual_variant.witness_formula += '''
-                                <a href="#" class="ref-siglum variant-siglum" onClick="navigate_to('siglum', '{0}', this); return false;">{0}</a>
-                            '''.format(siglum_label)
-                            if siglum_label.lower() not in all_sigla:
-                                references_selectively_quoted_witness = True
-
-                            if not starting_siglum:
-                                starting_siglum = siglum_label
-                            elif next_siglum_ends:
-                                ending_siglum = siglum_label
-                                next_siglum_ends = False
-                            elif exclusion_started:
-                                excluding_sigla.append(siglum_label)
-
-                        else:
-                            if child.name == 'note':
-                                child.name = 'hi'
-                                textual_variant.witness_formula += tei_to_html(child)
-                            else:
-                                if 'etc.' in str(child.string):
-                                    textual_variant.witness_formula += note_exclusion_formula
-                                else:
-                                    textual_variant.witness_formula += str(child.string)
-
-                                formula = str(child.string).strip()
-
-                                # handle '+' ranges
-                                if formula.startswith('+') or 'etc.' in formula:
-                                    include_all_following = True
-                                    if '(−' in formula:
-                                        exclusion_started = True
-
-                                # handle exclusions
-                                if '(−' in formula:
-                                    exclusion_started = True
-                                elif formula.startswith(')') and exclusion_started:
-                                    exclusion_started = False
-
-                                # handle '-' ranges
-                                elif formula.startswith('-'):
-                                    next_siglum_ends = True
-
-                                # use ',' to delimit the need to add individual sigla or add ranges
-                                if ',' in formula:
-                                    if starting_siglum and not exclusion_started:
-
-                                        # the "get_witness_ids" function will handle:
-                                        # '-' ranges
-                                        # '+' ranges
-                                        # exclusions
-                                        # individual sigla
-                                        textual_variant.witnesses.extend(
-                                            get_witness_ids(
-                                                witnesses,
-                                                witness_groups,
-                                                starting_siglum,
-                                                ending_witness_siglum=ending_siglum,
-                                                include_all_following=include_all_following,
-                                                excluding_sigla=excluding_sigla + note_exclusions
-                                            )
-                                        )
-
-                                        starting_siglum = None
-                                        ending_siglum = None
-                                        include_all_following = False
-                                        excluding_sigla = []
-
-                    # handle any further additions of sigla at the end of the formula
-                    if starting_siglum:
-                        textual_variant.witnesses.extend(
-                            get_witness_ids(
-                                witnesses,
-                                witness_groups,
-                                starting_siglum,
-                                ending_witness_siglum=ending_siglum,
-                                include_all_following=include_all_following,
-                                excluding_sigla=excluding_sigla + note_exclusions
-                            )
+                    witness_ids = []
+                    if variant.wit:
+                        witness_ids, textual_variant.witness_formula = extract_witnesses_from_range_formula(
+                            variant.wit,
+                            witnesses,
+                            witness_groups,
+                            note_exclusions=note_exclusions,
+                            occasional_witnesses=occasional_witnesses,
+                            cited_witnesses=cited_witnesses
                         )
+                        cited_witnesses += witness_ids
+
+                        # extend rather than assign: assigning a list to this cross reference field turns
+                        # the IDs into Document objects, which get_variant_witness_indicators can't match
+                        textual_variant.witnesses.extend(witness_ids)
+
+                        # any siglum that isn't a primary witness or group marks the "selectively quoted" slot
+                        references_selectively_quoted_witness = any(
+                            siglum.get_text().replace(';', '').strip().lower() not in all_sigla
+                            for siglum in variant.wit.find_all('siglum')
+                        )
+                    else:
+                        textual_variant.witness_formula = ""
 
                     has_note_exclusions = False
                     try:
@@ -1493,14 +1436,13 @@ TEXTUAL NOTES INGESTION
                     # as variants of type 'lem' are when the lemma matches the copy-text. Therefore, the
                     # witnesses associated with this variant will be considered note-wide exclusions.
                     if has_note_exclusions:
-                        note_exclusions += [strip_tags(w.siglum_label) for w in witnesses if w.id in textual_variant.witnesses]
-                        note_exclusion_formula = "+ (-{0})".format(textual_variant.witness_formula)
+                        note_exclusions += witness_ids
                     else:
                         # If the 'note_exclusions' list has entries, it means an earlier variant for this note was
                         # of type 'lem,' and therefore any witnesses pertaining to this variant need to be added
                         # to the list of exclusions
                         if note_exclusions:
-                            note_exclusions += [strip_tags(w.siglum_label) for w in witnesses if w.id in textual_variant.witnesses]
+                            note_exclusions += witness_ids
 
                         variant_witness_indicators = get_variant_witness_indicators(witnesses, textual_variant)
                         textual_variant.witness_meter = make_witness_meter(
@@ -1616,52 +1558,277 @@ def perform_note_transforms(job_id):
         print(traceback.format_exc())
 
 
-def get_witness_ids(
-        witnesses,
-        witness_groups,
-        starting_witness_siglum,
-        ending_witness_siglum=None,
-        include_all_following=False,
-        excluding_sigla=[]):
-    witness_ids = []
+def make_witness_range_formula(sigla, witnesses, witness_groups):
+    '''
+    Builds an HTML witness formula (i.e. "F1-rann, dyce, stau, hud2-cam3") out of a list of
+    sigla, following the conventions used in the textual notes:
 
-    starting_found = False
-    ending_found = False
-    including_sigla = []
+        * three or more consecutive witnesses (in the chronological order of 'witnesses')
+          become a range: "F1-rann"
+        * one or two consecutive witnesses are listed individually: "cam1, glo"
+        * when every member of a witness group is listed individually, the group siglum
+          stands in for them: "pope, han" instead of "pope1, pope2, han1, han2"
 
-    for witness_group in witness_groups:
-        if strip_tags(witness_group.siglum_label).lower() == starting_witness_siglum.lower():
-            if not ending_witness_siglum and not include_all_following:
-                # starting_witness_siglum = None
-                for reffed_doc in witness_group.referenced_documents:
-                    if reffed_doc.siglum_label not in excluding_sigla:
-                        including_sigla.append(strip_tags(reffed_doc.siglum_label))
-                break
+    'sigla' are siglum labels as they appear in 'note_exclusions' (Document.siglum_label w/
+    tags stripped). Sigla that aren't primary witnesses are ignored.
+    '''
+    labels = [strip_tags(witness.siglum_label) for witness in witnesses]
+    label_indexes = {label.lower(): index for index, label in enumerate(labels)}
+
+    group_members = {}
+    for group in witness_groups:
+        member_indexes = [label_indexes.get(strip_tags(doc.siglum_label).lower()) for doc in group.referenced_documents]
+        if member_indexes and None not in member_indexes:
+            group_members[strip_tags(group.siglum_label)] = sorted(member_indexes)
+
+    indexes = sorted(set(label_indexes[siglum.lower()] for siglum in sigla if siglum.lower() in label_indexes))
+
+    # split into runs of consecutive witnesses
+    runs = []
+    for index in indexes:
+        if runs and index == runs[-1][-1] + 1:
+            runs[-1].append(index)
+        else:
+            runs.append([index])
+
+    # items are (position, html) so they can be sorted back into chronological order
+    items = []
+    singles = set()
+    for run in runs:
+        if len(run) >= 3:
+            items.append((run[0], f"{make_siglum_link(labels[run[0]])}-{make_siglum_link(labels[run[-1]])}"))
+        else:
+            singles.update(run)
+
+    # bigger groups first, so a group nested inside another (i.e. cam3 inside cam) doesn't win
+    for group_label, member_indexes in sorted(group_members.items(), key=lambda g: -len(g[1])):
+        if len(member_indexes) > 1 and all(index in singles for index in member_indexes):
+            singles.difference_update(member_indexes)
+            items.append((member_indexes[0], make_siglum_link(group_label)))
+
+    items += [(index, make_siglum_link(labels[index])) for index in singles]
+    items.sort(key=lambda item: item[0])
+
+    return ', '.join(html for position, html in items)
+
+
+def make_siglum_link(siglum_label):
+    return '''<a href="#" class="ref-siglum variant-siglum" onClick="navigate_to('siglum', '{0}', this); return false;">{0}</a>'''.format(siglum_label)
+
+
+def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_exclusions=(), occasional_witnesses=(), cited_witnesses=()):
+    '''
+    The inverse of make_witness_range_formula: reads the <wit> tag of a textual note variant, i.e.
+
+        <wit><siglum>F2</siglum>&sigrange;<siglum>john1</siglum>, <siglum>cap</siglum> (<hi>subst.</hi>)</wit>
+
+    and returns a tuple of:
+
+        * the IDs of the primary witnesses that have the reading, in chronological order (the order
+          of 'witnesses')
+        * the formula as HTML for TextualVariant.witness_formula, i.e. each siglum as a link made by
+          make_siglum_link, <note>s as spans, and "etc." followed by "(−...)" listing the witnesses
+          cited earlier in the note (see make_witness_range_formula)
+
+    The formula is a list of items separated by commas (or semicolons), each of which is one of:
+
+        A           a witness, or a group siglum standing in for all of its members
+        A-B         every witness from A through B
+        A+          A and every later witness
+        A etc.      same as A+ (the note's earlier witnesses are left out, see below)
+
+    A range can be followed by exclusions, i.e. "A+ (−X, Y-Z)". Conjecturers ("dyce1 conj.") and
+    editions reporting a conjecture ("conj. in cam1", "apud theo1") count as witnesses. These
+    sigla are passed over:
+
+        * sigla that aren't primary witnesses (occasional witnesses, MS notes)
+        * sigla in parenthetical asides, i.e. "(and cam3, alex: Centurion)", "(attrib. to Hanmer by cam1)"
+
+    as is everything else in the formula (subst., citations like "(1899, p. 453)", etc.).
+
+    'witnesses' and 'witness_groups' are as in parse_textualnotes_file. 'note_exclusions' are IDs
+    of witnesses cited earlier in the note (i.e. those of a variant w/ type 'lem'); ranges skip
+    them, since a witness can't have two readings. 'occasional_witnesses' (Documents) are only
+    used to place a range that starts or ends w/ one, i.e. "rowe1-theo3", by publication date.
+    'cited_witnesses' are IDs of every witness cited by an earlier variant in the note, whether or
+    not the note has a 'lem' variant; only "etc." skips them (and lists them in its "(−...)").
+    '''
+    # SIGLUM MARKERS
+    # Each <siglum> in the formula is swapped for a single Unicode "private use" character
+    # (U+E000, U+E001, ...), whose offset from U+E000 is the siglum's position in 'sigla'. The
+    # formula can then be read w/ regular expressions without the text of a siglum (which may
+    # contain digits, parentheses, or punctuation) being confused w/ the formula's own syntax.
+    marker_base = 0xE000
+    marker = '[\ue000-\uf8ff]'
+
+    # Siglum labels are compared in a normalized form: tags stripped, entities unescaped,
+    # semicolons removed, whitespace trimmed, and lowercased. The TEI sometimes wraps parts of a
+    # siglum in <hi> (i.e. m<hi>tby</hi>3), leaves whitespace inside <siglum>, and stores sigla in
+    # different cases than the witness list (i.e. "Qq" vs. "qq").
+    def clean(siglum_label):
+        return html_lib.unescape(strip_tags(siglum_label)).replace(';', '').strip().lower()
+
+    # WITNESS AND GROUP LOOKUPS
+    # Primary witnesses are referred to by their position in 'witnesses', which is in
+    # chronological order, so a range like "F2-john1" is simply every position from F2's to
+    # john1's. A group siglum (i.e. "Ff" or "cam") stands in for all of its member editions, so
+    # each group maps to the sorted positions of its members that are primary witnesses.
+    witness_indexes = {clean(witness.siglum_label): index for index, witness in enumerate(witnesses)}
+    group_indexes = {}
+    for group in witness_groups:
+        members = [witness_indexes.get(clean(doc.siglum_label)) for doc in group.referenced_documents]
+        group_indexes[clean(group.siglum_label)] = sorted(m for m in members if m is not None)
+
+    # NOTE-LEVEL EXCLUSIONS
+    # 'excluded_by_note' are the positions of witnesses that read w/ the copy text (they're cited
+    # by a 'lem' variant earlier in the note). A witness can't have two readings, so every range
+    # in this formula skips them.
+    note_exclusions = {str(witness_id) for witness_id in note_exclusions}
+    excluded_by_note = {index for index, witness in enumerate(witnesses) if str(witness.id) in note_exclusions}
+
+    # "etc." means "and every other witness not already cited in this note," so 'excluded_by_etc'
+    # adds the positions of every witness cited by any earlier variant in the note.
+    cited_witnesses = {str(witness_id) for witness_id in cited_witnesses}
+    excluded_by_etc = excluded_by_note | {index for index, witness in enumerate(witnesses) if str(witness.id) in cited_witnesses}
+
+    # FLATTEN THE <wit> TAG
+    # Walk the children of <wit> once, building two things in parallel:
+    #   * 'formula': the plain text of the formula w/ a marker in place of each siglum, which is
+    #     what gets parsed below to work out the witnesses
+    #   * 'formula_html': the formula as it's displayed in the variorum reader
+    sigla = []
+    formula = ''
+    formula_html = ''
+    for child in wit.children:
+
+        # A <siglum> becomes a marker in 'formula' and a link in 'formula_html'
+        if child.name == 'siglum':
+            siglum_label = child.get_text().replace(';', '').strip()
+            formula += chr(marker_base + len(sigla))
+            formula_html += make_siglum_link(siglum_label)
+            sigla.append(clean(siglum_label))
+
+        # A <note> inside a formula is an editorial aside; it's displayed as a span. A copy is
+        # renamed so the BeautifulSoup tree passed in isn't altered.
+        elif child.name == 'note':
+            note = deepcopy(child)
+            note.name = 'hi'
+            formula += note.get_text()
+            formula_html += tei_to_html(note)
+
+        # Everything else (text, and tags like <hi>, <name>, and <ref> for "subst.", "conj.",
+        # names of conjecturers, and citations) contributes its text. Entities have already been
+        # resolved by the parser, so &sigrange; is "-", &plus; is "+", and &minus; is "−".
+        else:
+            text = child.get_text() if child.name else str(child)
+            formula += text
+            text = html_lib.escape(text, quote=False)
+
+            # In the displayed formula, "etc." is followed by the witnesses it leaves out, i.e.
+            # "mal etc. (−F1-rann, dyce, ...)", condensed into ranges and groups the same way the
+            # textual notes themselves are written
+            if 'etc.' in text and excluded_by_etc:
+                exclusion_formula = make_witness_range_formula(
+                    [strip_tags(witnesses[index].siglum_label) for index in excluded_by_etc],
+                    witnesses,
+                    witness_groups
+                )
+                text = text.replace('etc.', f"etc. (−{exclusion_formula})", 1)
+            formula_html += text
+
+    # RESOLVING SIGLA
+    # Turns a marker back into the positions of the primary witnesses its siglum refers to: one
+    # position for a witness, the members' positions for a group, or none for anything else
+    # (occasional witnesses, MS notes, names encoded as sigla), which don't appear on the meter.
+    def resolve(siglum_marker):
+        siglum = sigla[ord(siglum_marker) - marker_base]
+        if siglum in witness_indexes:
+            return [witness_indexes[siglum]]
+        return group_indexes.get(siglum, [])
+
+    # A range can begin or end w/ an occasional witness (i.e. "rowe1-theo3"). Occasional
+    # witnesses have no position of their own, so the endpoint is placed among the primary
+    # witnesses by publication date: a range starting w/ one begins at the first primary witness
+    # published on or after it, and a range ending w/ one stops at the last primary witness
+    # published on or before it.
+    occasional_dates = {clean(doc.siglum_label): doc.pub_date for doc in occasional_witnesses if doc.pub_date}
+
+    def resolve_endpoint(siglum_marker, is_start):
+        indexes = resolve(siglum_marker)
+        siglum = sigla[ord(siglum_marker) - marker_base]
+        if not indexes and siglum in occasional_dates:
+            date = occasional_dates[siglum]
+            if is_start:
+                indexes = [index for index, witness in enumerate(witnesses) if (witness.pub_date or '') >= date][:1]
             else:
-                starting_witness_siglum = strip_tags(witness_group.referenced_documents[0].siglum_label)
-        elif ending_witness_siglum and strip_tags(witness_group.siglum_label).lower() == ending_witness_siglum.lower():
-            ending_witness_siglum = strip_tags(witness_group.referenced_documents[-1].siglum_label)
-        elif excluding_sigla:
-            original_length = len(excluding_sigla)
-            for ex_index in range(0, original_length):
-                if excluding_sigla[ex_index].lower() == strip_tags(witness_group.siglum_label).lower():
-                    for reffed_doc in witness_group.referenced_documents:
-                        excluding_sigla.append(strip_tags(reffed_doc.siglum_label))
+                indexes = [index for index, witness in enumerate(witnesses) if (witness.pub_date or '') <= date][-1:]
+        return indexes
 
-    for witness in witnesses:
-        if not starting_found and strip_tags(witness.siglum_label).lower() == starting_witness_siglum.lower():
-            witness_ids.append(witness.id)
-            starting_found = True
-        elif starting_found and (ending_witness_siglum or include_all_following) and not ending_found:
-            if strip_tags(witness.siglum_label) not in excluding_sigla:
-                witness_ids.append(witness.id)
+    # The positions covered by a range "A-B." A group endpoint stretches the range to cover the
+    # whole group, so "Ff-rowe" starts at the first Folio and ends w/ the last Rowe edition. If
+    # either endpoint can't be placed, or the range runs backwards, it covers nothing.
+    def span(start_marker, end_marker):
+        start, end = resolve_endpoint(start_marker, True), resolve_endpoint(end_marker, False)
+        if start and end:
+            return range(start[0], end[-1] + 1)
+        return range(0)
 
-                if strip_tags(witness.siglum_label) == ending_witness_siglum:
-                    ending_found = True
-        elif strip_tags(witness.siglum_label) in including_sigla:
-            witness_ids.append(witness.id)
+    # READING THE FORMULA
+    # 'indexes' collects the positions of every witness that has this reading
+    indexes = set()
 
-    return witness_ids
+    # A formula is a list of items separated by commas, or occasionally semicolons. Commas and
+    # semicolons inside parentheses don't separate items, since exclusion lists and editorial
+    # asides use them too, i.e. "F2+ (−rowe2-pope2, han)" is one item.
+    for item in re.split(r'[,;](?![^()]*\))', formula):
+
+        # An exclusion list, "(−X, Y-Z)", follows the range it applies to. Its witnesses (and
+        # the witnesses that read w/ the copy text) are skipped by the ranges in this item. The
+        # minus sign is sometimes encoded as an en dash, so both are accepted.
+        excluded = set(excluded_by_note)
+        for exclusion in re.findall(r'\(\s*[−–]([^)]*)\)', item):
+            for match in re.finditer(rf'({marker})(?:\s*-\s*({marker}))?', exclusion):
+                excluded.update(span(*match.groups()) if match.group(2) else resolve(match.group(1)))
+        item = re.sub(r'\(\s*[−–][^)]*\)', ' ', item)
+
+        # Any other parenthetical is an editorial aside, i.e. "(subst.)", a citation like
+        # "(1899, p. 453)", or a remark like "(and cam3, alex: Centurion)", so sigla inside it
+        # aren't witnesses for this reading. Nested parentheses are removed innermost first.
+        while re.search(r'\([^()]*\)', item):
+            item = re.sub(r'\([^()]*\)', ' ', item)
+
+        # What's left is sigla w/ connecting text ("conj.", "and", "apud", names, etc.). Each
+        # siglum is matched along w/ an optional "-" and second siglum (a range), and an optional
+        # "+" or "etc." (every later witness). Several can occur in one item, i.e. "mtby3 and
+        # del2 conj." or a pair of sigla missing the comma between them. Conjecturers and
+        # editions reporting a conjecture ("conj. in cam1", "apud theo1") count as witnesses.
+        for match in re.finditer(rf'({marker})(?:\s*-\s*({marker}))?\s*(\+|etc\.)?', item):
+            start_marker, end_marker, open_ended = match.groups()
+
+            # "etc." also skips every witness cited earlier in the note
+            item_excluded = excluded | excluded_by_etc if open_ended == 'etc.' else excluded
+
+            # "A-B": every witness from A through B
+            if end_marker:
+                witness_span = span(start_marker, end_marker)
+
+            # "A+" or "A etc.": A and every later witness
+            elif open_ended and resolve(start_marker):
+                witness_span = range(resolve(start_marker)[0], len(witnesses))
+
+            # A single witness or group
+            else:
+                indexes.update(resolve(start_marker))
+                continue
+
+            # The first witness of a range is always included, since it's named explicitly; the
+            # rest are included unless excluded
+            if witness_span:
+                indexes.add(witness_span[0])
+                indexes.update(index for index in witness_span if index not in item_excluded)
+
+    # Positions are sorted, so the IDs come back in chronological order
+    return [witnesses[index].id for index in sorted(indexes)], formula_html
 
 
 def get_variant_witness_indicators(witnesses, variant):
