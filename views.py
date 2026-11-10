@@ -18,14 +18,6 @@ from corpus import get_corpus, Job
 from .utilities import STATUS_IMPORTING, STATUS_IMPORTED, STATUS_LINEATED, bulk_delete_content
 
 
-# TEMPORARY FIX FOR SOFT LAUNCH
-editors = {
-    'wt': "ROBERT KEAN TURNER, VIRGINIA WESTLING HAAS, with ROBERT A. JONES, ANDREW J. SABOL, PATRICIA E. TATSPAUGH; GENERAL EDITORS Paul Werstine and Eric Rasmussen",
-    'mnd': "Judith M. Kennedy and Richard Kennedy, with Susan May, Roberta Barker, David Nicol; GENERAL EDITORS Paul Werstine and Eric Rasmussen",
-    'lr': "Richard Knowles, Kevin Donovan, with Paula Glatzer; GENERAL EDITORS Paul Werstine and Eric Rasmussen"
-}
-
-
 def splash(request):
     return render(
         request,
@@ -81,8 +73,7 @@ def playviewer(request, corpus_id=None, play_prefix=None):
             'playviewer_url': playviewer_url,
             'paratext_prefix': paratext_prefix,
             'corpus_id': corpus_id,
-            'play': play,
-            'editors': editors[play_prefix],
+            'play': play
         }
     )
 
@@ -607,6 +598,7 @@ def collation_wizard(request, corpus_id, play_prefix):
             'response': response,
             'page_title': f"Collation Wizard: {play.title}",
             'corpus_id': corpus_id,
+            'corpus_name': corpus.name,
             'play': play,
             'play_prefix': play_prefix,
             'state': state,
@@ -896,12 +888,12 @@ def lineator(request, corpus_id, play_prefix):
             'response': response,
             'page_title': f"Lineator: {play.title}",
             'corpus_id': corpus_id,
+            'corpus_name': corpus.name,
             'play': play,
             'play_prefix': play_prefix,
             'witnesses': witnesses,
             'witness_id': witness_id,
             'copy_text_editable': not play_has_tei_content(corpus, play),
-            'popup': True,
         }
     )
 
@@ -1048,16 +1040,21 @@ def api_lineator_update(request, corpus_id, play_prefix):
         return line if line and line.play and line.play.id == play.id else None
 
     # ASSIGN TLNs TO WITNESS LINES (one line, or several when pushing lines down). A line without a
-    # TLN is always stored as null, which the Lineator treats as still to be aligned and suggests a
-    # row for. An assignment can also move a line in the witness's reading order. A witness never
-    # has two lines with the same TLN (a line split across regions is one line with several
-    # images), so assignments that would leave a TLN on two lines are refused as a whole.
+    # TLN is stored as null, which the Lineator treats as still to be aligned and suggests a row
+    # for, unless the assignment is marked "unplaced" (the line was unassigned): that's stored as an
+    # empty TLN, and the Lineator shows the line in a "Not yet placed" row of its own. An assignment
+    # can also move a line in the witness's reading order. A witness never has two lines with the
+    # same TLN (a line split across regions is one line with several images), so assignments that
+    # would leave a TLN on two lines are refused as a whole.
     if action == 'set-witness-tlns':
         changes = []
         for assignment in edit.get('assignments', []):
             line = get_witness_line(assignment.get('line_id'))
             if line:
-                changes.append((line, clean_tln(assignment.get('tln')), assignment.get('order')))
+                tln = clean_tln(assignment.get('tln'))
+                if not tln and assignment.get('unplaced'):
+                    tln = ''
+                changes.append((line, tln, assignment.get('order')))
 
         changing_ids = [line.id for line, tln, order in changes]
         claimed = set()

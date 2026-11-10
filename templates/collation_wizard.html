@@ -299,6 +299,9 @@
         const statusUrl = '/api/corpus/{{ corpus_id }}/collation-wizard/{{ play_prefix }}/status/'
 
         document.addEventListener('DOMContentLoaded', () => {
+            add_breadcrumb('{{ corpus_name|force_escape|escapejs }}', '/corpus/{{ corpus_id }}/')
+            add_breadcrumb('{{ play.title|force_escape|escapejs }}', '/corpus/{{ corpus_id }}/Play/{{ play.id }}/')
+            add_breadcrumb('Collation Wizard', '/corpus/{{ corpus_id }}/collation-wizard/{{ play_prefix }}/')
             hide_loading_overlay()
 
             onElsMatching('[data-confirm]', 'click', event => {

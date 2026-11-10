@@ -151,7 +151,7 @@
     <div class="small text-muted my-2">
         Drag a witness line by its <i class="fas fa-grip-vertical"></i> handle onto a row to give it that row's TLN.
         <span class="legend-swatch" style="border: 1px dashed var(--bs-primary);"></span>suggested placement (not saved until accepted)
-        <span class="legend-swatch ms-2" style="border: 1px dashed var(--bs-warning);"></span>no TLN and no free row nearby
+        <span class="legend-swatch ms-2" style="border: 1px dashed var(--bs-warning);"></span>not yet placed (no TLN)
         <span class="legend-swatch ms-2" style="background: repeating-linear-gradient(45deg, transparent, transparent 3px, var(--bs-tertiary-bg) 3px, var(--bs-tertiary-bg) 6px);"></span>not in the copy text
     </div>
 
@@ -182,6 +182,10 @@
         let imageEditor = null
 
         document.addEventListener('DOMContentLoaded', () => {
+            add_breadcrumb('{{ corpus_name|force_escape|escapejs }}', '/corpus/{{ corpus_id }}/')
+            add_breadcrumb('{{ play.title|force_escape|escapejs }}', '/corpus/{{ corpus_id }}/Play/{{ play.id }}/')
+            add_breadcrumb('Collation Wizard', '/corpus/{{ corpus_id }}/collation-wizard/{{ play_prefix }}/')
+            add_breadcrumb('Lineator', `/corpus/${corpusId}/lineator/${playPrefix}/`)
             setToolbarOffset()
             new ResizeObserver(setToolbarOffset).observe(getEl('lineator-toolbar'))
             window.addEventListener('scroll', scheduleImageLoading, {passive: true})
@@ -230,9 +234,10 @@
         // LAYOUT
         // ------------------------------------------------------------------
         // A witness line whose TLN is in the copy text sits across from that copy text line (several
-        // lines with the same TLN stack). A line without a TLN takes the next free copy text row
-        // between its anchored neighbors (by order) as a suggestion; failing that, and for a line whose
-        // TLN isn't in the copy text (an added line), it gets a row of its own after its predecessor.
+        // lines with the same TLN stack). A line still to be aligned (a null TLN) takes the next free
+        // copy text row between its anchored neighbors (by order) as a suggestion; failing that, and for
+        // a line that was unassigned (an empty TLN) or whose TLN isn't in the copy text (an added
+        // line), it gets a row of its own after its predecessor.
         function layOutRows() {
             const copyIndex = new Map(copyText.map((line, index) => [line.tln, index]))
             const lines = [...witnessLines].sort((a, b) => a.order - b.order)
@@ -257,7 +262,7 @@
                     position = anchorRow[k]
                     return
                 }
-                if (!line.tln) {
+                if (line.tln === null || line.tln === undefined) {
                     let row = position + 1
                     while (row < nextAnchorRow[k] && (anchored[row].length || suggested[row])) row++
                     if (row < nextAnchorRow[k]) {
@@ -308,7 +313,7 @@
         function witnessLineHtml(line, kind) {
             let tools = ''
             if (kind === 'suggested') tools += `<button class="btn btn-sm btn-primary" data-tool="accept" title="Accept this placement">Accept</button>`
-            if (line.tln) tools += `<button class="btn btn-sm btn-light border" data-tool="unassign" title="Remove this line's TLN and let the Lineator suggest a row for it">Unassign</button>`
+            if (line.tln) tools += `<button class="btn btn-sm btn-light border" data-tool="unassign" title="Remove this line's TLN and move it to a row of its own">Unassign</button>`
             if (kind !== 'added') tools += `<button class="btn btn-sm btn-light border" data-tool="added" title="Mark as a line added in this witness">Added line</button>`
             tools += `<button class="btn btn-sm btn-light border" data-tool="images" title="Edit this line's images (or double-click one)"><i class="fas fa-image"></i></button>`
             tools += `<button class="btn btn-sm btn-light border" data-tool="edit" title="Correct this line's transcription"><i class="fas fa-pen"></i></button>`
@@ -766,7 +771,7 @@
                 const row = rows.find(r => r.witness.includes(line))
 
                 if (tool === 'accept') setWitnessTlns([{line_id: line.id, tln: row.copy.tln}], `${row.copy.tln} assigned.`)
-                else if (tool === 'unassign') setWitnessTlns([{line_id: line.id, tln: null}], 'TLN removed.')
+                else if (tool === 'unassign') setWitnessTlns([{line_id: line.id, tln: null, unplaced: true}], 'TLN removed; the line is now in a row of its own.')
                 else if (tool === 'added') setWitnessTlns([{line_id: line.id, tln: suggestAddedTln(line.id)}], 'Marked as an added line. Adjust its TLN if needed.')
                 else if (tool === 'images') openWitnessLineImages(line)
                 else if (tool === 'delete') deleteWitnessLine(line)
@@ -819,7 +824,7 @@
             onDelegate(rowsEl(), 'change', 'input.witness-tln', event => {
                 const input = event.target
                 const line = findWitnessLine(input.dataset.lineId)
-                setWitnessTlns([{line_id: line.id, tln: fullTln(input.value) || null}], 'TLN saved.')
+                setWitnessTlns([{line_id: line.id, tln: fullTln(input.value) || null, unplaced: true}], 'TLN saved.')
                     .catch(() => input.value = displayTln(line.tln))
             })
 
