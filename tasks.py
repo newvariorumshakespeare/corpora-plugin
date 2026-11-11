@@ -836,6 +836,8 @@ PLAY TEXT INGESTION
         fakeline = BeautifulSoup('<lb xml:id="xxxx" n="xxxx"/>', 'xml')
         handle_playtext_tag(corpus, play, fakeline.lb, line_info)
 
+        clamp_playtag_locations(corpus, play)
+
         # build line_id_map and ordered_line_ids for use by get_line_ids functions
         lines = corpus.get_content('PlayLine', {'play': play.id}, only=['id', 'xml_id', 'alt_xml_ids'])
         lines = lines.order_by('line_number')
@@ -854,19 +856,22 @@ PLAY TEXT INGESTION
                 elif line_to_register not in line_id_map[alt_xml_id]:
                     line_id_map[alt_xml_id].append(line_to_register)
 
-        # register virtual line info in line_id_map
+        # register virtual line info in line_id_map. A virtual line's lines are kept in play order,
+        # since notes group their lines by consecutive line numbers and get_line_ids takes a range
+        # from the first and last line of each xml_id.
+        line_positions = {line_id: position for position, line_id in enumerate(ordered_line_ids)}
         links = lines_tei.find_all('link')
         for link in links:
             if _contains(link.attrs, ['xml:id', 'type', 'target']):
                 xml_id = link['xml:id']
-                if xml_id not in line_id_map:
-                    line_id_map[xml_id] = []
+                virtual_line_ids = set(line_id_map.get(xml_id, []))
 
                 targets = link['target'].replace('#', '').split()
                 for target in targets:
                     if target in line_id_map:
-                        line_id_map[xml_id] += line_id_map[target]
-                        line_id_map[xml_id] = list(set(line_id_map[xml_id]))
+                        virtual_line_ids.update(line_id_map[target])
+
+                line_id_map[xml_id] = sorted(virtual_line_ids, key=lambda line_id: line_positions[line_id])
 
         # output line_id_map and ordered_line_ids for debugging or standalone textual/commentary note ingestion
         with open(corpus.path + '/files/{0}_line_id_map.json'.format(play.prefix), 'w', encoding='utf-8') as line_info_out:
@@ -1172,6 +1177,38 @@ def make_playtext_line(corpus, play, line_info):
             line_info['current_speech'].save()
             line_info['current_speech'] = None
             line_info['current_speech_ended'] = False
+
+
+def clamp_playtag_locations(corpus, play):
+    '''
+    PlayTag offsets are taken from the length of a line's text while it is still being collected,
+    but the line is stored stripped. A tag that opens or closes after whitespace at the end of a
+    line (such as the newlines between a closing tag and the next <lb>) can therefore point past
+    the end of the stored line. This moves any such start or end location back to the end of its
+    line, which lineate_transcendent_tags relies on to move a tag that starts at the end of one
+    line onto the next.
+    '''
+    line_ends = {}
+    lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_number', 'text'])
+    for line in lines:
+        line_ends[line.line_number] = make_text_location(line.line_number, len(line.text))
+
+    tags = corpus.get_content('PlayTag', {'play': play.id})
+    tags = tags.no_cache()
+    tags = tags.batch_size(100)
+
+    for tag in tags:
+        changed = False
+        for field in ['start_location', 'end_location']:
+            location = getattr(tag, field)
+            if location is not None:
+                line_end = line_ends.get(floor(location))
+                if line_end is not None and location > line_end:
+                    setattr(tag, field, line_end)
+                    changed = True
+
+        if changed:
+            tag.save(do_indexing=False, do_linking=False)
 
 
 def make_text_location(line_number, char_index):
