@@ -1126,8 +1126,13 @@ def handle_playtext_tag(corpus, play, tag, line_info):
 
     # otherwise, this is a string of the playtext to be kept track of for building the playlines
     else:
-        new_words = str(tag)
-        line_info['text'] += new_words.replace('\n', '')
+        # The TEI is pretty-printed, so a line's text can be wrapped and indented. Collapse that
+        # whitespace to single spaces, and drop it at the start of a line or after a space, so
+        # PlayTag offsets (taken from the length of the text so far) match the stored line text.
+        new_words = collapse_whitespace(str(tag))
+        if not line_info['text'] or line_info['text'].endswith(' '):
+            new_words = new_words.lstrip(' ')
+        line_info['text'] += new_words
 
 
 def make_playtext_line(corpus, play, line_info):
@@ -1349,7 +1354,7 @@ TEXTUAL NOTES INGESTION
 
                 note_lemma = None
                 if note.app.find('lem', recursive=False):
-                    note_lemma = tei_to_html(note.app.lem)
+                    note_lemma = collapse_whitespace(tei_to_html(note.app.lem))
 
                 current_color = 1
                 note_exclusions = []
@@ -1364,7 +1369,7 @@ TEXTUAL NOTES INGESTION
 
                     reading_description = variant.find('rdgDesc')
                     if reading_description:
-                        textual_variant.description = tei_to_html(reading_description)
+                        textual_variant.description = collapse_whitespace(tei_to_html(reading_description))
 
                     reading = variant.find('rdg')
                     if reading:
@@ -1374,7 +1379,7 @@ TEXTUAL NOTES INGESTION
                                 textual_variant.transform_type += '_' + reading['subtype']
                         else:
                             textual_variant.transform_type = "punctuation"
-                        textual_variant.transform = tei_to_html(reading)
+                        textual_variant.transform = collapse_whitespace(tei_to_html(reading))
 
                     if note_lemma:
                         textual_variant.lemma = note_lemma
@@ -1382,7 +1387,7 @@ TEXTUAL NOTES INGESTION
                     # see if a variant has its own lemma to override note level lemma
                     lem_tag = variant.find('lem')
                     if lem_tag:
-                        textual_variant.lemma = tei_to_html(lem_tag)
+                        textual_variant.lemma = collapse_whitespace(tei_to_html(lem_tag))
 
                     witness_ids = []
                     if variant.wit:
@@ -3097,6 +3102,17 @@ def get_line_ids(xml_id_start, xml_id_end, line_id_map, ordered_line_ids):
                 err_msg += "Line with XML ID {0} not found! ".format(xml_id)
 
     return line_ids, err_msg
+
+
+def collapse_whitespace(text):
+    '''
+    Collapses runs of spaces, tabs and newlines into a single space. En spaces and non-breaking
+    spaces are left alone, since the textual notes use them in markers like ellipses and the
+    line delimiter.
+    '''
+    if not text:
+        return text
+    return re.sub(r'[ \t\r\n]+', ' ', text)
 
 
 def stitch_lines(lines, embed_line_markers=False, embed_pipes=False):
