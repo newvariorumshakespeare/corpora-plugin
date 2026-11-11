@@ -1282,19 +1282,6 @@ TEXTUAL NOTES INGESTION
 ##########################################################\n'''
 
     try:
-        # open textualnotes xml, read raw text into tei_text,
-        # and perform special text replacements before feeding
-        # into BeautifulSoup
-
-        #with open(textualnotes_file_path, 'r') as tei_in:
-        #    tei_text = tei_in.read()
-        #    text_replacements = extract_text_replacements(tei_in)
-        #
-        #    for text, replacement in text_replacements.items():
-        #        tei_text = tei_text.replace(text, replacement)
-        #
-        #    notes_tei = BeautifulSoup(tei_text, "xml")
-
         notes_tei = parse_tei_xml(textualnotes_file_path)
 
         all_sigla = []
@@ -1399,7 +1386,11 @@ TEXTUAL NOTES INGESTION
 
                     witness_ids = []
                     if variant.wit:
-                        witness_ids, textual_variant.witness_formula = extract_witnesses_from_range_formula(
+                        (
+                            witness_ids,
+                            textual_variant.witness_formula,
+                            references_selectively_quoted_witness
+                        ) = extract_witnesses_from_range_formula(
                             variant.wit,
                             witnesses,
                             witness_groups,
@@ -1412,12 +1403,6 @@ TEXTUAL NOTES INGESTION
                         # extend rather than assign: assigning a list to this cross reference field turns
                         # the IDs into Document objects, which get_variant_witness_indicators can't match
                         textual_variant.witnesses.extend(witness_ids)
-
-                        # any siglum that isn't a primary witness or group marks the "selectively quoted" slot
-                        references_selectively_quoted_witness = any(
-                            siglum.get_text().replace(';', '').strip().lower() not in all_sigla
-                            for siglum in variant.wit.find_all('siglum')
-                        )
                     else:
                         textual_variant.witness_formula = ""
 
@@ -1627,8 +1612,11 @@ def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_ex
         * the IDs of the primary witnesses that have the reading, in chronological order (the order
           of 'witnesses')
         * the formula as HTML for TextualVariant.witness_formula, i.e. each siglum as a link made by
-          make_siglum_link, <note>s as spans, and "etc." followed by "(−...)" listing the witnesses
-          cited earlier in the note (see make_witness_range_formula)
+          make_siglum_link and <note>s as spans. An "A etc." item is displayed as the witnesses it
+          stands for, condensed into ranges and groups by make_witness_range_formula, w/o "etc."
+        * whether the reading is cited by a siglum that puts no primary witness on the meter (an
+          occasional witness, an MS note, or a group made up only of occasional witnesses), which
+          is shown in the meter's last, "selectively quoted" slot
 
     The formula is a list of items separated by commas (or semicolons), each of which is one of:
 
@@ -1651,7 +1639,7 @@ def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_ex
     them, since a witness can't have two readings. 'occasional_witnesses' (Documents) are only
     used to place a range that starts or ends w/ one, i.e. "rowe1-theo3", by publication date.
     'cited_witnesses' are IDs of every witness cited by an earlier variant in the note, whether or
-    not the note has a 'lem' variant; only "etc." skips them (and lists them in its "(−...)").
+    not the note has a 'lem' variant; only "etc." skips them.
     '''
     # SIGLUM MARKERS
     # Each <siglum> in the formula is swapped for a single Unicode "private use" character
@@ -1695,18 +1683,23 @@ def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_ex
     # Walk the children of <wit> once, building two things in parallel:
     #   * 'formula': the plain text of the formula w/ a marker in place of each siglum, which is
     #     what gets parsed below to work out the witnesses
-    #   * 'formula_html': the formula as it's displayed in the variorum reader
+    #   * 'formula_html': the formula as it's displayed in the variorum reader. It also has a
+    #     marker in place of each siglum until the formula has been read, so that "A etc." items
+    #     can be found and rewritten (see DISPLAYING THE FORMULA below).
     sigla = []
+    siglum_labels = []
     formula = ''
     formula_html = ''
     for child in wit.children:
 
-        # A <siglum> becomes a marker in 'formula' and a link in 'formula_html'
+        # A <siglum> becomes a marker in both 'formula' and 'formula_html'. 'sigla' keeps its
+        # normalized form for lookups; 'siglum_labels' keeps it as written, for its link.
         if child.name == 'siglum':
             siglum_label = child.get_text().replace(';', '').strip()
             formula += chr(marker_base + len(sigla))
-            formula_html += make_siglum_link(siglum_label)
+            formula_html += chr(marker_base + len(sigla))
             sigla.append(clean(siglum_label))
+            siglum_labels.append(siglum_label)
 
         # A <note> inside a formula is an editorial aside; it's displayed as a span. A copy is
         # renamed so the BeautifulSoup tree passed in isn't altered.
@@ -1722,19 +1715,7 @@ def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_ex
         else:
             text = child.get_text() if child.name else str(child)
             formula += text
-            text = html_lib.escape(text, quote=False)
-
-            # In the displayed formula, "etc." is followed by the witnesses it leaves out, i.e.
-            # "mal etc. (−F1-rann, dyce, ...)", condensed into ranges and groups the same way the
-            # textual notes themselves are written
-            if 'etc.' in text and excluded_by_etc:
-                exclusion_formula = make_witness_range_formula(
-                    [strip_tags(witnesses[index].siglum_label) for index in excluded_by_etc],
-                    witnesses,
-                    witness_groups
-                )
-                text = text.replace('etc.', f"etc. (−{exclusion_formula})", 1)
-            formula_html += text
+            formula_html += html_lib.escape(text, quote=False)
 
     # RESOLVING SIGLA
     # Turns a marker back into the positions of the primary witnesses its siglum refers to: one
@@ -1774,8 +1755,14 @@ def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_ex
         return range(0)
 
     # READING THE FORMULA
-    # 'indexes' collects the positions of every witness that has this reading
+    # 'indexes' collects the positions of every witness that has this reading. 'etc_witnesses'
+    # maps the marker of each "A etc." item's siglum to the positions that item covers, so the
+    # item can be displayed as those witnesses.
+    # 'cited_markers' collects the markers of the sigla that cite this reading (i.e. not those in
+    # exclusion lists or asides).
     indexes = set()
+    etc_witnesses = {}
+    cited_markers = set()
 
     # A formula is a list of items separated by commas, or occasionally semicolons. Commas and
     # semicolons inside parentheses don't separate items, since exclusion lists and editorial
@@ -1804,6 +1791,7 @@ def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_ex
         # editions reporting a conjecture ("conj. in cam1", "apud theo1") count as witnesses.
         for match in re.finditer(rf'({marker})(?:\s*-\s*({marker}))?\s*(\+|etc\.)?', item):
             start_marker, end_marker, open_ended = match.groups()
+            cited_markers.update(m for m in (start_marker, end_marker) if m)
 
             # "etc." also skips every witness cited earlier in the note
             item_excluded = excluded | excluded_by_etc if open_ended == 'etc.' else excluded
@@ -1824,11 +1812,41 @@ def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_ex
             # The first witness of a range is always included, since it's named explicitly; the
             # rest are included unless excluded
             if witness_span:
-                indexes.add(witness_span[0])
-                indexes.update(index for index in witness_span if index not in item_excluded)
+                item_indexes = {witness_span[0]} | {index for index in witness_span if index not in item_excluded}
+                indexes.update(item_indexes)
+                if open_ended == 'etc.':
+                    etc_witnesses[start_marker] = item_indexes
+
+    # DISPLAYING THE FORMULA
+    # The NVS editors display an "A etc." item as the witnesses it stands for rather than as
+    # "etc.", since what "etc." leaves out depends on the rest of the note. The siglum and "etc."
+    # (along w/ any exclusion list after it, which the witnesses already account for) are
+    # replaced w/ those witnesses, condensed into ranges and groups, i.e. "mtby3 conj., v1793
+    # etc." is displayed as "mtby3 conj., v1793-rann, sing, ...". An "etc." whose siglum isn't a
+    # primary witness or group covers no witnesses, so it's left as written.
+    def display_etc(match):
+        if match.group(1) not in etc_witnesses:
+            return match.group(0)
+        return make_witness_range_formula(
+            [strip_tags(witnesses[index].siglum_label) for index in etc_witnesses[match.group(1)]],
+            witnesses,
+            witness_groups
+        )
+    formula_html = re.sub(rf'({marker})\s*etc\.(\s*\(\s*[−–][^)]*\))?', display_etc, formula_html)
+
+    # The remaining markers become links to their sigla
+    formula_html = re.sub(marker, lambda match: make_siglum_link(siglum_labels[ord(match.group(0)) - marker_base]), formula_html)
+
+    # SELECTIVELY QUOTED WITNESSES
+    # The meter's last slot shows that the reading is also found in a witness the NVS quotes only
+    # selectively, i.e. one cited by a siglum that resolves to no primary witness: an occasional
+    # witness (and1), an MS note (mtby2), or a group whose members are all occasional witnesses
+    # (MND's "and"). Sigla in exclusion lists and asides don't count, since they don't cite this
+    # reading.
+    cites_selectively_quoted_witness = any(not resolve(siglum_marker) for siglum_marker in cited_markers)
 
     # Positions are sorted, so the IDs come back in chronological order
-    return [witnesses[index].id for index in sorted(indexes)], formula_html
+    return [witnesses[index].id for index in sorted(indexes)], formula_html, cites_selectively_quoted_witness
 
 
 def get_variant_witness_indicators(witnesses, variant):
