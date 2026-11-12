@@ -1,0 +1,353 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+    <style>
+        .wizard-step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 50%;
+            background-color: var(--bs-primary);
+            color: #fff;
+            font-weight: bold;
+            margin-right: .5rem;
+        }
+        #witness-table td { vertical-align: middle; }
+        #witness-table select { min-width: 10rem; }
+        .witness-title { font-size: .85em; color: var(--bs-secondary-color); }
+        .line-stats { font-size: .85em; white-space: nowrap; }
+    </style>
+{% endblock %}
+
+{% block main %}
+    <div class="container-fluid">
+
+        <!-- PROJECT STATUS -->
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <span class="badge text-bg-light border p-2">
+                Base text: {% if state.base_text_siglum %}<strong>{{ state.base_text_siglum }}</strong>{% else %}<em>not chosen</em>{% endif %}
+            </span>
+            <span class="badge text-bg-light border p-2">
+                Copy text:
+                {% if state.copy_text_line_count %}<strong>{{ state.copy_text_line_count }} lines</strong>
+                {% elif state.copy_text_status == 'Importing' %}<strong>importing</strong>
+                {% else %}<em>not imported</em>{% endif %}
+            </span>
+            <span class="badge text-bg-light border p-2">
+                Witnesses: <strong>{{ state.witnesses|length }}</strong>
+                ({{ state.imported_count }} imported, {{ state.lineated_count }} lineated)
+            </span>
+        </div>
+
+        <!-- STEP 1: WITNESSES -->
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center">
+                <span class="wizard-step-number">1</span>
+                <h5 class="mb-0">Witnesses</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    Each witness pairs a document with the transcription project its lines come from.
+                    Importing a witness turns that project's regions into collation lines.
+                </p>
+
+                {% if state.witnesses %}
+                    {% for witness in state.witnesses %}
+                        <form id="witness-form-{{ witness.id }}" method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="witness-id" value="{{ witness.id }}">
+                        </form>
+                    {% endfor %}
+
+                    <div class="table-responsive">
+                        <table id="witness-table" class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Witness</th>
+                                    <th>Type</th>
+                                    <th>Transcription project</th>
+                                    <th>Status</th>
+                                    <th>Lines</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for witness in state.witnesses %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ witness.siglum }}</strong>
+                                            {% if witness.is_base_text %}<span class="badge text-bg-primary ms-1">Base text</span>{% endif %}
+                                            <div class="witness-title">{{ witness.title|default:"" }}{% if witness.pub_date %} ({{ witness.pub_date }}){% endif %}</div>
+                                        </td>
+                                        <td>
+                                            <select name="ref-type" form="witness-form-{{ witness.id }}" class="form-select form-select-sm">
+                                                <option value="primary_witness" {% if witness.ref_type != 'occasional_witness' %}selected{% endif %}>Fully collated</option>
+                                                <option value="occasional_witness" {% if witness.ref_type == 'occasional_witness' %}selected{% endif %}>Occasionally collated</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="transcription-project-id" form="witness-form-{{ witness.id }}" class="form-select form-select-sm">
+                                                {% if not witness.transcription_project_id %}<option value="">Choose a project...</option>{% endif %}
+                                                {% for tp in witness.transcription_projects %}
+                                                    <option value="{{ tp.id }}" {% if tp.id == witness.transcription_project_id %}selected{% endif %}>{{ tp.name }} ({{ tp.pages }})</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td id="witness-status-{{ witness.id }}" {% if witness.status == 'Importing' %}data-importing="witness"{% endif %} data-witness-id="{{ witness.id }}">
+                                            {% include 'collation_wizard_status.html' with status=witness.status percent=witness.percent %}
+                                        </td>
+                                        <td class="line-stats">
+                                            {% if witness.line_count %}
+                                                {{ witness.line_count }} lines<br>
+                                                {{ witness.tln_count }} with a TLN<br>
+                                                {% if state.copy_text_line_count and not witness.is_base_text %}{{ witness.matched_count }} match the copy text{% endif %}
+                                            {% else %}
+                                                <span class="text-muted">none yet</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end text-nowrap">
+                                            <button type="submit" form="witness-form-{{ witness.id }}" name="action" value="save-witness" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Save the type and transcription project"><i class="fas fa-save"></i></button>
+                                            <button type="submit" form="witness-form-{{ witness.id }}" name="action" value="import-lines" class="btn btn-sm btn-outline-primary"
+                                                {% if witness.status == 'Importing' or witness.status == 'Lineated' %}disabled{% endif %}
+                                                {% if witness.line_count %}data-confirm="Re-import the lines for {{ witness.siglum }}? Its current {{ witness.line_count }} collation lines will be replaced."{% endif %}>
+                                                {% if witness.line_count %}Re-import{% else %}Import{% endif %} lines
+                                            </button>
+                                            {% if not witness.is_base_text %}
+                                                <button type="submit" form="witness-form-{{ witness.id }}" name="action" value="set-base-text" class="btn btn-sm btn-outline-primary"
+                                                    {% if state.copy_text_line_count %}disabled title="Reset the copy text to choose a different base text"{% endif %}
+                                                    data-confirm="Make {{ witness.siglum }} the base text{% if witness.status == 'Imported' %} and import the copy text from it{% endif %}?">
+                                                    Make base text
+                                                </button>
+                                            {% endif %}
+                                            <button type="submit" form="witness-form-{{ witness.id }}" name="action" value="remove-witness" class="btn btn-sm btn-outline-danger"
+                                                data-confirm="Remove {{ witness.siglum }} as a witness? Its {{ witness.line_count }} collation lines will be deleted."
+                                                data-bs-toggle="tooltip" title="Remove this witness">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p><em>No witnesses yet.</em></p>
+                {% endif %}
+
+                <form method="post" class="row g-2 align-items-end mt-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add-witness">
+                    <div class="col-md-6">
+                        <label for="add-witness-project" class="form-label">Add a witness from a transcription project</label>
+                        <select id="add-witness-project" name="transcription-project-id" class="form-select" required>
+                            <option value="">Choose a transcription project...</option>
+                            {% for tp in state.available_transcription_projects %}
+                                <option value="{{ tp.id }}">{{ tp.siglum }}: {{ tp.name }} ({{ tp.pages }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="add-witness-type" class="form-label">Type</label>
+                        <select id="add-witness-type" name="ref-type" class="form-select">
+                            <option value="primary_witness">Fully collated</option>
+                            <option value="occasional_witness">Occasionally collated</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">Add witness and import lines</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- STEP 2: BASE TEXT AND COPY TEXT -->
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center">
+                <span class="wizard-step-number">2</span>
+                <h5 class="mb-0">Base text and copy text</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    The copy text is made from the base text's lines, one line per TLN. Editorial changes to it
+                    happen from here on, and every witness, the base text included, is lineated against it.
+                </p>
+
+                <dl class="row mb-3">
+                    <dt class="col-sm-2">Base text</dt>
+                    <dd class="col-sm-10">
+                        {% if state.base_text_siglum %}{{ state.base_text_siglum }}{% else %}<em>Not chosen yet. Use "Make base text" on one of the witnesses above.</em>{% endif %}
+                    </dd>
+                    <dt class="col-sm-2">Copy text</dt>
+                    <dd class="col-sm-10">
+                        <span id="copy-text-status" {% if state.copy_text_status == 'Importing' %}data-importing="copy-text"{% endif %}>
+                            {% include 'collation_wizard_status.html' with status=state.copy_text_status percent=state.copy_text_percent %}
+                        </span>
+                        {% if state.copy_text_line_count %}
+                            {{ state.copy_text_line_count }} lines
+                            {% if state.copy_text_placeholder_count %}
+                                <span class="badge text-bg-warning ms-1">{{ state.copy_text_placeholder_count }} placeholder TLNs</span>
+                                <div class="small text-muted">Lines whose TLN was missing or duplicated in the base text. The Import Copy Text report in the Job Manager lists the regions to fix.</div>
+                            {% endif %}
+                        {% endif %}
+                    </dd>
+                </dl>
+
+                <form method="post" class="d-flex gap-2">
+                    {% csrf_token %}
+                    {% if not state.copy_text_line_count %}
+                        <button type="submit" name="action" value="import-copy-text" class="btn btn-primary"
+                            {% if not state.base_text_siglum or state.copy_text_status == 'Importing' %}disabled{% endif %}>
+                            Import copy text{% if state.base_text_siglum %} from {{ state.base_text_siglum }}{% endif %}
+                        </button>
+                    {% else %}
+                        <button type="submit" name="action" value="reset-copy-text" class="btn btn-outline-danger"
+                            data-confirm="Delete all {{ state.copy_text_line_count }} lines of the copy text? Any editorial changes made to them will be lost.">
+                            Reset copy text
+                        </button>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        <!-- STEP 3: LINEATE -->
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center">
+                <span class="wizard-step-number">3</span>
+                <h5 class="mb-0">Lineate</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    The Lineator assigns the correct TLNs to the copy text and to each witness, so that every line of a
+                    witness is matched with its counterpart in the copy text, including lines a witness adds or omits.
+                </p>
+
+                {% if not state.copy_text_line_count %}
+                    <p><em>Import the copy text in step 2 before lineating.</em></p>
+                {% elif state.witnesses %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Witness</th>
+                                    <th>Lines with a copy-text TLN</th>
+                                    <th>Status</th>
+                                    <th class="text-end"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for witness in state.witnesses %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ witness.siglum }}</strong>
+                                            {% if witness.is_base_text %}<span class="badge text-bg-primary ms-1">Base text</span>{% endif %}
+                                        </td>
+                                        <td class="line-stats">
+                                            {% if witness.line_count %}
+                                                {{ witness.matched_count }} of {{ witness.line_count }}
+                                            {% else %}
+                                                <span class="text-muted">no lines imported</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if witness.status == 'Lineated' %}<span class="badge text-bg-primary">Lineated</span>
+                                            {% else %}<span class="text-muted">Not lineated</span>{% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <a href="/corpus/{{ corpus_id }}/lineator/{{ play_prefix }}/?witness={{ witness.id }}"
+                                               class="btn btn-sm btn-primary {% if not witness.line_count or witness.status == 'Importing' %}disabled{% endif %}">
+                                                Lineate
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p><em>Add witnesses in step 1 to lineate them.</em></p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- STEP 4: COLLATE -->
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center">
+                <span class="wizard-step-number">4</span>
+                <h5 class="mb-0">Collate</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    The Collator compares the full array of witnesses against the copy text, line by line, to find
+                    their textual variants.
+                </p>
+                <p>
+                    {{ state.lineated_count }} of {{ state.witnesses|length }} witnesses lineated.
+                </p>
+                <a href="/corpus/{{ corpus_id }}/collator/{{ play_prefix }}/" class="btn btn-primary {% if not state.copy_text_line_count %}disabled{% endif %}">
+                    Open the Collator
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script type="application/javascript">
+        const statusUrl = '/api/corpus/{{ corpus_id }}/collation-wizard/{{ play_prefix }}/status/'
+
+        document.addEventListener('DOMContentLoaded', () => {
+            add_breadcrumb('{{ corpus_name|force_escape|escapejs }}', '/corpus/{{ corpus_id }}/')
+            add_breadcrumb('{{ play.title|force_escape|escapejs }}', '/corpus/{{ corpus_id }}/Play/{{ play.id }}/')
+            add_breadcrumb('Collation Wizard', '/corpus/{{ corpus_id }}/collation-wizard/{{ play_prefix }}/')
+            hide_loading_overlay()
+
+            onElsMatching('[data-confirm]', 'click', event => {
+                if (!confirm(event.currentTarget.dataset.confirm)) event.preventDefault()
+            })
+
+            // actions are handled before the page is rendered again, so show that something's happening
+            onElsMatching('form[method="post"]', 'submit', () => show_loading_overlay())
+
+            if (getElsWithQuery('[data-importing]').length) pollStatus()
+        })
+
+        function statusHtml(status, percent) {
+            if (status === 'Importing') return `<span class="badge text-bg-info">Importing ${percent || 0}%</span>`
+            if (status === 'Interrupted') return `<span class="badge text-bg-warning" title="The job stopped before finishing">Interrupted</span>`
+            return ''
+        }
+
+        // While jobs run, show their progress; once they've all finished, reload to show the results.
+        // Reloading with a GET (rather than location.reload) avoids resubmitting the form that started them.
+        function pollStatus() {
+            setTimeout(() => {
+                fetch(statusUrl)
+                    .then(res => res.json())
+                    .then(status => {
+                        let stillImporting = false
+
+                        forElsMatching('[data-importing="witness"]', cell => {
+                            let witnessStatus = status.witnesses[cell.dataset.witnessId]
+                            if (witnessStatus && witnessStatus.status === 'Importing') {
+                                stillImporting = true
+                                cell.innerHTML = statusHtml(witnessStatus.status, witnessStatus.percent)
+                            }
+                        })
+
+                        let copyTextCell = getElWithQuery('[data-importing="copy-text"]')
+                        if (copyTextCell && status.copy_text && status.copy_text.status === 'Importing') {
+                            stillImporting = true
+                            copyTextCell.innerHTML = statusHtml(status.copy_text.status, status.copy_text.percent)
+                        }
+
+                        if (stillImporting) pollStatus()
+                        else window.location.href = window.location.pathname
+                    })
+                    .catch(() => pollStatus())
+            }, 3000)
+        }
+    </script>
+{% endblock %}

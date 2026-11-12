@@ -18,7 +18,10 @@ from random import randint
 from math import floor
 from mongoengine.queryset.visitor import Q
 from .content import REGISTRY as NVS_CONTENT_TYPE_SCHEMA
-from .utilities import make_collation_lines_from_transcription_project
+from .utilities import (
+    assemble_witness_lines, bulk_delete_content,
+    STATUS_IMPORTING, STATUS_IMPORTED, STATUS_LINEATED, STATUS_ERROR
+)
 from plugins.document.content import REGISTRY as DOCUMENT_REGISTRY
 from manager.utilities import _contains, _contains_any
 from manager.tasks import run_job
@@ -86,41 +89,30 @@ REGISTRY = {
         "functions": ['perform_note_transforms']
     },
     "Make Collation Lines": {
-        "version": "0.1",
+        "version": "0.2",
         "jobsite_type": "HUEY",
         "track_provenance": True,
         "create_report": True,
-        "content_type": "Play",
+        "content_type": "Reference",
         "configuration": {
-            "parameters": {
-                "method": {
-                    "value": "",
-                    "type": "text",
-                    "label": "Collation Line Creation Method",
-                },
-                "transcription_project_id": {
-                    "value": "",
-                    "type": "text",
-                    "label": "ID for a Transcription Project",
-                },
-            },
+            "parameters": {},
         },
         "module": 'plugins.nvs.tasks',
         "functions": ['make_collation_lines']
     },
     "Import Copy Text": {
-        "version": "0.1",
+        "version": "0.3",
         "jobsite_type": "HUEY",
         "track_provenance": True,
         "create_report": True,
-        "content_type": "Play",
+        "content_type": "Corpus",
         "configuration": {
             "parameters": {
-                "siglum": {
+                "play_prefix": {
                     "value": "",
                     "type": "text",
-                    "label": "Siglum",
-                }
+                    "label": "Play Prefix",
+                },
             },
         },
         "module": 'plugins.nvs.tasks',
@@ -158,19 +150,7 @@ nvs_document_fields = [
         "label": "Siglum Label",
         "type": "keyword",
         "in_lists": True
-    },
-    {
-        "name": "bibliographic_entry",
-        "label": "Bibliographic Entry",
-        "type": "text",
-        "in_lists": True
-    },
-    {
-        "name": "bibliographic_entry_text",
-        "label": "Bibliographic Entry Text",
-        "in_lists": True,
-        "type": "keyword",
-    },
+    }
 ]
 
 nvs_document_types = {
@@ -218,24 +198,6 @@ Ingestion Scope:    {4}
         es_logger.setLevel(logging.ERROR)
 
         ensure_nvs_content_types(corpus)
-
-        content_block_handles = [
-            'info_about',
-            'info_contributors',
-            'info_print',
-            'info_how_to',
-            'info_faqs',
-            'tools_about',
-            'tools_advanced_search',
-            'tools_data'
-        ]
-        for handle in content_block_handles:
-            content_block = corpus.get_content('ContentBlock', {'handle': handle}, single_result=True)
-            if not content_block:
-                content_block = corpus.get_content('ContentBlock')
-                content_block.handle = handle
-                content_block.html = "Default content."
-                content_block.save()
 
         # pull down latest commits to play repo
         play_repo.pull(corpus)
@@ -457,7 +419,6 @@ def reset_nvs_content_types(corpus):
         'WitnessLocation',
         'Reference',
         'DocumentCollection',
-        'ContentBlock',
         'Play',
         'Document'
     ]
@@ -478,7 +439,7 @@ def ensure_nvs_content_types(corpus):
 
     if nvs_doc_schema:
         nvs_doc_schema['fields'] += nvs_document_fields
-        nvs_doc_schema['templates']['Label']['template'] = "{{ Document.siglum|safe }}"
+        nvs_doc_schema['templates']['Label']['template'] = "{{ Document.siglum|safe|striptags }}"
 
         doc_schema_ensured = True
         if 'Document' in corpus.content_types:
@@ -875,6 +836,8 @@ PLAY TEXT INGESTION
         fakeline = BeautifulSoup('<lb xml:id="xxxx" n="xxxx"/>', 'xml')
         handle_playtext_tag(corpus, play, fakeline.lb, line_info)
 
+        clamp_playtag_locations(corpus, play)
+
         # build line_id_map and ordered_line_ids for use by get_line_ids functions
         lines = corpus.get_content('PlayLine', {'play': play.id}, only=['id', 'xml_id', 'alt_xml_ids'])
         lines = lines.order_by('line_number')
@@ -893,19 +856,22 @@ PLAY TEXT INGESTION
                 elif line_to_register not in line_id_map[alt_xml_id]:
                     line_id_map[alt_xml_id].append(line_to_register)
 
-        # register virtual line info in line_id_map
+        # register virtual line info in line_id_map. A virtual line's lines are kept in play order,
+        # since notes group their lines by consecutive line numbers and get_line_ids takes a range
+        # from the first and last line of each xml_id.
+        line_positions = {line_id: position for position, line_id in enumerate(ordered_line_ids)}
         links = lines_tei.find_all('link')
         for link in links:
             if _contains(link.attrs, ['xml:id', 'type', 'target']):
                 xml_id = link['xml:id']
-                if xml_id not in line_id_map:
-                    line_id_map[xml_id] = []
+                virtual_line_ids = set(line_id_map.get(xml_id, []))
 
                 targets = link['target'].replace('#', '').split()
                 for target in targets:
                     if target in line_id_map:
-                        line_id_map[xml_id] += line_id_map[target]
-                        line_id_map[xml_id] = list(set(line_id_map[xml_id]))
+                        virtual_line_ids.update(line_id_map[target])
+
+                line_id_map[xml_id] = sorted(virtual_line_ids, key=lambda line_id: line_positions[line_id])
 
         # output line_id_map and ordered_line_ids for debugging or standalone textual/commentary note ingestion
         with open(corpus.path + '/files/{0}_line_id_map.json'.format(play.prefix), 'w', encoding='utf-8') as line_info_out:
@@ -1165,8 +1131,13 @@ def handle_playtext_tag(corpus, play, tag, line_info):
 
     # otherwise, this is a string of the playtext to be kept track of for building the playlines
     else:
-        new_words = str(tag)
-        line_info['text'] += new_words.replace('\n', '')
+        # The TEI is pretty-printed, so a line's text can be wrapped and indented. Collapse that
+        # whitespace to single spaces, and drop it at the start of a line or after a space, so
+        # PlayTag offsets (taken from the length of the text so far) match the stored line text.
+        new_words = collapse_whitespace(str(tag))
+        if not line_info['text'] or line_info['text'].endswith(' '):
+            new_words = new_words.lstrip(' ')
+        line_info['text'] += new_words
 
 
 def make_playtext_line(corpus, play, line_info):
@@ -1206,6 +1177,38 @@ def make_playtext_line(corpus, play, line_info):
             line_info['current_speech'].save()
             line_info['current_speech'] = None
             line_info['current_speech_ended'] = False
+
+
+def clamp_playtag_locations(corpus, play):
+    '''
+    PlayTag offsets are taken from the length of a line's text while it is still being collected,
+    but the line is stored stripped. A tag that opens or closes after whitespace at the end of a
+    line (such as the newlines between a closing tag and the next <lb>) can therefore point past
+    the end of the stored line. This moves any such start or end location back to the end of its
+    line, which lineate_transcendent_tags relies on to move a tag that starts at the end of one
+    line onto the next.
+    '''
+    line_ends = {}
+    lines = corpus.get_content('PlayLine', {'play': play.id}, only=['line_number', 'text'])
+    for line in lines:
+        line_ends[line.line_number] = make_text_location(line.line_number, len(line.text))
+
+    tags = corpus.get_content('PlayTag', {'play': play.id})
+    tags = tags.no_cache()
+    tags = tags.batch_size(100)
+
+    for tag in tags:
+        changed = False
+        for field in ['start_location', 'end_location']:
+            location = getattr(tag, field)
+            if location is not None:
+                line_end = line_ends.get(floor(location))
+                if line_end is not None and location > line_end:
+                    setattr(tag, field, line_end)
+                    changed = True
+
+        if changed:
+            tag.save(do_indexing=False, do_linking=False)
 
 
 def make_text_location(line_number, char_index):
@@ -1321,19 +1324,6 @@ TEXTUAL NOTES INGESTION
 ##########################################################\n'''
 
     try:
-        # open textualnotes xml, read raw text into tei_text,
-        # and perform special text replacements before feeding
-        # into BeautifulSoup
-
-        #with open(textualnotes_file_path, 'r') as tei_in:
-        #    tei_text = tei_in.read()
-        #    text_replacements = extract_text_replacements(tei_in)
-        #
-        #    for text, replacement in text_replacements.items():
-        #        tei_text = tei_text.replace(text, replacement)
-        #
-        #    notes_tei = BeautifulSoup(tei_text, "xml")
-
         notes_tei = parse_tei_xml(textualnotes_file_path)
 
         all_sigla = []
@@ -1350,6 +1340,12 @@ TEXTUAL NOTES INGESTION
 
         for witness_group in witness_groups:
             all_sigla.append(strip_tags(witness_group.siglum_label).lower())
+
+        # occasional witnesses are only used to place witness ranges that begin or end w/ one
+        occasional_witnesses = [
+            ref.document for ref in
+            corpus.get_content("Reference", {'play': play.id, 'ref_type': 'occasional_witness'})
+        ]
 
         with open(corpus.path + '/files/' + play.prefix + '_sigla.json', 'w', encoding='utf-8') as sigla_out:
             json.dump(all_sigla, sigla_out)
@@ -1373,6 +1369,10 @@ TEXTUAL NOTES INGESTION
             textual_note.xml_id = note['xml:id']
             textual_note.witness_meter = "0" * (len(witnesses) + 1)
 
+            if 'target' not in note.attrs:
+                report += f"Error: Missing target attribute for textual note {textual_note.xml_id}!\n\n"
+                continue
+
             textual_note.lines, line_err_msg = get_line_ids(
                 note['target'],
                 note.attrs.get('targetEnd', None),
@@ -1391,11 +1391,11 @@ TEXTUAL NOTES INGESTION
 
                 note_lemma = None
                 if note.app.find('lem', recursive=False):
-                    note_lemma = tei_to_html(note.app.lem)
+                    note_lemma = collapse_whitespace(tei_to_html(note.app.lem))
 
                 current_color = 1
                 note_exclusions = []
-                note_exclusion_formula = ''
+                cited_witnesses = []  # every witness cited so far in this note, for "etc."
                 variants = note.app.find_all('appPart')
 
                 for variant in variants:
@@ -1406,7 +1406,7 @@ TEXTUAL NOTES INGESTION
 
                     reading_description = variant.find('rdgDesc')
                     if reading_description:
-                        textual_variant.description = tei_to_html(reading_description)
+                        textual_variant.description = collapse_whitespace(tei_to_html(reading_description))
 
                     reading = variant.find('rdg')
                     if reading:
@@ -1416,7 +1416,7 @@ TEXTUAL NOTES INGESTION
                                 textual_variant.transform_type += '_' + reading['subtype']
                         else:
                             textual_variant.transform_type = "punctuation"
-                        textual_variant.transform = tei_to_html(reading)
+                        textual_variant.transform = collapse_whitespace(tei_to_html(reading))
 
                     if note_lemma:
                         textual_variant.lemma = note_lemma
@@ -1424,98 +1424,29 @@ TEXTUAL NOTES INGESTION
                     # see if a variant has its own lemma to override note level lemma
                     lem_tag = variant.find('lem')
                     if lem_tag:
-                        textual_variant.lemma = tei_to_html(lem_tag)
+                        textual_variant.lemma = collapse_whitespace(tei_to_html(lem_tag))
 
-                    starting_siglum = None
-                    ending_siglum = None
-                    next_siglum_ends = False
-                    include_all_following = False
-                    exclusion_started = False
-                    excluding_sigla = []
-
-                    textual_variant.witness_formula = ""
-                    for child in variant.wit.children:
-                        if child.name == 'siglum':
-                            siglum_label = strip_tags(tei_to_html(child)).replace(';', '')
-                            textual_variant.witness_formula += '''
-                                <a href="#" class="ref-siglum variant-siglum" onClick="navigate_to('siglum', '{0}', this); return false;">{0}</a>
-                            '''.format(siglum_label)
-                            if siglum_label.lower() not in all_sigla:
-                                references_selectively_quoted_witness = True
-
-                            if not starting_siglum:
-                                starting_siglum = siglum_label
-                            elif next_siglum_ends:
-                                ending_siglum = siglum_label
-                                next_siglum_ends = False
-                            elif exclusion_started:
-                                excluding_sigla.append(siglum_label)
-
-                        else:
-                            if child.name == 'note':
-                                child.name = 'hi'
-                                textual_variant.witness_formula += tei_to_html(child)
-                            else:
-                                if 'etc.' in str(child.string):
-                                    textual_variant.witness_formula += note_exclusion_formula
-                                else:
-                                    textual_variant.witness_formula += str(child.string)
-
-                                formula = str(child.string).strip()
-
-                                # handle '+' ranges
-                                if formula.startswith('+') or 'etc.' in formula:
-                                    include_all_following = True
-                                    if '(−' in formula:
-                                        exclusion_started = True
-
-                                # handle exclusions
-                                if '(−' in formula:
-                                    exclusion_started = True
-                                elif formula.startswith(')') and exclusion_started:
-                                    exclusion_started = False
-
-                                # handle '-' ranges
-                                elif formula.startswith('-'):
-                                    next_siglum_ends = True
-
-                                # use ',' to delimit the need to add individual sigla or add ranges
-                                if ',' in formula:
-                                    if starting_siglum and not exclusion_started:
-
-                                        # the "get_witness_ids" function will handle:
-                                        # '-' ranges
-                                        # '+' ranges
-                                        # exclusions
-                                        # individual sigla
-                                        textual_variant.witnesses.extend(
-                                            get_witness_ids(
-                                                witnesses,
-                                                witness_groups,
-                                                starting_siglum,
-                                                ending_witness_siglum=ending_siglum,
-                                                include_all_following=include_all_following,
-                                                excluding_sigla=excluding_sigla + note_exclusions
-                                            )
-                                        )
-
-                                        starting_siglum = None
-                                        ending_siglum = None
-                                        include_all_following = False
-                                        excluding_sigla = []
-
-                    # handle any further additions of sigla at the end of the formula
-                    if starting_siglum:
-                        textual_variant.witnesses.extend(
-                            get_witness_ids(
-                                witnesses,
-                                witness_groups,
-                                starting_siglum,
-                                ending_witness_siglum=ending_siglum,
-                                include_all_following=include_all_following,
-                                excluding_sigla=excluding_sigla + note_exclusions
-                            )
+                    witness_ids = []
+                    if variant.wit:
+                        (
+                            witness_ids,
+                            textual_variant.witness_formula,
+                            references_selectively_quoted_witness
+                        ) = extract_witnesses_from_range_formula(
+                            variant.wit,
+                            witnesses,
+                            witness_groups,
+                            note_exclusions=note_exclusions,
+                            occasional_witnesses=occasional_witnesses,
+                            cited_witnesses=cited_witnesses
                         )
+                        cited_witnesses += witness_ids
+
+                        # extend rather than assign: assigning a list to this cross reference field turns
+                        # the IDs into Document objects, which get_variant_witness_indicators can't match
+                        textual_variant.witnesses.extend(witness_ids)
+                    else:
+                        textual_variant.witness_formula = ""
 
                     has_note_exclusions = False
                     try:
@@ -1532,14 +1463,13 @@ TEXTUAL NOTES INGESTION
                     # as variants of type 'lem' are when the lemma matches the copy-text. Therefore, the
                     # witnesses associated with this variant will be considered note-wide exclusions.
                     if has_note_exclusions:
-                        note_exclusions += [strip_tags(w.siglum_label) for w in witnesses if w.id in textual_variant.witnesses]
-                        note_exclusion_formula = "+ (-{0})".format(textual_variant.witness_formula)
+                        note_exclusions += witness_ids
                     else:
                         # If the 'note_exclusions' list has entries, it means an earlier variant for this note was
                         # of type 'lem,' and therefore any witnesses pertaining to this variant need to be added
                         # to the list of exclusions
                         if note_exclusions:
-                            note_exclusions += [strip_tags(w.siglum_label) for w in witnesses if w.id in textual_variant.witnesses]
+                            note_exclusions += witness_ids
 
                         variant_witness_indicators = get_variant_witness_indicators(witnesses, textual_variant)
                         textual_variant.witness_meter = make_witness_meter(
@@ -1655,52 +1585,310 @@ def perform_note_transforms(job_id):
         print(traceback.format_exc())
 
 
-def get_witness_ids(
-        witnesses,
-        witness_groups,
-        starting_witness_siglum,
-        ending_witness_siglum=None,
-        include_all_following=False,
-        excluding_sigla=[]):
-    witness_ids = []
+def make_witness_range_formula(sigla, witnesses, witness_groups):
+    '''
+    Builds an HTML witness formula (i.e. "F1-rann, dyce, stau, hud2-cam3") out of a list of
+    sigla, following the conventions used in the textual notes:
 
-    starting_found = False
-    ending_found = False
-    including_sigla = []
+        * three or more consecutive witnesses (in the chronological order of 'witnesses')
+          become a range: "F1-rann"
+        * one or two consecutive witnesses are listed individually: "cam1, glo"
+        * when every member of a witness group is listed individually, the group siglum
+          stands in for them: "pope, han" instead of "pope1, pope2, han1, han2"
 
-    for witness_group in witness_groups:
-        if strip_tags(witness_group.siglum_label).lower() == starting_witness_siglum.lower():
-            if not ending_witness_siglum and not include_all_following:
-                # starting_witness_siglum = None
-                for reffed_doc in witness_group.referenced_documents:
-                    if reffed_doc.siglum_label not in excluding_sigla:
-                        including_sigla.append(strip_tags(reffed_doc.siglum_label))
-                break
+    'sigla' are siglum labels as they appear in 'note_exclusions' (Document.siglum_label w/
+    tags stripped). Sigla that aren't primary witnesses are ignored.
+    '''
+    labels = [strip_tags(witness.siglum_label) for witness in witnesses]
+    label_indexes = {label.lower(): index for index, label in enumerate(labels)}
+
+    group_members = {}
+    for group in witness_groups:
+        member_indexes = [label_indexes.get(strip_tags(doc.siglum_label).lower()) for doc in group.referenced_documents]
+        if member_indexes and None not in member_indexes:
+            group_members[strip_tags(group.siglum_label)] = sorted(member_indexes)
+
+    indexes = sorted(set(label_indexes[siglum.lower()] for siglum in sigla if siglum.lower() in label_indexes))
+
+    # split into runs of consecutive witnesses
+    runs = []
+    for index in indexes:
+        if runs and index == runs[-1][-1] + 1:
+            runs[-1].append(index)
+        else:
+            runs.append([index])
+
+    # items are (position, html) so they can be sorted back into chronological order
+    items = []
+    singles = set()
+    for run in runs:
+        if len(run) >= 3:
+            items.append((run[0], f"{make_siglum_link(labels[run[0]])}-{make_siglum_link(labels[run[-1]])}"))
+        else:
+            singles.update(run)
+
+    # bigger groups first, so a group nested inside another (i.e. cam3 inside cam) doesn't win
+    for group_label, member_indexes in sorted(group_members.items(), key=lambda g: -len(g[1])):
+        if len(member_indexes) > 1 and all(index in singles for index in member_indexes):
+            singles.difference_update(member_indexes)
+            items.append((member_indexes[0], make_siglum_link(group_label)))
+
+    items += [(index, make_siglum_link(labels[index])) for index in singles]
+    items.sort(key=lambda item: item[0])
+
+    return ', '.join(html for position, html in items)
+
+
+def make_siglum_link(siglum_label):
+    return '''<a href="#" class="ref-siglum variant-siglum" onClick="navigate_to('siglum', '{0}', this); return false;">{0}</a>'''.format(siglum_label)
+
+
+def extract_witnesses_from_range_formula(wit, witnesses, witness_groups, note_exclusions=(), occasional_witnesses=(), cited_witnesses=()):
+    '''
+    The inverse of make_witness_range_formula: reads the <wit> tag of a textual note variant, i.e.
+
+        <wit><siglum>F2</siglum>&sigrange;<siglum>john1</siglum>, <siglum>cap</siglum> (<hi>subst.</hi>)</wit>
+
+    and returns a tuple of:
+
+        * the IDs of the primary witnesses that have the reading, in chronological order (the order
+          of 'witnesses')
+        * the formula as HTML for TextualVariant.witness_formula, i.e. each siglum as a link made by
+          make_siglum_link and <note>s as spans. An "A etc." item is displayed as the witnesses it
+          stands for, condensed into ranges and groups by make_witness_range_formula, w/o "etc."
+        * whether the reading is cited by a siglum that puts no primary witness on the meter (an
+          occasional witness, an MS note, or a group made up only of occasional witnesses), which
+          is shown in the meter's last, "selectively quoted" slot
+
+    The formula is a list of items separated by commas (or semicolons), each of which is one of:
+
+        A           a witness, or a group siglum standing in for all of its members
+        A-B         every witness from A through B
+        A+          A and every later witness
+        A etc.      same as A+ (the note's earlier witnesses are left out, see below)
+
+    A range can be followed by exclusions, i.e. "A+ (−X, Y-Z)". Conjecturers ("dyce1 conj.") and
+    editions reporting a conjecture ("conj. in cam1", "apud theo1") count as witnesses. These
+    sigla are passed over:
+
+        * sigla that aren't primary witnesses (occasional witnesses, MS notes)
+        * sigla in parenthetical asides, i.e. "(and cam3, alex: Centurion)", "(attrib. to Hanmer by cam1)"
+
+    as is everything else in the formula (subst., citations like "(1899, p. 453)", etc.).
+
+    'witnesses' and 'witness_groups' are as in parse_textualnotes_file. 'note_exclusions' are IDs
+    of witnesses cited earlier in the note (i.e. those of a variant w/ type 'lem'); ranges skip
+    them, since a witness can't have two readings. 'occasional_witnesses' (Documents) are only
+    used to place a range that starts or ends w/ one, i.e. "rowe1-theo3", by publication date.
+    'cited_witnesses' are IDs of every witness cited by an earlier variant in the note, whether or
+    not the note has a 'lem' variant; only "etc." skips them.
+    '''
+    # SIGLUM MARKERS
+    # Each <siglum> in the formula is swapped for a single Unicode "private use" character
+    # (U+E000, U+E001, ...), whose offset from U+E000 is the siglum's position in 'sigla'. The
+    # formula can then be read w/ regular expressions without the text of a siglum (which may
+    # contain digits, parentheses, or punctuation) being confused w/ the formula's own syntax.
+    marker_base = 0xE000
+    marker = '[\ue000-\uf8ff]'
+
+    # Siglum labels are compared in a normalized form: tags stripped, entities unescaped,
+    # semicolons removed, whitespace trimmed, and lowercased. The TEI sometimes wraps parts of a
+    # siglum in <hi> (i.e. m<hi>tby</hi>3), leaves whitespace inside <siglum>, and stores sigla in
+    # different cases than the witness list (i.e. "Qq" vs. "qq").
+    def clean(siglum_label):
+        return html_lib.unescape(strip_tags(siglum_label)).replace(';', '').strip().lower()
+
+    # WITNESS AND GROUP LOOKUPS
+    # Primary witnesses are referred to by their position in 'witnesses', which is in
+    # chronological order, so a range like "F2-john1" is simply every position from F2's to
+    # john1's. A group siglum (i.e. "Ff" or "cam") stands in for all of its member editions, so
+    # each group maps to the sorted positions of its members that are primary witnesses.
+    witness_indexes = {clean(witness.siglum_label): index for index, witness in enumerate(witnesses)}
+    group_indexes = {}
+    for group in witness_groups:
+        members = [witness_indexes.get(clean(doc.siglum_label)) for doc in group.referenced_documents]
+        group_indexes[clean(group.siglum_label)] = sorted(m for m in members if m is not None)
+
+    # NOTE-LEVEL EXCLUSIONS
+    # 'excluded_by_note' are the positions of witnesses that read w/ the copy text (they're cited
+    # by a 'lem' variant earlier in the note). A witness can't have two readings, so every range
+    # in this formula skips them.
+    note_exclusions = {str(witness_id) for witness_id in note_exclusions}
+    excluded_by_note = {index for index, witness in enumerate(witnesses) if str(witness.id) in note_exclusions}
+
+    # "etc." means "and every other witness not already cited in this note," so 'excluded_by_etc'
+    # adds the positions of every witness cited by any earlier variant in the note.
+    cited_witnesses = {str(witness_id) for witness_id in cited_witnesses}
+    excluded_by_etc = excluded_by_note | {index for index, witness in enumerate(witnesses) if str(witness.id) in cited_witnesses}
+
+    # FLATTEN THE <wit> TAG
+    # Walk the children of <wit> once, building two things in parallel:
+    #   * 'formula': the plain text of the formula w/ a marker in place of each siglum, which is
+    #     what gets parsed below to work out the witnesses
+    #   * 'formula_html': the formula as it's displayed in the variorum reader. It also has a
+    #     marker in place of each siglum until the formula has been read, so that "A etc." items
+    #     can be found and rewritten (see DISPLAYING THE FORMULA below).
+    sigla = []
+    siglum_labels = []
+    formula = ''
+    formula_html = ''
+    for child in wit.children:
+
+        # A <siglum> becomes a marker in both 'formula' and 'formula_html'. 'sigla' keeps its
+        # normalized form for lookups; 'siglum_labels' keeps it as written, for its link.
+        if child.name == 'siglum':
+            siglum_label = child.get_text().replace(';', '').strip()
+            formula += chr(marker_base + len(sigla))
+            formula_html += chr(marker_base + len(sigla))
+            sigla.append(clean(siglum_label))
+            siglum_labels.append(siglum_label)
+
+        # A <note> inside a formula is an editorial aside; it's displayed as a span. A copy is
+        # renamed so the BeautifulSoup tree passed in isn't altered.
+        elif child.name == 'note':
+            note = deepcopy(child)
+            note.name = 'hi'
+            formula += note.get_text()
+            formula_html += tei_to_html(note)
+
+        # Everything else (text, and tags like <hi>, <name>, and <ref> for "subst.", "conj.",
+        # names of conjecturers, and citations) contributes its text. Entities have already been
+        # resolved by the parser, so &sigrange; is "-", &plus; is "+", and &minus; is "−".
+        else:
+            text = child.get_text() if child.name else str(child)
+            formula += text
+            formula_html += html_lib.escape(text, quote=False)
+
+    # RESOLVING SIGLA
+    # Turns a marker back into the positions of the primary witnesses its siglum refers to: one
+    # position for a witness, the members' positions for a group, or none for anything else
+    # (occasional witnesses, MS notes, names encoded as sigla), which don't appear on the meter.
+    def resolve(siglum_marker):
+        siglum = sigla[ord(siglum_marker) - marker_base]
+        if siglum in witness_indexes:
+            return [witness_indexes[siglum]]
+        return group_indexes.get(siglum, [])
+
+    # A range can begin or end w/ an occasional witness (i.e. "rowe1-theo3"). Occasional
+    # witnesses have no position of their own, so the endpoint is placed among the primary
+    # witnesses by publication date: a range starting w/ one begins at the first primary witness
+    # published on or after it, and a range ending w/ one stops at the last primary witness
+    # published on or before it.
+    occasional_dates = {clean(doc.siglum_label): doc.pub_date for doc in occasional_witnesses if doc.pub_date}
+
+    def resolve_endpoint(siglum_marker, is_start):
+        indexes = resolve(siglum_marker)
+        siglum = sigla[ord(siglum_marker) - marker_base]
+        if not indexes and siglum in occasional_dates:
+            date = occasional_dates[siglum]
+            if is_start:
+                indexes = [index for index, witness in enumerate(witnesses) if (witness.pub_date or '') >= date][:1]
             else:
-                starting_witness_siglum = strip_tags(witness_group.referenced_documents[0].siglum_label)
-        elif ending_witness_siglum and strip_tags(witness_group.siglum_label).lower() == ending_witness_siglum.lower():
-            ending_witness_siglum = strip_tags(witness_group.referenced_documents[-1].siglum_label)
-        elif excluding_sigla:
-            original_length = len(excluding_sigla)
-            for ex_index in range(0, original_length):
-                if excluding_sigla[ex_index].lower() == strip_tags(witness_group.siglum_label).lower():
-                    for reffed_doc in witness_group.referenced_documents:
-                        excluding_sigla.append(strip_tags(reffed_doc.siglum_label))
+                indexes = [index for index, witness in enumerate(witnesses) if (witness.pub_date or '') <= date][-1:]
+        return indexes
 
-    for witness in witnesses:
-        if not starting_found and strip_tags(witness.siglum_label).lower() == starting_witness_siglum.lower():
-            witness_ids.append(witness.id)
-            starting_found = True
-        elif starting_found and (ending_witness_siglum or include_all_following) and not ending_found:
-            if strip_tags(witness.siglum_label) not in excluding_sigla:
-                witness_ids.append(witness.id)
+    # The positions covered by a range "A-B." A group endpoint stretches the range to cover the
+    # whole group, so "Ff-rowe" starts at the first Folio and ends w/ the last Rowe edition. If
+    # either endpoint can't be placed, or the range runs backwards, it covers nothing.
+    def span(start_marker, end_marker):
+        start, end = resolve_endpoint(start_marker, True), resolve_endpoint(end_marker, False)
+        if start and end:
+            return range(start[0], end[-1] + 1)
+        return range(0)
 
-                if strip_tags(witness.siglum_label) == ending_witness_siglum:
-                    ending_found = True
-        elif strip_tags(witness.siglum_label) in including_sigla:
-            witness_ids.append(witness.id)
+    # READING THE FORMULA
+    # 'indexes' collects the positions of every witness that has this reading. 'etc_witnesses'
+    # maps the marker of each "A etc." item's siglum to the positions that item covers, so the
+    # item can be displayed as those witnesses.
+    # 'cited_markers' collects the markers of the sigla that cite this reading (i.e. not those in
+    # exclusion lists or asides).
+    indexes = set()
+    etc_witnesses = {}
+    cited_markers = set()
 
-    return witness_ids
+    # A formula is a list of items separated by commas, or occasionally semicolons. Commas and
+    # semicolons inside parentheses don't separate items, since exclusion lists and editorial
+    # asides use them too, i.e. "F2+ (−rowe2-pope2, han)" is one item.
+    for item in re.split(r'[,;](?![^()]*\))', formula):
+
+        # An exclusion list, "(−X, Y-Z)", follows the range it applies to. Its witnesses (and
+        # the witnesses that read w/ the copy text) are skipped by the ranges in this item. The
+        # minus sign is sometimes encoded as an en dash, so both are accepted.
+        excluded = set(excluded_by_note)
+        for exclusion in re.findall(r'\(\s*[−–]([^)]*)\)', item):
+            for match in re.finditer(rf'({marker})(?:\s*-\s*({marker}))?', exclusion):
+                excluded.update(span(*match.groups()) if match.group(2) else resolve(match.group(1)))
+        item = re.sub(r'\(\s*[−–][^)]*\)', ' ', item)
+
+        # Any other parenthetical is an editorial aside, i.e. "(subst.)", a citation like
+        # "(1899, p. 453)", or a remark like "(and cam3, alex: Centurion)", so sigla inside it
+        # aren't witnesses for this reading. Nested parentheses are removed innermost first.
+        while re.search(r'\([^()]*\)', item):
+            item = re.sub(r'\([^()]*\)', ' ', item)
+
+        # What's left is sigla w/ connecting text ("conj.", "and", "apud", names, etc.). Each
+        # siglum is matched along w/ an optional "-" and second siglum (a range), and an optional
+        # "+" or "etc." (every later witness). Several can occur in one item, i.e. "mtby3 and
+        # del2 conj." or a pair of sigla missing the comma between them. Conjecturers and
+        # editions reporting a conjecture ("conj. in cam1", "apud theo1") count as witnesses.
+        for match in re.finditer(rf'({marker})(?:\s*-\s*({marker}))?\s*(\+|etc\.)?', item):
+            start_marker, end_marker, open_ended = match.groups()
+            cited_markers.update(m for m in (start_marker, end_marker) if m)
+
+            # "etc." also skips every witness cited earlier in the note
+            item_excluded = excluded | excluded_by_etc if open_ended == 'etc.' else excluded
+
+            # "A-B": every witness from A through B
+            if end_marker:
+                witness_span = span(start_marker, end_marker)
+
+            # "A+" or "A etc.": A and every later witness
+            elif open_ended and resolve(start_marker):
+                witness_span = range(resolve(start_marker)[0], len(witnesses))
+
+            # A single witness or group
+            else:
+                indexes.update(resolve(start_marker))
+                continue
+
+            # The first witness of a range is always included, since it's named explicitly; the
+            # rest are included unless excluded
+            if witness_span:
+                item_indexes = {witness_span[0]} | {index for index in witness_span if index not in item_excluded}
+                indexes.update(item_indexes)
+                if open_ended == 'etc.':
+                    etc_witnesses[start_marker] = item_indexes
+
+    # DISPLAYING THE FORMULA
+    # The NVS editors display an "A etc." item as the witnesses it stands for rather than as
+    # "etc.", since what "etc." leaves out depends on the rest of the note. The siglum and "etc."
+    # (along w/ any exclusion list after it, which the witnesses already account for) are
+    # replaced w/ those witnesses, condensed into ranges and groups, i.e. "mtby3 conj., v1793
+    # etc." is displayed as "mtby3 conj., v1793-rann, sing, ...". An "etc." whose siglum isn't a
+    # primary witness or group covers no witnesses, so it's left as written.
+    def display_etc(match):
+        if match.group(1) not in etc_witnesses:
+            return match.group(0)
+        return make_witness_range_formula(
+            [strip_tags(witnesses[index].siglum_label) for index in etc_witnesses[match.group(1)]],
+            witnesses,
+            witness_groups
+        )
+    formula_html = re.sub(rf'({marker})\s*etc\.(\s*\(\s*[−–][^)]*\))?', display_etc, formula_html)
+
+    # The remaining markers become links to their sigla
+    formula_html = re.sub(marker, lambda match: make_siglum_link(siglum_labels[ord(match.group(0)) - marker_base]), formula_html)
+
+    # SELECTIVELY QUOTED WITNESSES
+    # The meter's last slot shows that the reading is also found in a witness the NVS quotes only
+    # selectively, i.e. one cited by a siglum that resolves to no primary witness: an occasional
+    # witness (and1), an MS note (mtby2), or a group whose members are all occasional witnesses
+    # (MND's "and"). Sigla in exclusion lists and asides don't count, since they don't cite this
+    # reading.
+    cites_selectively_quoted_witness = any(not resolve(siglum_marker) for siglum_marker in cited_markers)
+
+    # Positions are sorted, so the IDs come back in chronological order
+    return [witnesses[index].id for index in sorted(indexes)], formula_html, cites_selectively_quoted_witness
 
 
 def get_variant_witness_indicators(witnesses, variant):
@@ -2579,7 +2767,6 @@ APPENDIX INGESTION
             traceback.format_exc()
         )
 
-    del app_tei
     return report
 
 
@@ -2952,6 +3139,17 @@ def get_line_ids(xml_id_start, xml_id_end, line_id_map, ordered_line_ids):
                 err_msg += "Line with XML ID {0} not found! ".format(xml_id)
 
     return line_ids, err_msg
+
+
+def collapse_whitespace(text):
+    '''
+    Collapses runs of spaces, tabs and newlines into a single space. En spaces and non-breaking
+    spaces are left alone, since the textual notes use them in markers like ellipses and the
+    line delimiter.
+    '''
+    if not text:
+        return text
+    return re.sub(r'[ \t\r\n]+', ' ', text)
 
 
 def stitch_lines(lines, embed_line_markers=False, embed_pipes=False):
@@ -3329,45 +3527,248 @@ def place_tags(location, line, taggings, open_tags):
 
 
 def make_collation_lines(job_id):
+    # Turns the regions of a witness's transcription project into CollationLines, one per line of
+    # the witness, in reading order. See assemble_witness_lines for how segments are combined.
     job = Job(job_id)
-    method = job.get_param_value('method')
+    corpus = job.corpus
+    witness = job.content
 
-    if job.corpus and job.content and method:
-        if method == 'transcription_project':
-            make_collation_lines_from_transcription_project(job)
+    try:
+        job.set_status('running')
 
-    job.complete(status='complete')
+        problem = None
+        if not witness:
+            problem = "Unable to find the witness (Reference) for this job."
+        elif not witness.play or not witness.document:
+            problem = "This witness isn't associated with both a play and a document."
+        elif not witness.transcription_project:
+            problem = "This witness has no transcription project to make collation lines from."
+        elif witness.collation_status == STATUS_LINEATED:
+            problem = "This witness has already been lineated. Re-importing its lines would discard that work."
+
+        if problem:
+            fail_collation_job(job, witness, 'collation_status', problem)
+            return
+
+        witness.collation_status = f"{STATUS_IMPORTING}: {job_id}"
+        witness.save()
+
+        play = witness.play
+        trans_project = witness.transcription_project
+        is_base_text = bool(play.base_text) and play.base_text.id == witness.document.id
+
+        # clear out lines from any previous import
+        previous_line_count = bulk_delete_content(corpus, 'CollationLine', {'witness': witness.id})
+
+        assembled = assemble_witness_lines(corpus, trans_project, job)
+        lines = assembled['lines']
+
+        for order, line_info in enumerate(lines, start=1):
+            line = corpus.get_content('CollationLine')
+            line.witness = witness.id
+            line.play = play.id
+            line.tln = line_info['tln']
+            line.order = order
+            line.text = line_info['text']
+            line.images = line_info['images']
+            line.save()
+
+            if order % 100 == 0:
+                job.set_status('running', percent_complete=90 + int((order / len(lines)) * 10))
+
+        duplicate_regions = [
+            describe_region_issue(region, line['duplicate_tln'])
+            for line in lines if line.get('duplicate_tln') for region in line['regions']
+        ]
+        lines_without_tln = len([line for line in lines if not line['tln']])
+        bad_ids = [
+            f"{region['raw_id']!r} (page {region['ref_no']})"
+            for line in lines for region in line['regions']
+            if not region['tln'] and str(region['raw_id'] or '').strip()
+        ]
+
+        report = f'''
+##########################################################
+COLLATION LINES FOR {witness.document.siglum} ({play.title})
+##########################################################
+Transcription project:  {trans_project.name}
+Base text:              {'yes' if is_base_text else 'no'}
+Previous lines deleted: {previous_line_count}
+Lines created:          {len(lines)}
+Lines with a TLN:       {len(lines) - lines_without_tln}
+Lines without a TLN:    {lines_without_tln}
+Segmented lines:        {len([line for line in lines if len(line['regions']) > 1])}
+Lines using raw OCR:    {len([line for line in lines if not all(r['has_transcription'] for r in line['regions'])])}
+Empty regions skipped:  {len(assembled['empty_regions'])}
+'''
+        if assembled['untranscribed_pages']:
+            report += f"\nPages never opened in Transcribe ({len(assembled['untranscribed_pages'])}): {', '.join(assembled['untranscribed_pages'])}\n"
+        if assembled['incomplete_pages']:
+            report += f"\nPages not marked complete ({len(assembled['incomplete_pages'])}): {', '.join(assembled['incomplete_pages'])}\n"
+        if assembled['unparseable_pages']:
+            report += f"\nPages whose transcription data couldn't be read: {', '.join(assembled['unparseable_pages'])}\n"
+        if bad_ids:
+            report += f"\nIDs that aren't TLNs ({len(bad_ids)}): {', '.join(bad_ids[:50])}\n"
+        if duplicate_regions:
+            report += "\nRegions sharing a TLN (only the first line in reading order keeps it; the others were imported without one, to be aligned in the Lineator):\n\n"
+            report += '\n'.join(duplicate_regions) + '\n'
+
+        job.report(report)
+        witness.collation_status = STATUS_IMPORTED
+        job.complete(status='complete')
+
+    except Exception:
+        fail_collation_job(job, witness, 'collation_status', traceback.format_exc())
 
 
 def import_copy_text(job_id):
+    # Creates the copy text (one PlayLine per line of the base text, with the line's TLN as its
+    # xml_id) from the CollationLines of the play's base text. Lines with a missing or duplicate
+    # TLN are imported anyway under a placeholder TLN, since PlayLine xml_ids must be unique within
+    # a play, and every region behind them is listed in the job report so that transcribers have
+    # a list of what to fix. The base text's line gets the placeholder too, so the base text stays
+    # aligned line for line with its copy text (and a placeholder renamed in the Lineator carries
+    # it along). From here on, editorial interventions happen on the PlayLines, and other
+    # witnesses are lineated against them.
     job = Job(job_id)
     corpus = job.corpus
-    play = job.content
-    siglum = job.get_param_value('siglum')
-    reindex = False
+    play_prefix = job.get_param_value('play_prefix')
+    play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True) if play_prefix else None
+    started_creating = False
 
-    if play:
-        doc = corpus.get_content('Document', {'siglum': siglum}, single_result=True)
-        collation_lines = corpus.get_content('CollationLine', {
-            'play': play.id,
-            'witness': doc.id
-        }).order_by('order')
+    try:
+        job.set_status('running')
 
-        lines_processed = 0
-        total_lines = collation_lines.count()
-        for collation_line in collation_lines:
+        problems = []
+        base_witness = None
+        base_lines = []
+        if not play:
+            problems.append(f"Unable to find a play with the prefix {play_prefix!r}.")
+        elif not play.base_text:
+            problems.append("No base text has been declared for this play.")
+        else:
+            base_witness = corpus.get_content('Reference', {
+                'play': play.id,
+                'document': play.base_text.id
+            }, single_result=True)
+
+            if not base_witness:
+                problems.append(f"{play.base_text.siglum} is the base text, but it isn't a witness for this play.")
+            elif base_witness.collation_status not in [STATUS_IMPORTED, STATUS_LINEATED]:
+                problems.append(f"The lines for {play.base_text.siglum} haven't been imported from its transcription project yet.")
+            else:
+                base_lines = list(corpus.get_content('CollationLine', {'witness': base_witness.id}).order_by('order'))
+                if not base_lines:
+                    problems.append(f"{play.base_text.siglum} has no collation lines.")
+
+            existing_play_lines = corpus.get_content('PlayLine', {'play': play.id}).count()
+            if existing_play_lines:
+                problems.append(f"{play.title} already has {existing_play_lines} PlayLines. Delete them before importing a new copy text.")
+
+        if problems:
+            fail_collation_job(job, play, 'copy_text_status', ' '.join(problems))
+            return
+
+        play.copy_text_status = f"{STATUS_IMPORTING}: {job_id}"
+        play.save()
+
+        lines_without_tln = len([line for line in base_lines if not line.tln])
+        used_tlns = set()
+        placeholders = []
+        started_creating = True
+        for line_number, base_line in enumerate(base_lines, start=1):
+            xml_id = base_line.tln
+            if not xml_id:
+                xml_id = f"tln_unassigned_{line_number}"
+            elif xml_id in used_tlns:
+                copy_number = 2
+                while f"{base_line.tln}_duplicate_{copy_number}" in used_tlns:
+                    copy_number += 1
+                xml_id = f"{base_line.tln}_duplicate_{copy_number}"
+
+            if xml_id != base_line.tln:
+                placeholders.append(f"PlayLine {line_number} given the placeholder TLN {xml_id}: {base_line.text}")
+                base_line.tln = xml_id
+                base_line.collation_xml = None
+                base_line.save()
+            used_tlns.add(xml_id)
+
             play_line = corpus.get_content('PlayLine')
-            play_line.xml_id = collation_line.tln
-            play_line.line_number = collation_line.order
-            play_line.text = collation_line.text
+            play_line.xml_id = xml_id
+            play_line.line_number = line_number
+            play_line.text = base_line.text
             play_line.play = play.id
             play_line.save()
 
-            lines_processed += 1
-            if lines_processed % 100 == 0:
-                job.set_status('running', percent_complete=int( (lines_processed / total_lines) * 100))
+            if line_number % 100 == 0:
+                job.set_status('running', percent_complete=int((line_number / len(base_lines)) * 90))
 
-    job.complete(status='complete')
+        # list every region of the base text that still needs a transcriber's attention
+        assembled = assemble_witness_lines(corpus, base_witness.transcription_project)
+        region_issues = []
+        for line in assembled['lines']:
+            for region in line['regions']:
+                region_issues.append(describe_region_issue(region, line.get('duplicate_tln')))
+        for region in assembled['empty_regions']:
+            region_issues.append(describe_region_issue(region, None))
+        region_issues = [issue for issue in region_issues if issue]
+
+        duplicate_tlns = len({line['duplicate_tln'] for line in assembled['lines'] if line.get('duplicate_tln')})
+
+        report = f'''
+##########################################################
+COPY TEXT FOR {play.title} FROM {play.base_text.siglum}
+##########################################################
+Transcription project:  {base_witness.transcription_project.name}
+PlayLines created:      {len(base_lines)}
+Lines without a TLN:    {lines_without_tln}
+Duplicated TLNs:        {duplicate_tlns}
+Placeholder TLNs:       {len(placeholders)}
+Regions with problems:  {len(region_issues)}
+'''
+        if placeholders:
+            report += "\nPlayLines given placeholder TLNs (fix the TLN in Transcribe or the Lineator):\n\n"
+            report += '\n'.join(placeholders) + '\n'
+        if region_issues:
+            report += "\nRegions to fix in Transcribe (as the transcription project stands now):\n\n"
+            report += '\n'.join(region_issues) + '\n'
+
+        job.report(report)
+        play.copy_text_status = STATUS_IMPORTED
+        play.save()
+        job.complete(status='complete')
+
+    except Exception:
+        # don't leave a partial copy text behind, since it would block the next attempt (any
+        # PlayLines are this job's, since it refuses to start when the play already has some)
+        if started_creating:
+            bulk_delete_content(corpus, 'PlayLine', {'play': play.id})
+        fail_collation_job(job, play, 'copy_text_status', traceback.format_exc())
+
+
+def describe_region_issue(region, duplicate_tln):
+    issues = []
+    if not region['tln']:
+        issues.append("without TLN")
+    if not region['has_transcription']:
+        issues.append("with no transcription")
+    if duplicate_tln:
+        issues.append(f"with duplicate TLN ({duplicate_tln})")
+
+    if issues:
+        return f"Region {' and '.join(issues)} found: {region['text'] or '[empty region]'} (page {region['ref_no']})"
+    return None
+
+
+def fail_collation_job(job, content, status_field, message):
+    # the status gets a short summary and the full message goes to the job report
+    if content:
+        summary = message.strip().splitlines()[-1]
+        if len(summary) > 150:
+            summary = f"{summary[:150]}... (see job report)"
+        setattr(content, status_field, f"{STATUS_ERROR}: {summary}")
+        content.save()
+    job.complete(status='error', error_msg=message)
 
 
 def time_it(timer_name, stop=False):

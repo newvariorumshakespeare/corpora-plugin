@@ -15,14 +15,7 @@ from manager.utilities import (
 )
 from manager.tasks import run_job
 from corpus import get_corpus, Job
-
-
-# TEMPORARY FIX FOR SOFT LAUNCH
-editors = {
-    'wt': "ROBERT KEAN TURNER, VIRGINIA WESTLING HAAS, with ROBERT A. JONES, ANDREW J. SABOL, PATRICIA E. TATSPAUGH; GENERAL EDITORS Paul Werstine and Eric Rasmussen",
-    'mnd': "Judith M. Kennedy and Richard Kennedy, with Susan May, Roberta Barker, David Nicol; GENERAL EDITORS Paul Werstine and Eric Rasmussen",
-    'lr': "Richard Knowles, Kevin Donovan, with Paula Glatzer; GENERAL EDITORS Paul Werstine and Eric Rasmussen"
-}
+from .utilities import STATUS_IMPORTING, STATUS_IMPORTED, STATUS_LINEATED, bulk_delete_content
 
 
 def splash(request):
@@ -80,8 +73,7 @@ def playviewer(request, corpus_id=None, play_prefix=None):
             'playviewer_url': playviewer_url,
             'paratext_prefix': paratext_prefix,
             'corpus_id': corpus_id,
-            'play': play,
-            'editors': editors[play_prefix],
+            'play': play
         }
     )
 
@@ -407,17 +399,11 @@ def home(request, corpus_id=None):
 
 def info_about(request, corpus_id=None):
     nvs_page = "info-about"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_about'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -425,7 +411,6 @@ def info_about(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
@@ -468,17 +453,11 @@ def info_contributors(request, corpus_id=None):
 
 def info_print_editions(request, corpus_id=None):
     nvs_page = "info-print-editions"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_print'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -486,7 +465,6 @@ def info_print_editions(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
@@ -536,17 +514,11 @@ def info_news(request, corpus_id=None):
 
 def info_how_to(request, corpus_id=None):
     nvs_page = "info-how-to"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_how_to'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -554,7 +526,6 @@ def info_how_to(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
@@ -562,17 +533,11 @@ def info_how_to(request, corpus_id=None):
 
 def info_faqs(request, corpus_id=None):
     nvs_page = "info-faqs"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'info_faqs'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -580,7 +545,6 @@ def info_faqs(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
@@ -588,17 +552,11 @@ def info_faqs(request, corpus_id=None):
 
 def tools_about(request, corpus_id=None):
     nvs_page = "tools-about"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
     site_request = False
 
     if not corpus_id and hasattr(request, 'corpus_id'):
         corpus_id = request.corpus_id
         site_request = True
-
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'tools_about'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
 
     return render(
         request,
@@ -606,62 +564,657 @@ def tools_about(request, corpus_id=None):
         {
             'corpus_id': corpus_id,
             'site_request': site_request,
-            'content': dynamic_content,
             'nvs_page': nvs_page
         }
     )
 
 
-def tools_advanced_search(request, corpus_id=None):
-    nvs_page = "tools-advanced-search"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
-    site_request = False
 
-    if not corpus_id and hasattr(request, 'corpus_id'):
-        corpus_id = request.corpus_id
-        site_request = True
+@login_required
+def collation_wizard(request, corpus_id, play_prefix):
+    # The entry point for collating an edition: pair documents with transcription projects to
+    # make witnesses, declare the base text and import the copy text from it, and move on to
+    # the Lineator and Collator.
+    response = _get_context(request)
+    corpus, role = get_scholar_corpus(corpus_id, response['scholar'])
 
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'tools_advanced_search'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
+    if not (corpus and scholar_has_privilege('Contributor', role)):
+        raise Http404("Corpus does not exist, or you are not authorized to view it.")
+
+    play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+    if not play:
+        raise Http404("Play does not exist.")
+
+    if request.method == 'POST' and 'action' in request.POST:
+        handle_collation_wizard_action(request, corpus, play, response)
+        play.reload()
+
+    state = get_collation_wizard_state(corpus, play)
 
     return render(
         request,
-        'tools_advanced_search.html',
+        'collation_wizard.html',
         {
+            'response': response,
+            'page_title': f"Collation Wizard: {play.title}",
             'corpus_id': corpus_id,
-            'site_request': site_request,
-            'content': dynamic_content,
-            'nvs_page': nvs_page
+            'corpus_name': corpus.name,
+            'play': play,
+            'play_prefix': play_prefix,
+            'state': state,
         }
     )
 
 
-def tools_data_extraction(request, corpus_id=None):
-    nvs_page = "tools-data-extraction"
-    dynamic_content = "Some <i>dynamically</i> generated content!"
-    site_request = False
+def handle_collation_wizard_action(request, corpus, play, response):
+    action = _clean(request.POST, 'action')
+    scholar_id = str(response['scholar'].id)
+    witness = None
+    if 'witness-id' in request.POST:
+        witness = corpus.get_content('Reference', _clean(request.POST, 'witness-id'))
+        if not witness or not witness.play or witness.play.id != play.id:
+            response['errors'].append("Unable to find that witness for this play.")
+            return
 
-    if not corpus_id and hasattr(request, 'corpus_id'):
-        corpus_id = request.corpus_id
-        site_request = True
+    # ADD A WITNESS FROM A TRANSCRIPTION PROJECT
+    if action == 'add-witness':
+        trans_project = corpus.get_content('TranscriptionProject', _clean(request.POST, 'transcription-project-id'))
+        if not trans_project:
+            response['errors'].append("Please choose a transcription project.")
+            return
 
-    corpus = get_corpus(corpus_id)
-    content_block = corpus.get_content('ContentBlock', {'handle': 'tools_data'}, single_result=True)
-    if content_block:
-        dynamic_content = content_block.html
+        witness = corpus.get_content('Reference', {'play': play.id, 'document': trans_project.document.id}, single_result=True)
+        if witness:
+            response['messages'].append(f"{trans_project.document.siglum} was already a witness, so it now uses {trans_project.name}.")
+        else:
+            witness = corpus.get_content('Reference')
+            witness.play = play.id
+            witness.document = trans_project.document.id
+
+        witness.ref_type = _clean(request.POST, 'ref-type') or 'primary_witness'
+        witness.transcription_project = trans_project.id
+        witness.save()
+        queue_collation_lines(corpus, witness, scholar_id, response)
+
+    # CHANGE A WITNESS'S TRANSCRIPTION PROJECT OR TYPE, OR (RE)IMPORT ITS LINES
+    elif action in ['save-witness', 'import-lines'] and witness:
+        trans_project_id = _clean(request.POST, 'transcription-project-id')
+        if trans_project_id:
+            trans_project = corpus.get_content('TranscriptionProject', trans_project_id)
+            if trans_project and trans_project.document.id == witness.document.id:
+                witness.transcription_project = trans_project.id
+        if _clean(request.POST, 'ref-type') in ['primary_witness', 'occasional_witness']:
+            witness.ref_type = _clean(request.POST, 'ref-type')
+        witness.save()
+
+        if action == 'import-lines':
+            queue_collation_lines(corpus, witness, scholar_id, response)
+        else:
+            response['messages'].append(f"{witness.document.siglum} saved.")
+
+    # REMOVE A WITNESS AND ITS LINES
+    elif action == 'remove-witness' and witness:
+        if play.base_text and play.base_text.id == witness.document.id and play_has_copy_text(corpus, play):
+            response['errors'].append("This witness is the base text for the copy text. Reset the copy text before removing it.")
+            return
+
+        siglum = witness.document.siglum
+        bulk_delete_content(corpus, 'CollationLine', {'witness': witness.id})
+        if play.base_text and play.base_text.id == witness.document.id:
+            play.base_text = None
+            play.save()
+        witness.delete(track_deletions=False)
+        response['messages'].append(f"{siglum} removed, along with its collation lines.")
+
+    # DECLARE THE BASE TEXT AND IMPORT THE COPY TEXT FROM IT
+    elif action == 'set-base-text' and witness:
+        if play_has_copy_text(corpus, play):
+            response['errors'].append("This play already has a copy text. Reset it before choosing a different base text.")
+            return
+
+        play.base_text = witness.document.id
+        play.save()
+        response['messages'].append(f"{witness.document.siglum} is now the base text.")
+        if witness.collation_status == STATUS_IMPORTED:
+            queue_copy_text(corpus, play, scholar_id, response)
+        else:
+            response['messages'].append("Its copy text can be imported once its lines have been imported.")
+
+    elif action == 'import-copy-text':
+        queue_copy_text(corpus, play, scholar_id, response)
+
+    # DELETE THE COPY TEXT SO IT CAN BE REIMPORTED
+    elif action == 'reset-copy-text':
+        tei_content = play_has_tei_content(corpus, play)
+        if tei_content:
+            response['errors'].append(f"{play.title} has content ingested from TEI ({', '.join(tei_content)}), so its PlayLines can't be reset here.")
+            return
+
+        deleted = bulk_delete_content(corpus, 'PlayLine', {'play': play.id})
+        play.copy_text_status = None
+        play.save()
+        response['messages'].append(f"Copy text reset: {deleted} PlayLines deleted.")
+
+
+def queue_collation_lines(corpus, witness, scholar_id, response):
+    if not witness.transcription_project:
+        response['errors'].append(f"{witness.document.siglum} needs a transcription project before its lines can be imported.")
+    elif witness.collation_status == STATUS_LINEATED:
+        response['errors'].append(f"{witness.document.siglum} has already been lineated, so its lines can't be re-imported.")
+    elif is_importing(witness.collation_status):
+        response['errors'].append(f"{witness.document.siglum} is already importing.")
+    else:
+        job_id = corpus.queue_local_job(
+            content_type='Reference',
+            content_id=str(witness.id),
+            task_name='Make Collation Lines',
+            scholar_id=scholar_id,
+        )
+        witness.collation_status = f"{STATUS_IMPORTING}: {job_id}"
+        witness.save()
+        run_job(job_id)
+        response['messages'].append(f"Importing lines for {witness.document.siglum} from {witness.transcription_project.name}.")
+
+
+def queue_copy_text(corpus, play, scholar_id, response):
+    if not play.base_text:
+        response['errors'].append("Choose a base text first.")
+    elif play_has_copy_text(corpus, play):
+        response['errors'].append("This play already has a copy text. Reset it before importing again.")
+    elif is_importing(play.copy_text_status):
+        response['errors'].append("The copy text is already importing.")
+    else:
+        job_id = corpus.queue_local_job(
+            task_name='Import Copy Text',
+            scholar_id=scholar_id,
+            parameters={'play_prefix': play.prefix},
+        )
+        play.copy_text_status = f"{STATUS_IMPORTING}: {job_id}"
+        play.save()
+        run_job(job_id)
+        response['messages'].append(f"Importing the copy text from {play.base_text.siglum}.")
+
+
+def play_has_copy_text(corpus, play):
+    return corpus.get_content('PlayLine', {'play': play.id}).count() > 0
+
+
+def is_importing(status):
+    return bool(status) and status.startswith(f"{STATUS_IMPORTING}:")
+
+
+def get_job_progress(status):
+    # Returns (status, percent complete) for a collation or copy text status. A finished job
+    # leaves the job queue, so a status still saying "Importing" with no job behind it means
+    # the job was interrupted (e.g. by a restart).
+    if is_importing(status):
+        job_status, percent = Job.get_status(status.split(':', 1)[1].strip())
+        if job_status is None:
+            return 'Interrupted', 0
+        return 'Importing', percent or 0
+    return status or '', None
+
+
+def get_collation_wizard_state(corpus, play):
+    # Reads raw values rather than content objects throughout: following a cross-reference to a
+    # Document loads the whole document, page records and all, which made this page take seconds.
+    copy_text_tlns = set(corpus.get_content('PlayLine', {'play': play.id}).scalar('xml_id'))
+    base_text_id = play.to_mongo().get('base_text')
+
+    # page completion for every transcription project, so witnesses can be paired with one
+    page_counts = {}
+    for transcription in corpus.get_content('Transcription', all=True).only('project', 'complete').as_pymongo():
+        if transcription.get('project'):
+            counts = page_counts.setdefault(transcription['project'], [0, 0])
+            counts[1] += 1
+            if transcription.get('complete'):
+                counts[0] += 1
+
+    raw_projects = list(corpus.get_content('TranscriptionProject', all=True).only('name', 'document').as_pymongo())
+    raw_witnesses = [
+        witness for witness in corpus.get_content('Reference', {'play': play.id}).only(
+            'document', 'transcription_project', 'ref_type', 'collation_status'
+        ).as_pymongo()
+        if witness.get('document') and witness.get('ref_type') in [None, '', 'primary_witness', 'occasional_witness']
+    ]
+
+    document_ids = set(tp['document'] for tp in raw_projects if tp.get('document'))
+    document_ids |= set(witness['document'] for witness in raw_witnesses)
+    documents = {
+        document['_id']: document
+        for document in corpus.get_content('Document', {'id__in': list(document_ids)}).only('siglum', 'title', 'pub_date').as_pymongo()
+    }
+
+    trans_projects = []
+    for trans_project in raw_projects:
+        document = documents.get(trans_project.get('document'))
+        if document:
+            complete, total = page_counts.get(trans_project['_id'], [0, 0])
+            trans_projects.append({
+                'id': str(trans_project['_id']),
+                'name': trans_project.get('name'),
+                'document_id': str(document['_id']),
+                'siglum': document.get('siglum'),
+                'pages': f"{complete}/{total} pages complete",
+            })
+    trans_projects.sort(key=lambda tp: (tp['siglum'] or '', tp['name'] or ''))
+
+    witnesses = []
+    for witness in raw_witnesses:
+        document = documents.get(witness['document'], {})
+        tlns = list(corpus.get_content('CollationLine', {'witness': witness['_id']}).scalar('tln'))
+        status, percent = get_job_progress(witness.get('collation_status'))
+        document_id = str(witness['document'])
+        witnesses.append({
+            'id': str(witness['_id']),
+            'document_id': document_id,
+            'siglum': document.get('siglum'),
+            'title': document.get('title'),
+            'pub_date': document.get('pub_date'),
+            'ref_type': witness.get('ref_type'),
+            'transcription_project_id': str(witness['transcription_project']) if witness.get('transcription_project') else '',
+            'transcription_projects': [tp for tp in trans_projects if tp['document_id'] == document_id],
+            'status': status,
+            'percent': percent,
+            'is_base_text': witness['document'] == base_text_id,
+            'line_count': len(tlns),
+            'tln_count': len([tln for tln in tlns if tln]),
+            'matched_count': len([tln for tln in tlns if tln in copy_text_tlns]),
+        })
+    witnesses.sort(key=lambda w: (not w['is_base_text'], w['pub_date'] or '9999', w['siglum'] or ''))
+
+    witness_document_ids = set(w['document_id'] for w in witnesses)
+    copy_text_status, copy_text_percent = get_job_progress(play.copy_text_status)
+    base_text = documents.get(base_text_id) or (
+        corpus.get_content('Document', {'id': base_text_id}).only('siglum').as_pymongo().first() if base_text_id else None
+    )
+
+    return {
+        'witnesses': witnesses,
+        'available_transcription_projects': [tp for tp in trans_projects if tp['document_id'] not in witness_document_ids],
+        'base_text_siglum': base_text.get('siglum') if base_text else None,
+        'copy_text_line_count': len(copy_text_tlns),
+        'copy_text_placeholder_count': len([tln for tln in copy_text_tlns if tln and ('_unassigned_' in tln or '_duplicate_' in tln)]),
+        'copy_text_status': copy_text_status,
+        'copy_text_percent': copy_text_percent,
+        'imported_count': len([w for w in witnesses if w['status'] in [STATUS_IMPORTED, STATUS_LINEATED]]),
+        'lineated_count': len([w for w in witnesses if w['status'] == STATUS_LINEATED]),
+    }
+
+
+@login_required
+def api_collation_wizard_status(request, corpus_id, play_prefix):
+    # Lets the wizard poll the progress of the jobs it launched.
+    response = _get_context(request)
+    corpus, role = get_scholar_corpus(corpus_id, response['scholar'])
+    status = {'witnesses': {}, 'copy_text': None}
+
+    if corpus and scholar_has_privilege('Contributor', role):
+        play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+        if play:
+            for witness in corpus.get_content('Reference', {'play': play.id}, only=['collation_status']):
+                witness_status, percent = get_job_progress(witness.collation_status)
+                status['witnesses'][str(witness.id)] = {'status': witness_status, 'percent': percent}
+            copy_text_status, percent = get_job_progress(play.copy_text_status)
+            status['copy_text'] = {'status': copy_text_status, 'percent': percent}
+
+    return HttpResponse(json.dumps(status), content_type='application/json')
+
+
+@login_required
+def lineator(request, corpus_id, play_prefix):
+    # Stage 2 of collation: assign each line of a witness the TLN of its counterpart in the copy
+    # text (the play's PlayLines). The page lays the lines out and edits them through the
+    # lineator APIs below.
+    response = _get_context(request)
+    corpus, role = get_scholar_corpus(corpus_id, response['scholar'])
+
+    if not (corpus and scholar_has_privilege('Contributor', role)):
+        raise Http404("Corpus does not exist, or you are not authorized to view it.")
+
+    play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+    if not play:
+        raise Http404("Play does not exist.")
+
+    witnesses = get_collation_wizard_state(corpus, play)['witnesses']
+    witness_id = request.GET.get('witness')
+    if not any(w['id'] == witness_id for w in witnesses):
+        witness_id = witnesses[0]['id'] if witnesses else None
 
     return render(
         request,
-        'tools_data.html',
+        'lineator.html',
         {
+            'response': response,
+            'page_title': f"Lineator: {play.title}",
             'corpus_id': corpus_id,
-            'site_request': site_request,
-            'content': dynamic_content,
-            'nvs_page': nvs_page
+            'corpus_name': corpus.name,
+            'play': play,
+            'play_prefix': play_prefix,
+            'witnesses': witnesses,
+            'witness_id': witness_id,
+            'copy_text_editable': not play_has_tei_content(corpus, play),
         }
     )
+
+
+def play_has_tei_content(corpus, play):
+    # Plays ingested from TEI have notes and tags that point at their PlayLines' TLNs, so their
+    # copy text mustn't be reset, renamed or rewritten from the collation tools
+    return [ct for ct in ['PlayTag', 'TextualNote', 'Commentary'] if corpus.get_content(ct, {'play': play.id}).count()]
+
+
+def witnesses_with_both_tlns(corpus, play, tln, other_tln):
+    # the sigla of witnesses with lines at both TLNs, which renaming one TLN to the other would
+    # leave with two lines at the same TLN
+    if not tln or not other_tln:
+        return []
+    witness_ids = [
+        set(line['witness'] for line in corpus.get_content('CollationLine', {'play': play.id, 'tln': t}).only('witness').as_pymongo())
+        for t in [tln, other_tln]
+    ]
+    both = witness_ids[0] & witness_ids[1]
+    if not both:
+        return []
+    return sorted(witness.document.siglum for witness in corpus.get_content('Reference', {'id__in': list(both)}, all=True))
+
+
+def get_lineator_corpus_play(request, corpus_id, play_prefix):
+    response = _get_context(request)
+    corpus, role = get_scholar_corpus(corpus_id, response['scholar'])
+    if corpus and scholar_has_privilege('Contributor', role):
+        play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
+        if play:
+            return corpus, play
+    return None, None
+
+
+@login_required
+def api_lineator_lines(request, corpus_id, play_prefix, witness_id):
+    # The copy text and one witness's lines, in order, for the Lineator to lay out. Copy text
+    # lines carry the images of the base text's line with the same TLN.
+    corpus, play = get_lineator_corpus_play(request, corpus_id, play_prefix)
+    if not corpus:
+        raise Http404("Corpus or play does not exist, or you are not authorized to view it.")
+
+    witness = corpus.get_content('Reference', {'id': witness_id, 'play': play.id}).only('document', 'collation_status').as_pymongo().first()
+    if not witness:
+        raise Http404("Witness does not exist.")
+
+    base_lines = {}
+    base_witness = None
+    base_text_id = play.to_mongo().get('base_text')
+    if base_text_id:
+        base_witness = corpus.get_content('Reference', {'play': play.id, 'document': base_text_id}).only('id').as_pymongo().first()
+        if base_witness:
+            for line in corpus.get_content('CollationLine', {'witness': base_witness['_id']}).only('tln', 'images').as_pymongo():
+                if line.get('tln') and line['tln'] not in base_lines:
+                    base_lines[line['tln']] = line
+
+    copy_text = [
+        {
+            'id': str(line['_id']),
+            'tln': line.get('xml_id'),
+            'text': line.get('text', ''),
+            'images': base_lines.get(line.get('xml_id'), {}).get('images', []),
+            'base_line_id': str(base_lines[line.get('xml_id')]['_id']) if line.get('xml_id') in base_lines else None,
+        }
+        for line in corpus.get_content('PlayLine', {'play': play.id}).only('xml_id', 'line_number', 'text').order_by('line_number').as_pymongo()
+    ]
+    witness_lines = [
+        {
+            'id': str(line['_id']),
+            'tln': line.get('tln'),
+            'order': line.get('order'),
+            'text': line.get('text', ''),
+            'images': line.get('images', []),
+        }
+        for line in corpus.get_content('CollationLine', {'witness': witness['_id']}).only('tln', 'order', 'text', 'images').order_by('order').as_pymongo()
+    ]
+
+    return HttpResponse(json.dumps({
+        'copy_text': copy_text,
+        'witness_lines': witness_lines,
+        'lineated': witness.get('collation_status') == STATUS_LINEATED,
+        'base_witness_id': str(base_witness['_id']) if base_witness else None,
+    }), content_type='application/json')
+
+
+@login_required
+def api_witness_pages(request, corpus_id, play_prefix, witness_id):
+    # The page images of a witness, in page order, for the line image editor: how to open each one
+    # in OpenSeadragon and how to build region URLs for it.
+    corpus, play = get_lineator_corpus_play(request, corpus_id, play_prefix)
+    if not corpus:
+        raise Http404("Corpus or play does not exist, or you are not authorized to view it.")
+
+    witness = corpus.get_content('Reference', {'id': witness_id, 'play': play.id}, single_result=True)
+    if not witness or not witness.transcription_project:
+        raise Http404("Witness or its transcription project does not exist.")
+
+    trans_project = witness.transcription_project
+    document = trans_project.document
+    pageset = trans_project.pageset if trans_project.pageset != 'all' and trans_project.pageset in document.page_sets else None
+    image_files = document.get_page_file_collection(trans_project.image_pfc, pageset).get('page_files', {}) if trans_project.image_pfc else {}
+
+    pages = []
+    for ref_no in document.ordered_pages(pageset).ordered_ref_nos:
+        image_file = image_files.get(ref_no)
+        if not image_file or 'uri' not in image_file:
+            continue
+        iiif_info = image_file.get('iiif_info') or {}
+        image_uri = image_file['uri'].replace('/', '|')
+        pages.append({
+            'ref_no': ref_no,
+            'image_uri': image_uri,
+            # Corpora's image route redirects external IIIF images before it gets to info.json, so
+            # those are opened straight from their own IIIF server
+            'info_url': f"{image_file['path']}/info.json" if iiif_info else f"/image/uri/{image_uri}/info.json",
+            'rotation': iiif_info.get('fixed_rotation', 0) or 0,
+        })
+
+    return HttpResponse(json.dumps({'pages': pages}), content_type='application/json')
+
+
+@login_required
+def api_lineator_update(request, corpus_id, play_prefix):
+    # Saves one edit from the Lineator. Takes a JSON body with an "action" and returns the
+    # result (or an "error") as JSON.
+    corpus, play = get_lineator_corpus_play(request, corpus_id, play_prefix)
+    if not corpus or request.method != 'POST':
+        raise Http404("Corpus or play does not exist, or you are not authorized to edit it.")
+
+    try:
+        edit = json.loads(request.body)
+    except ValueError:
+        edit = {}
+    action = edit.get('action')
+    result = {}
+
+    def clean_tln(tln):
+        tln = (tln or '').strip()
+        return tln or None
+
+    def get_witness_line(line_id):
+        line = corpus.get_content('CollationLine', line_id) if line_id else None
+        return line if line and line.play and line.play.id == play.id else None
+
+    # ASSIGN TLNs TO WITNESS LINES (one line, or several when pushing lines down). A line without a
+    # TLN is stored as null, which the Lineator treats as still to be aligned and suggests a row
+    # for, unless the assignment is marked "unplaced" (the line was unassigned): that's stored as an
+    # empty TLN, and the Lineator shows the line in a "Not yet placed" row of its own. An assignment
+    # can also move a line in the witness's reading order. A witness never has two lines with the
+    # same TLN (a line split across regions is one line with several images), so assignments that
+    # would leave a TLN on two lines are refused as a whole.
+    if action == 'set-witness-tlns':
+        changes = []
+        for assignment in edit.get('assignments', []):
+            line = get_witness_line(assignment.get('line_id'))
+            if line:
+                tln = clean_tln(assignment.get('tln'))
+                if not tln and assignment.get('unplaced'):
+                    tln = ''
+                changes.append((line, tln, assignment.get('order')))
+
+        changing_ids = [line.id for line, tln, order in changes]
+        claimed = set()
+        conflict = None
+        for line, tln, order in changes:
+            if not tln:
+                continue
+            if (line.witness.id, tln) in claimed or corpus.get_content('CollationLine', {'witness': line.witness.id, 'tln': tln, 'id__nin': changing_ids}).count():
+                conflict = tln
+                break
+            claimed.add((line.witness.id, tln))
+
+        if conflict:
+            result['error'] = f"Another line of this witness already has {conflict}. Combine the two lines, or push the other one down, instead."
+        else:
+            saved = []
+            for line, tln, order in changes:
+                line.tln = tln
+                if order is not None:
+                    line.order = float(order)
+                line.collation_xml = None
+                line.save()
+                saved.append({'line_id': str(line.id), 'tln': line.tln, 'order': line.order})
+            result['saved'] = saved
+
+    # DELETE A WITNESS LINE THAT ISN'T PART OF THE PLAY (a running header, a page number, etc. that
+    # wasn't removed in Transcribe). It comes back if the witness is re-imported from a
+    # transcription project that still has the region.
+    elif action == 'delete-witness-line':
+        line = get_witness_line(edit.get('line_id'))
+        if line:
+            line.delete(track_deletions=False)
+            result['removed_line_id'] = edit.get('line_id')
+        else:
+            result['error'] = "Unable to find that line."
+
+    # REPLACE A LINE'S IMAGES (cropped, added, removed, or reordered in the line image editor)
+    elif action == 'set-line-images':
+        line = get_witness_line(edit.get('line_id'))
+        images = edit.get('images')
+        if not line:
+            result['error'] = "Unable to find that line."
+        elif not isinstance(images, list) or not all(isinstance(url, str) and url.startswith('/image/uri/') for url in images):
+            result['error'] = "Images must be region URLs from this corpus."
+        else:
+            line.images = images
+            line.collation_xml = None
+            line.save()
+            result.update({'line_id': str(line.id), 'images': line.images})
+
+    # MERGE ONE WITNESS LINE INTO ANOTHER (its text and images go before or after the target's)
+    elif action == 'combine-witness-lines':
+        target = get_witness_line(edit.get('target_line_id'))
+        source = get_witness_line(edit.get('source_line_id'))
+        if not target or not source or target.id == source.id or target.witness.id != source.witness.id:
+            result['error'] = "Unable to find those two lines of the same witness."
+        else:
+            if edit.get('position') == 'before':
+                target.text = f"{source.text or ''} {target.text or ''}".strip()
+                target.images = (source.images or []) + (target.images or [])
+            else:
+                target.text = f"{target.text or ''} {source.text or ''}".strip()
+                target.images = (target.images or []) + (source.images or [])
+            target.collation_xml = None
+            target.save()
+            source.delete(track_deletions=False)
+            result.update({'line_id': str(target.id), 'text': target.text, 'images': target.images, 'removed_line_id': edit.get('source_line_id')})
+
+    elif action == 'edit-witness-text':
+        line = get_witness_line(edit.get('line_id'))
+        if line:
+            line.text = edit.get('text', '')
+            line.collation_xml = None
+            line.save()
+            result['text'] = line.text
+        else:
+            result['error'] = "Unable to find that witness line."
+
+    # RENAME A COPY TEXT TLN, CARRYING EVERY WITNESS LINE THAT USES IT ALONG WITH IT
+    elif action == 'rename-copy-tln':
+        new_tln = clean_tln(edit.get('tln'))
+        play_line = corpus.get_content('PlayLine', edit.get('play_line_id')) if edit.get('play_line_id') else None
+
+        if play_has_tei_content(corpus, play):
+            result['error'] = f"{play.title}'s copy text came from TEI, so its TLNs can't be changed here."
+        elif not play_line or play_line.play.id != play.id:
+            result['error'] = "Unable to find that copy text line."
+        elif not new_tln:
+            result['error'] = "Every copy text line needs a TLN."
+        elif new_tln != play_line.xml_id and corpus.get_content('PlayLine', {'play': play.id, 'xml_id': new_tln}).count():
+            result['error'] = f"{new_tln} is already used by another copy text line."
+        elif new_tln != play_line.xml_id and (clashing := witnesses_with_both_tlns(corpus, play, play_line.xml_id, new_tln)):
+            result['error'] = f"{', '.join(clashing)} already {'has a line' if len(clashing) == 1 else 'have lines'} at {new_tln} as well as at {play_line.xml_id}, so renaming would give {'it' if len(clashing) == 1 else 'each'} two lines with the same TLN. Combine or unassign one of them first."
+        else:
+            old_tln = play_line.xml_id
+            play_line.xml_id = new_tln
+            play_line.save()
+
+            carried = 0
+            if old_tln and old_tln != new_tln:
+                for line in corpus.get_content('CollationLine', {'play': play.id, 'tln': old_tln}):
+                    line.tln = new_tln
+                    line.collation_xml = None
+                    line.save()
+                    carried += 1
+            result.update({'tln': new_tln, 'old_tln': old_tln, 'witness_lines_updated': carried})
+
+    elif action == 'edit-copy-text':
+        play_line = corpus.get_content('PlayLine', edit.get('play_line_id')) if edit.get('play_line_id') else None
+        if play_has_tei_content(corpus, play):
+            result['error'] = f"{play.title}'s copy text came from TEI, so it can't be edited here."
+        elif not play_line or play_line.play.id != play.id:
+            result['error'] = "Unable to find that copy text line."
+        else:
+            play_line.text = edit.get('text', '')
+            play_line.save()
+            # every witness's comparison against this line is now out of date
+            for line in corpus.get_content('CollationLine', {'play': play.id, 'tln': play_line.xml_id}):
+                line.collation_xml = None
+                line.save()
+            result['text'] = play_line.text
+
+    # DELETE A COPY TEXT LINE THAT ISN'T PART OF THE PLAY (e.g. a running header in the base text).
+    # Witness lines that were aligned with it lose its TLN, so they become suggestions to realign
+    # rather than pointing at a TLN that no longer exists.
+    elif action == 'delete-copy-line':
+        play_line = corpus.get_content('PlayLine', edit.get('play_line_id')) if edit.get('play_line_id') else None
+        if play_has_tei_content(corpus, play):
+            result['error'] = f"{play.title}'s copy text came from TEI, so its lines can't be deleted here."
+        elif not play_line or play_line.play.id != play.id:
+            result['error'] = "Unable to find that copy text line."
+        else:
+            tln = play_line.xml_id
+            unaligned = 0
+            if tln:
+                for line in corpus.get_content('CollationLine', {'play': play.id, 'tln': tln}):
+                    line.tln = None
+                    line.collation_xml = None
+                    line.save()
+                    unaligned += 1
+            play_line.delete(track_deletions=False)
+            result.update({'removed_play_line_id': edit.get('play_line_id'), 'tln': tln, 'witness_lines_unaligned': unaligned})
+
+    # MARK A WITNESS AS LINEATED (OR NOT)
+    elif action == 'set-lineated':
+        witness = corpus.get_content('Reference', edit.get('witness_id')) if edit.get('witness_id') else None
+        if not witness or witness.play.id != play.id:
+            result['error'] = "Unable to find that witness."
+        elif is_importing(witness.collation_status):
+            result['error'] = "This witness is still importing."
+        else:
+            witness.collation_status = STATUS_LINEATED if edit.get('lineated') else STATUS_IMPORTED
+            witness.save()
+            result['lineated'] = witness.collation_status == STATUS_LINEATED
+
+    else:
+        result['error'] = f"Unknown action: {action}"
+
+    return HttpResponse(json.dumps(result), content_type='application/json')
+
 
 @login_required
 def collator(request, corpus_id, play_prefix):
@@ -1444,7 +1997,6 @@ def get_nvs_witnesses(corpus, play):
             'siglum_label': wit_ref.document.siglum_label,
             'bibliographic_entry': "{0} {1}".format(wit_ref.document.siglum_label, wit_ref.bibliographic_entry),
             'published': wit_ref.document.pub_date,
-            'collation_status': wit_ref.collation_status,
             'occasional': False
         }
 
@@ -1463,7 +2015,6 @@ def get_nvs_witnesses(corpus, play):
             'document_id': str(wit_ref.document.id),
             'bibliographic_entry': wit_ref.bibliographic_entry,
             'published': wit_ref.document.pub_date,
-            'collation_status': wit_ref.collation_status,
             'occasional': True
         }
 

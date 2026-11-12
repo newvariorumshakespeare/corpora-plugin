@@ -1,0 +1,947 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+    <style>
+        /* corpora.css scrolls smoothly, which turns every small auto-scroll step while dragging into an
+           animation that the next step restarts */
+        html { scroll-behavior: auto !important; }
+
+        #lineator-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background-color: var(--bs-body-bg);
+            border-bottom: 1px solid var(--bs-border-color);
+        }
+        #lineator-header {
+            position: sticky;
+            top: var(--lineator-toolbar-height, 3rem);
+            z-index: 10;
+            background-color: var(--bs-tertiary-bg);
+            font-weight: bold;
+        }
+        .lineator-row {
+            display: grid;
+            /* the witness column gets an extra track for its lines' drag handles (and the padding, gap and
+               borders around them), so its text and images get the same width as the copy text's */
+            --handle-width: 1.6rem;
+            --handle-space: calc(.3rem + .4rem + var(--handle-width) + 2px);
+            grid-template-columns: minmax(0, 1fr) 11rem minmax(0, 1fr) var(--handle-space);
+            border-bottom: 1px solid var(--bs-border-color);
+        }
+        .lineator-row > div { padding: .3rem .5rem; min-width: 0; }
+        .lineator-row > div:last-child { grid-column: span 2; }
+        .lineator-row .tln-cell { border-left: 1px solid var(--bs-border-color); border-right: 1px solid var(--bs-border-color); }
+        .lineator-row.drop-hover > .witness-cell { background-color: rgba(var(--bs-primary-rgb), .12); box-shadow: inset 0 0 0 2px rgba(var(--bs-primary-rgb), .5); }
+        .lineator-row.flash { animation: flash-row 1.5s ease-out; }
+        @keyframes flash-row { from { background-color: rgba(var(--bs-warning-rgb), .5); } to { background-color: transparent; } }
+
+        /* rows for witness lines that aren't in the copy text */
+        .copy-cell.not-in-copy-text {
+            background: repeating-linear-gradient(45deg, transparent, transparent 6px, var(--bs-tertiary-bg) 6px, var(--bs-tertiary-bg) 12px);
+            color: var(--bs-secondary-color);
+            font-style: italic;
+            font-size: .85em;
+        }
+        .witness-cell.omitted { color: var(--bs-secondary-color); font-size: .85em; }
+
+        /* a line's images sit side by side, each about as tall as a line of its text */
+        .lineator-row { --line-height: 1.5rem; }
+        .line-text { position: relative; font-size: 1rem; line-height: var(--line-height); }
+        .line-images {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .15rem .5rem;
+            margin-top: .15rem;
+        }
+        .line-images img {
+            display: block;
+            height: var(--line-height);
+            width: auto;
+            max-width: 100%;
+            object-fit: contain;
+            object-position: left center;
+        }
+        #lineator-rows:not(.show-images) .line-images { display: none; }
+        /* a witness line is dragged by the grip on its right, as fields are in the content type manager */
+        .witness-line {
+            position: relative;
+            display: flex;
+            gap: .4rem;
+            border: 1px solid transparent;
+            border-radius: .25rem;
+            padding: .1rem 0 .1rem .3rem;
+        }
+        .witness-line .line-body { flex: 1 1 auto; min-width: 0; }
+        .witness-line .drag-handle {
+            flex: 0 0 var(--handle-width);
+            align-self: stretch;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            cursor: grab;
+        }
+        body.draggable--is-dragging, body.draggable--is-dragging * { cursor: grabbing !important; }
+        .witness-line + .witness-line { margin-top: .3rem; }
+        .witness-line:hover { border-color: var(--bs-border-color); }
+        .witness-line.suggested { border: 1px dashed var(--bs-primary); opacity: .7; }
+        .witness-line.unplaced { border: 1px dashed var(--bs-warning); }
+        .witness-line.draggable-source--is-dragging { opacity: .3; }
+        .witness-line.draggable-mirror { background-color: var(--bs-body-bg); border-color: var(--bs-primary); box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .2); z-index: 100; }
+        .line-tools {
+            position: absolute;
+            top: -.1rem;
+            right: 0;
+            display: none;
+            gap: .15rem;
+            z-index: 5;
+        }
+        .witness-line .line-tools { right: calc(var(--handle-width) + .4rem); }
+        .witness-line:hover .line-tools, .copy-cell:hover .line-tools { display: flex; }
+        .line-tools .btn { padding: 0 .3rem; font-size: .75rem; }
+        .copy-cell { position: relative; }
+        .tln-cell input { width: 100%; font-family: var(--bs-font-monospace); font-size: .8rem; }
+        .tln-cell .tln-label { font-family: var(--bs-font-monospace); font-size: .8rem; }
+        .line-editor textarea { width: 100%; font-size: 1rem; }
+
+        .drop-menu {
+            position: absolute;
+            z-index: 200;
+            max-width: 32rem;
+            padding: .5rem;
+            background-color: var(--bs-body-bg);
+            border: 1px solid var(--bs-primary);
+            border-radius: .375rem;
+            box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .2);
+        }
+        .lineator-row.drop-target { background-color: rgba(var(--bs-primary-rgb), .12); }
+
+        .legend-swatch { display: inline-block; width: 1.5rem; height: .9rem; vertical-align: middle; margin-right: .25rem; border-radius: .2rem; }
+    </style>
+{% endblock %}
+
+{% block main %}
+    <div id="lineator-toolbar" class="d-flex flex-wrap gap-2 align-items-center py-2">
+        <a href="/corpus/{{ corpus_id }}/collation-wizard/{{ play_prefix }}/" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Wizard
+        </a>
+        <select id="witness-select" class="form-select form-select-sm w-auto">
+            {% for witness in witnesses %}
+                <option value="{{ witness.id }}" {% if witness.id == witness_id %}selected{% endif %}>
+                    {{ witness.siglum }}{% if witness.is_base_text %} (base text){% endif %}{% if witness.status == 'Lineated' %} &#10003;{% endif %}
+                </option>
+            {% endfor %}
+        </select>
+        <input id="jump-tln" type="text" class="form-control form-control-sm w-auto" placeholder="Jump to TLN (e.g. 2307)">
+        <button id="next-unresolved" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" data-bs-trigger="hover" data-bs-container="#lineator-toolbar" title="Scroll to the next suggested or unplaced line">Next unresolved</button>
+        <span id="lineator-stats" class="small text-muted"></span>
+        <span id="lineator-message" class="small"></span>
+        <div class="form-check form-switch ms-auto mb-0">
+            <input id="images-switch" class="form-check-input" type="checkbox" role="switch">
+            <label class="form-check-label" for="images-switch">Show images</label>
+        </div>
+        <div class="form-check form-switch mb-0">
+            <input id="lineated-switch" class="form-check-input" type="checkbox" role="switch">
+            <label class="form-check-label" for="lineated-switch">Lineated</label>
+        </div>
+    </div>
+
+    <div class="small text-muted my-2">
+        Drag a witness line by its <i class="fas fa-grip-vertical"></i> handle onto a row to give it that row's TLN.
+        <span class="legend-swatch" style="border: 1px dashed var(--bs-primary);"></span>suggested placement (not saved until accepted)
+        <span class="legend-swatch ms-2" style="border: 1px dashed var(--bs-warning);"></span>not yet placed (no TLN)
+        <span class="legend-swatch ms-2" style="background: repeating-linear-gradient(45deg, transparent, transparent 3px, var(--bs-tertiary-bg) 3px, var(--bs-tertiary-bg) 6px);"></span>not in the copy text
+    </div>
+
+    <div id="lineator-header" class="lineator-row">
+        <div>Copy text</div>
+        <div class="tln-cell">TLN</div>
+        <div id="witness-header">Witness</div>
+    </div>
+    <div id="lineator-rows"></div>
+{% endblock %}
+
+{% block js %}
+    <script src="{% static 'js/sortable.js' %}"></script>
+    <script src="{% static 'js/openseadragon.min.js' %}"></script>
+    <script src="{% static 'js/openseadragonselection.js' %}"></script>
+    <script src="{% static 'js/collation/line-image-editor.js' %}?no-cache={% now 'U' %}"></script>
+    <script type="application/javascript">
+        const corpusId = '{{ corpus_id }}'
+        const playPrefix = '{{ play_prefix }}'
+        const witnessId = '{{ witness_id|default:"" }}'
+        const copyTextEditable = {{ copy_text_editable|yesno:"true,false" }}
+        const updateUrl = `/api/corpus/${corpusId}/lineator/${playPrefix}/update/`
+
+        let copyText = []       // [{id, tln, text, images}] in copy text order
+        let witnessLines = []   // [{id, tln, order, text, images}] in witness order
+        let rows = []           // the current layout, see layOutRows()
+        let baseWitnessId = null
+        let imageEditor = null
+
+        document.addEventListener('DOMContentLoaded', () => {
+            add_breadcrumb('{{ corpus_name|force_escape|escapejs }}', '/corpus/{{ corpus_id }}/')
+            add_breadcrumb('{{ play.title|force_escape|escapejs }}', '/corpus/{{ corpus_id }}/Play/{{ play.id }}/')
+            add_breadcrumb('Collation Wizard', '/corpus/{{ corpus_id }}/collation-wizard/{{ play_prefix }}/')
+            add_breadcrumb('Lineator', `/corpus/${corpusId}/lineator/${playPrefix}/`)
+            setToolbarOffset()
+            new ResizeObserver(setToolbarOffset).observe(getEl('lineator-toolbar'))
+            window.addEventListener('scroll', scheduleImageLoading, {passive: true})
+            getEl('lineator-rows').addEventListener('load', event => {
+                if (event.target.tagName === 'IMG' && event.target.dataset.src) loadedImageUrls.add(event.target.dataset.src)
+            }, true)
+
+            onEl(getEl('witness-select'), 'change', event => {
+                window.location.search = `?witness=${event.currentTarget.value}`
+            })
+            onEl(getEl('jump-tln'), 'keydown', event => {
+                if (event.key === 'Enter') jumpToTln(event.currentTarget.value)
+            })
+            onEl(getEl('next-unresolved'), 'click', event => {
+                hideTooltip(event.currentTarget)
+                scrollToNextUnresolved()
+            })
+            onEl(getEl('images-switch'), 'change', event => showImages(event.currentTarget.checked))
+            onEl(getEl('lineated-switch'), 'change', event => setLineated(event.currentTarget.checked))
+
+            if (!witnessId) {
+                getEl('lineator-rows').innerHTML = '<p class="p-3"><em>This play has no witnesses yet. Add some in the Collation Wizard.</em></p>'
+                hide_loading_overlay()
+                return
+            }
+
+            fetch(`/api/corpus/${corpusId}/lineator/${playPrefix}/lines/${witnessId}/`)
+                .then(res => res.json())
+                .then(data => {
+                    copyText = data.copy_text
+                    witnessLines = data.witness_lines
+                    baseWitnessId = data.base_witness_id
+                    getEl('lineated-switch').checked = data.lineated
+                    getEl('witness-header').textContent = getEl('witness-select').selectedOptions[0].textContent.trim()
+                    render()
+                    bindDragging()
+                    hide_loading_overlay()
+                })
+        })
+
+        function setToolbarOffset() {
+            document.documentElement.style.setProperty('--lineator-toolbar-height', `${getEl('lineator-toolbar').offsetHeight}px`)
+        }
+
+        // ------------------------------------------------------------------
+        // LAYOUT
+        // ------------------------------------------------------------------
+        // A witness line whose TLN is in the copy text sits across from that copy text line (several
+        // lines with the same TLN stack). A line still to be aligned (a null TLN) takes the next free
+        // copy text row between its anchored neighbors (by order) as a suggestion; failing that, and for
+        // a line that was unassigned (an empty TLN) or whose TLN isn't in the copy text (an added
+        // line), it gets a row of its own after its predecessor.
+        function layOutRows() {
+            const copyIndex = new Map(copyText.map((line, index) => [line.tln, index]))
+            const lines = [...witnessLines].sort((a, b) => a.order - b.order)
+            const anchored = copyText.map(() => [])
+            const suggested = copyText.map(() => null)
+            const extras = new Map()  // copy row index (-1 for before the first) => witness lines placed after it
+            const anchorRow = lines.map(line => line.tln && copyIndex.has(line.tln) ? copyIndex.get(line.tln) : null)
+
+            lines.forEach((line, k) => { if (anchorRow[k] !== null) anchored[anchorRow[k]].push(line) })
+
+            // the copy row of the next anchored line after each line, so we know how far a run can spread
+            const nextAnchorRow = new Array(lines.length)
+            let upcoming = copyText.length
+            for (let k = lines.length - 1; k >= 0; k--) {
+                nextAnchorRow[k] = upcoming
+                if (anchorRow[k] !== null) upcoming = anchorRow[k]
+            }
+
+            let position = -1
+            lines.forEach((line, k) => {
+                if (anchorRow[k] !== null) {
+                    position = anchorRow[k]
+                    return
+                }
+                if (line.tln === null || line.tln === undefined) {
+                    let row = position + 1
+                    while (row < nextAnchorRow[k] && (anchored[row].length || suggested[row])) row++
+                    if (row < nextAnchorRow[k]) {
+                        suggested[row] = line
+                        position = row
+                        return
+                    }
+                }
+                if (!extras.has(position)) extras.set(position, [])
+                extras.get(position).push(line)
+            })
+
+            const laidOut = []
+            const pushExtras = index => (extras.get(index) || []).forEach(line => laidOut.push({
+                key: `w:${line.id}`, copy: null, witness: [line], kind: line.tln ? 'added' : 'unplaced', after: index
+            }))
+
+            pushExtras(-1)
+            copyText.forEach((copyLine, index) => {
+                if (anchored[index].length) laidOut.push({key: `c:${index}`, copy: copyLine, copyIndex: index, witness: anchored[index], kind: 'anchored'})
+                else if (suggested[index]) laidOut.push({key: `c:${index}`, copy: copyLine, copyIndex: index, witness: [suggested[index]], kind: 'suggested'})
+                else laidOut.push({key: `c:${index}`, copy: copyLine, copyIndex: index, witness: [], kind: 'omitted'})
+                pushExtras(index)
+            })
+            return laidOut
+        }
+
+        // ------------------------------------------------------------------
+        // RENDERING
+        // ------------------------------------------------------------------
+        function escapeHtml(text) {
+            return String(text || '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]))
+        }
+
+        // Line images are stored at full size, so the image server is asked for something screen-sized. They
+        // load only once scrolling has settled (see loadImagesInView), so each one's box is sized from its
+        // region's proportions up front, and rows don't jump as images arrive.
+        function imagesHtml(images) {
+            return `<div class="line-images">${(images || []).map(url => {
+                const imageUrl = url.replace('/max/', '/!1200,300/')
+                const region = url.match(/\/\d+,\d+,(\d+),(\d+)\//)
+                const aspect = region ? `style="aspect-ratio: ${region[1]} / ${region[2]}"` : ''
+                const loaded = loadedImageUrls.has(imageUrl) ? `src="${imageUrl}"` : ''
+                return `<img data-src="${imageUrl}" ${loaded} ${aspect} alt="">`
+            }).join('')}</div>`
+        }
+
+        function witnessLineHtml(line, kind) {
+            let tools = ''
+            if (kind === 'suggested') tools += `<button class="btn btn-sm btn-primary" data-tool="accept" title="Accept this placement">Accept</button>`
+            if (line.tln) tools += `<button class="btn btn-sm btn-light border" data-tool="unassign" title="Remove this line's TLN and move it to a row of its own">Unassign</button>`
+            if (kind !== 'added') tools += `<button class="btn btn-sm btn-light border" data-tool="added" title="Mark as a line added in this witness">Added line</button>`
+            tools += `<button class="btn btn-sm btn-light border" data-tool="images" title="Edit this line's images (or double-click one)"><i class="fas fa-image"></i></button>`
+            tools += `<button class="btn btn-sm btn-light border" data-tool="edit" title="Correct this line's transcription"><i class="fas fa-pen"></i></button>`
+            tools += `<button class="btn btn-sm btn-outline-danger bg-body" data-tool="delete" title="Delete this line (e.g. a running header or page number)"><i class="fas fa-trash"></i></button>`
+
+            return `
+                <div class="witness-line ${kind}" data-line-id="${line.id}">
+                    <div class="line-tools">${tools}</div>
+                    <div class="line-body">
+                        <div class="line-text">${escapeHtml(line.text)}</div>
+                        ${imagesHtml(line.images)}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-danger drag-handle" title="Drag onto a row to give this line that row's TLN"><span class="fas fa-grip-vertical"></span></button>
+                </div>`
+        }
+
+        // TLN boxes leave off the "tln_" every TLN starts with (legacy plays' few other prefixes, like
+        // "dpln_", are shown and typed in full)
+        const TLN_PREFIX = 'tln_'
+        function displayTln(tln) {
+            return tln && tln.startsWith(TLN_PREFIX) ? tln.slice(TLN_PREFIX.length) : (tln || '')
+        }
+        function fullTln(value) {
+            value = value.trim()
+            return !value || /^(tln|dpln)_/.test(value) ? value : `${TLN_PREFIX}${value}`
+        }
+
+        function rowHtml(row) {
+            let copyCell, tlnCell, witnessCell
+
+            if (row.copy) {
+                copyCell = `
+                    <div class="copy-cell" data-play-line-id="${row.copy.id}">
+                        <div class="line-tools">
+                            ${row.copy.base_line_id ? `<button class="btn btn-sm btn-light border" data-tool="copy-images" title="Edit the base text's images for this line (or double-click one)"><i class="fas fa-image"></i></button>` : ''}
+                            ${copyTextEditable ? `<button class="btn btn-sm btn-light border" data-tool="edit-copy" title="Edit the copy text"><i class="fas fa-pen"></i></button>` : ''}
+                            ${copyTextEditable ? `<button class="btn btn-sm btn-outline-danger bg-body" data-tool="delete-copy" title="Delete this copy text line (e.g. a running header)"><i class="fas fa-trash"></i></button>` : ''}
+                        </div>
+                        <div class="line-text">${escapeHtml(row.copy.text)}</div>
+                        ${imagesHtml(row.copy.images)}
+                    </div>`
+                tlnCell = copyTextEditable
+                    ? `<div class="tln-cell"><input type="text" class="form-control form-control-sm copy-tln" data-play-line-id="${row.copy.id}" value="${escapeHtml(displayTln(row.copy.tln))}"></div>`
+                    : `<div class="tln-cell"><span class="tln-label">${escapeHtml(displayTln(row.copy.tln))}</span></div>`
+            } else {
+                const line = row.witness[0]
+                copyCell = `<div class="copy-cell not-in-copy-text">${row.kind === 'added' ? 'Added in this witness' : 'Not yet placed'}</div>`
+                tlnCell = `<div class="tln-cell"><input type="text" class="form-control form-control-sm witness-tln" data-line-id="${line.id}" value="${escapeHtml(displayTln(line.tln))}" placeholder="TLN for this line"></div>`
+            }
+
+            witnessCell = row.witness.length
+                ? `<div class="witness-cell">${row.witness.map(line => witnessLineHtml(line, row.kind)).join('')}</div>`
+                : `<div class="witness-cell omitted">&mdash;</div>`
+
+            const targetTln = row.copy ? row.copy.tln : (row.witness[0].tln || '')
+            return `<div class="lineator-row" data-key="${row.key}" data-target-tln="${escapeHtml(targetTln)}">${copyCell}${tlnCell}${witnessCell}</div>`
+        }
+
+        function render() {
+            rows = layOutRows()
+            getEl('lineator-rows').innerHTML = rows.map(rowHtml).join('')
+            updateStats()
+            watchImages()
+        }
+
+        // ------------------------------------------------------------------
+        // IMAGE LOADING
+        // ------------------------------------------------------------------
+        // With loading="lazy", every image a scroll passed over started downloading, so scrolling to the end of
+        // a play queued thousands of requests on the image server ahead of the images actually on screen.
+        // Instead an IntersectionObserver keeps track of the images in (or near) view, and they're loaded once
+        // scrolling has settled; any that scrolled away before finishing are cancelled.
+        const IMAGE_LOAD_DELAY = 150     // ms of quiet after scrolling before images load
+        const loadedImageUrls = new Set()
+        const imagesInView = new Set()
+        let imageObserver = null
+        let imageLoadTimer = null
+
+        function watchImages() {
+            if (imageObserver) imageObserver.disconnect()
+            imagesInView.clear()
+            if (!getEl('images-switch').checked) return scheduleImageLoading()
+            imageObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => entry.isIntersecting ? imagesInView.add(entry.target) : imagesInView.delete(entry.target))
+                scheduleImageLoading()
+            }, {rootMargin: '50% 0px'})
+            forElsMatching('#lineator-rows img[data-src]', img => imageObserver.observe(img))
+        }
+
+        function scheduleImageLoading() {
+            clearTimeout(imageLoadTimer)
+            imageLoadTimer = setTimeout(loadImagesInView, IMAGE_LOAD_DELAY)
+        }
+
+        function loadImagesInView() {
+            forElsMatching('#lineator-rows img[src][data-src]', img => {
+                if (!imagesInView.has(img) && !img.complete) img.removeAttribute('src')
+            })
+            imagesInView.forEach(img => { if (!img.getAttribute('src')) img.src = img.dataset.src })
+        }
+
+        // images are hidden until asked for; hiding them cancels any still loading
+        function showImages(show) {
+            keepingPlace(() => getEl('lineator-rows').classList.toggle('show-images', show))
+            watchImages()
+        }
+
+        // Witness lines are dragged between rows with Corpora's Sortable (Shopify Draggable), as fields
+        // are reordered in the corpus page's content type manager; dropping a line on a row gives it that
+        // row's TLN.
+        //
+        // Two things keep it from churning the page:
+        //  - Sortable's live preview (physically moving the dragged line into each row it passes over) is
+        //    switched off by cancelling its sort events. On a page of thousands of rows with images, every
+        //    such move reflowed the whole document and shifted the rows under the pointer. Instead the line
+        //    stays put, the mirror follows the pointer, and the row under the pointer is highlighted.
+        //  - It's bound once, to the rows' container, which survives re-rendering (Draggable finds the
+        //    line being dragged when the mouse goes down). Binding it to every row's cell meant rebuilding
+        //    it on every edit, and its Focusable plugin then wrote a tabindex onto thousands of elements.
+        let lineSorter = null
+        function bindDragging() {
+            lineSorter = new Sortable.default([getEl('lineator-rows')], {
+                draggable: '.witness-line',
+                handle: '.drag-handle',
+                mirror: {
+                    constrainDimensions: true,
+                    xAxis: false,
+                    // outside the rows, so following the pointer doesn't touch them
+                    appendTo: 'body'
+                },
+                // Draggable's own auto-scroll is replaced by autoScrollWhileDragging() below
+                scrollable: {speed: 0},
+                exclude: {plugins: [Sortable.default.Plugins.Focusable]}
+            })
+
+            let dragStartIndex = null
+            let dropRowEl = null
+            const setDropRow = rowEl => {
+                if (rowEl === dropRowEl) return
+                if (dropRowEl) dropRowEl.classList.remove('drop-hover')
+                dropRowEl = rowEl
+                if (dropRowEl) dropRowEl.classList.add('drop-hover')
+            }
+
+            lineSorter.on('drag:start', event => {
+                const lineId = event.originalSource.dataset.lineId
+                dragStartIndex = rows.findIndex(row => row.witness.some(line => line.id === lineId))
+                setDropRow(null)
+                startAutoScroll(event.sensorEvent)
+            })
+            lineSorter.on('drag:move', event => {
+                autoScroll.pointer = {x: event.sensorEvent.clientX, y: event.sensorEvent.clientY}
+                const target = event.sensorEvent.target
+                setDropRow(target && target.closest ? target.closest('#lineator-rows .lineator-row') : null)
+            })
+            lineSorter.on('sortable:sort', event => event.cancel())
+
+            lineSorter.on('drag:stop', event => {
+                stopAutoScroll()
+                const rowEl = dropRowEl
+                setDropRow(null)
+
+                const line = findWitnessLine(event.originalSource.dataset.lineId)
+                if (!line || !rowEl || rowEl.contains(event.originalSource)) return
+                const targetIndex = rows.findIndex(row => row.key === rowEl.dataset.key)
+                const targetRow = rows[targetIndex]
+                if (!targetRow) return
+                const tln = rowEl.dataset.targetTln
+                const fromAbove = dragStartIndex !== null && dragStartIndex < targetIndex
+
+                // let Draggable finish cleaning up after the drag before anything is redrawn
+                setTimeout(() => {
+                    // a row whose line is already confirmed: ask whether to combine or push it down
+                    const confirmed = ['anchored', 'added'].includes(targetRow.kind) ? targetRow.witness.filter(other => other.id !== line.id) : []
+                    if (confirmed.length) return showDropMenu(line, targetRow, confirmed, fromAbove)
+
+                    if (tln && line.tln !== tln) setWitnessTlns([{line_id: line.id, tln: tln}], `${tln} assigned.`)
+                }, 0)
+            })
+        }
+
+        // ------------------------------------------------------------------
+        // DROPPING ONTO A ROW THAT ALREADY HAS A LINE
+        // ------------------------------------------------------------------
+        function showDropMenu(line, targetRow, confirmed, fromAbove) {
+            closeDropMenu()
+            const rowEl = getElWithQuery(`[data-key="${targetRow.key}"]`)
+            const cell = rowEl.querySelector('.witness-cell')
+            const rect = cell.getBoundingClientRect()
+            const tln = targetRow.copy ? targetRow.copy.tln : confirmed[0].tln
+
+            const menu = htmlToEl(`
+                <div id="drop-menu" class="drop-menu" role="menu">
+                    <div class="small text-muted mb-1">${escapeHtml(tln)} already has a line. Drop "${escapeHtml(line.text.slice(0, 40))}${line.text.length > 40 ? '…' : ''}" here and:</div>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-primary" data-drop="combine" title="Merge it into the line here, ${fromAbove ? 'in front of' : 'after'} its text and images">Combine lines</button>
+                        <button class="btn btn-sm btn-outline-primary" data-drop="push" title="Give it ${escapeHtml(tln)}, and move the line here below it, without a TLN, to be aligned again">Push down</button>
+                        <button class="btn btn-sm btn-light border" data-drop="cancel">Cancel</button>
+                    </div>
+                </div>`)
+            menu.style.top = `${rect.top + window.scrollY + 4}px`
+            menu.style.left = `${rect.left + window.scrollX + 4}px`
+            document.body.appendChild(menu)
+            rowEl.classList.add('drop-target')
+            menu.querySelector('[data-drop="combine"]').focus()
+
+            const choose = choice => {
+                closeDropMenu()
+                if (choice === 'combine') combineLines(line, confirmed, fromAbove)
+                else if (choice === 'push') pushDown(line, tln, confirmed)
+            }
+            onDelegate(menu, 'click', '[data-drop]', (event, button) => choose(button.dataset.drop))
+
+            // Escape or a click anywhere else cancels
+            dropMenuDismiss = event => {
+                if (event.type === 'keydown' && event.key === 'Escape') choose('cancel')
+                else if (event.type === 'mousedown' && !menu.contains(event.target)) choose('cancel')
+            }
+            document.addEventListener('keydown', dropMenuDismiss)
+            document.addEventListener('mousedown', dropMenuDismiss)
+        }
+
+        let dropMenuDismiss = null
+        function closeDropMenu() {
+            removeEl(getEl('drop-menu'))
+            forElsMatching('.lineator-row.drop-target', el => el.classList.remove('drop-target'))
+            if (dropMenuDismiss) {
+                document.removeEventListener('keydown', dropMenuDismiss)
+                document.removeEventListener('mousedown', dropMenuDismiss)
+                dropMenuDismiss = null
+            }
+        }
+
+        // merge the dragged line into the line it was dropped on: in front of it when dragged from
+        // above, after it when dragged from below
+        function combineLines(line, confirmed, fromAbove) {
+            const target = fromAbove ? confirmed[0] : confirmed[confirmed.length - 1]
+            saveEdit({
+                action: 'combine-witness-lines',
+                target_line_id: target.id,
+                source_line_id: line.id,
+                position: fromAbove ? 'before' : 'after',
+            }).then(result => {
+                target.text = result.text
+                target.images = result.images
+                witnessLines = witnessLines.filter(other => other.id !== result.removed_line_id)
+                rerender()
+                showMessage('Lines combined.')
+            })
+        }
+
+        // give the dragged line the row's TLN, and move the line(s) that were there to just after it in the
+        // witness's reading order, without a TLN, so they show up directly below it as lines to align again
+        function pushDown(line, tln, confirmed) {
+            const pushed = [...confirmed].sort((a, b) => a.order - b.order)
+            const movingIds = new Set([line.id, ...pushed.map(other => other.id)])
+            const following = witnessLines.filter(other => !movingIds.has(other.id) && other.order > line.order).map(other => other.order)
+            const nextOrder = following.length ? Math.min(...following) : line.order + pushed.length + 1
+            const step = (nextOrder - line.order) / (pushed.length + 1)
+
+            const assignments = [{line_id: line.id, tln: tln}].concat(
+                pushed.map((other, i) => ({line_id: other.id, tln: null, order: line.order + step * (i + 1)}))
+            )
+            setWitnessTlns(assignments, `${tln} assigned; ${pushed.length === 1 ? 'the line that was there has' : `the ${pushed.length} lines that were there have`} been pushed below it to align again.`)
+        }
+
+        // Draggable scrolls a fixed 6px per frame, and only near the window's edges, which here sit under
+        // the sticky toolbar; across thousands of rows that's unusably slow. Instead, scroll when the
+        // pointer nears the bottom of the window or the column header, faster the deeper it goes and the
+        // longer it's held there (backing off the edge slows it down again for fine placement).
+        const AUTO_SCROLL_ZONE = 120       // px from the edge where scrolling starts
+        const AUTO_SCROLL_MAX_SPEED = 40   // px per frame at the very edge, before speeding up
+        const AUTO_SCROLL_MAX_BOOST = 12   // how many times faster holding at the edge can get
+        let autoScroll = {pointer: null, frame: null, heldSince: null, lastNudge: 0}
+
+        function startAutoScroll(sensorEvent) {
+            autoScroll = {pointer: {x: sensorEvent.clientX, y: sensorEvent.clientY}, frame: null, heldSince: null, lastNudge: 0}
+            autoScroll.frame = requestAnimationFrame(autoScrollWhileDragging)
+        }
+
+        function stopAutoScroll() {
+            cancelAnimationFrame(autoScroll.frame)
+            autoScroll = {pointer: null, frame: null, heldSince: null, lastNudge: 0}
+        }
+
+        function autoScrollWhileDragging(now) {
+            const pointer = autoScroll.pointer
+            if (!pointer) return
+
+            const top = getEl('lineator-header').getBoundingClientRect().bottom
+            const bottom = window.innerHeight
+            let direction = 0, depth = 0
+            if (pointer.y < top + AUTO_SCROLL_ZONE) {
+                direction = -1
+                depth = (top + AUTO_SCROLL_ZONE - pointer.y) / AUTO_SCROLL_ZONE
+            } else if (pointer.y > bottom - AUTO_SCROLL_ZONE) {
+                direction = 1
+                depth = (pointer.y - (bottom - AUTO_SCROLL_ZONE)) / AUTO_SCROLL_ZONE
+            }
+
+            if (direction) {
+                if (autoScroll.heldSince === null) autoScroll.heldSince = now
+                const secondsHeld = (now - autoScroll.heldSince) / 1000
+                const boost = Math.min(1 + secondsHeld * 3, AUTO_SCROLL_MAX_BOOST)
+                const speed = Math.max(2, Math.min(depth, 1) ** 2 * AUTO_SCROLL_MAX_SPEED * boost)
+                window.scrollBy({top: direction * speed, behavior: 'instant'})
+
+                // the rows move under a still pointer, so tell Draggable where the pointer now is, or the
+                // line would drop into whichever row it was over before the scrolling began
+                if (now - autoScroll.lastNudge > 100) {
+                    autoScroll.lastNudge = now
+                    document.dispatchEvent(new MouseEvent('mousemove', {
+                        bubbles: true, clientX: pointer.x, clientY: pointer.y, buttons: 1, view: window
+                    }))
+                }
+            } else {
+                autoScroll.heldSince = null
+            }
+
+            autoScroll.frame = requestAnimationFrame(autoScrollWhileDragging)
+        }
+
+        // re-render without losing the reader's place
+        function rerender() {
+            keepingPlace(render)
+        }
+
+        // make a change that moves rows around (re-rendering, showing images) while keeping the row at the
+        // top of the screen where it was
+        function keepingPlace(change) {
+            const top = getEl('lineator-header').getBoundingClientRect().bottom
+            let anchorKey = null, anchorOffset = null
+            for (const el of getEl('lineator-rows').children) {
+                const rect = el.getBoundingClientRect()
+                if (rect.bottom > top) {
+                    anchorKey = el.dataset.key
+                    anchorOffset = rect.top
+                    break
+                }
+            }
+
+            change()
+
+            const el = anchorKey ? getElWithQuery(`[data-key="${anchorKey}"]`) : null
+            if (el) scrollInstantly(el.getBoundingClientRect().top - anchorOffset)
+        }
+
+        // corpora.css makes the page scroll smoothly, which across thousands of rows animates for ages
+        // (and never moves at all while the page is in a background tab)
+        function scrollInstantly(delta) {
+            window.scrollBy({top: delta, behavior: 'instant'})
+        }
+
+        function updateStats() {
+            const count = kind => rows.filter(row => row.kind === kind).reduce((sum, row) => sum + row.witness.length, 0)
+            const omitted = rows.filter(row => row.kind === 'omitted').length
+            getEl('lineator-stats').textContent =
+                `${count('anchored')} matched · ${count('suggested')} suggested · ${count('added')} added · ${count('unplaced')} unplaced · ${omitted} copy text lines without a witness line`
+
+            // nothing left to step through
+            setDisabled(getEl('next-unresolved'), !count('suggested') && !count('unplaced'))
+        }
+
+        function showMessage(message, isError = false) {
+            const el = getEl('lineator-message')
+            el.textContent = message
+            el.className = `small ${isError ? 'text-danger' : 'text-success'}`
+            clearTimeout(showMessage.timer)
+            showMessage.timer = setTimeout(() => el.textContent = '', 5000)
+        }
+
+        // ------------------------------------------------------------------
+        // SAVING
+        // ------------------------------------------------------------------
+        function saveEdit(edit) {
+            return fetch(updateUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+                body: JSON.stringify(edit),
+            })
+                .then(res => res.json())
+                .then(result => {
+                    if (result.error) {
+                        showMessage(result.error, true)
+                        throw new Error(result.error)
+                    }
+                    return result
+                })
+        }
+
+        function findWitnessLine(lineId) { return witnessLines.find(line => line.id === lineId) }
+
+        function setWitnessTlns(assignments, message) {
+            return saveEdit({action: 'set-witness-tlns', assignments: assignments}).then(result => {
+                result.saved.forEach(saved => {
+                    const line = findWitnessLine(saved.line_id)
+                    line.tln = saved.tln
+                    line.order = saved.order
+                })
+                rerender()
+                showMessage(message || `Saved ${result.saved.length} line${result.saved.length === 1 ? '' : 's'}.`)
+            })
+        }
+
+        // suggest a TLN for a line added in the witness: the TLN of the nearest copy text line above it,
+        // plus .1, .2, etc. (a line sitting on a copy text row is extra to that row, so it counts from
+        // the row before)
+        function suggestAddedTln(lineId) {
+            const index = rows.findIndex(row => row.witness.some(line => line.id === lineId))
+            let previous = null
+            for (let i = index - 1; i >= 0 && !previous; i--) {
+                if (rows[i].copy) previous = rows[i].copy.tln
+            }
+            const base = previous || 'tln_0'
+            const used = new Set(witnessLines.map(line => line.tln).concat(copyText.map(line => line.tln)))
+            let n = 1
+            while (used.has(`${base}.${n}`)) n++
+            return `${base}.${n}`
+        }
+
+        function setLineated(lineated) {
+            saveEdit({action: 'set-lineated', witness_id: witnessId, lineated: lineated})
+                .then(result => showMessage(result.lineated ? 'Marked as lineated.' : 'No longer marked as lineated.'))
+                .catch(() => getEl('lineated-switch').checked = !lineated)
+        }
+
+        // ------------------------------------------------------------------
+        // INTERACTIONS
+        // ------------------------------------------------------------------
+        const rowsEl = () => getEl('lineator-rows')
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // line tools
+            onDelegate(rowsEl(), 'click', '[data-tool]', event => {
+                const button = event.target.closest('[data-tool]')
+                const tool = button.dataset.tool
+
+                if (tool === 'copy-images') return openCopyTextImages(button.closest('.copy-cell'))
+                if (tool === 'delete-copy') return deleteCopyTextLine(button.closest('.copy-cell'))
+
+                if (tool === 'edit-copy') {
+                    const cell = button.closest('.copy-cell')
+                    const copyLine = copyText.find(line => line.id === cell.dataset.playLineId)
+                    return openLineEditor(cell, copyLine.text, text =>
+                        saveEdit({action: 'edit-copy-text', play_line_id: copyLine.id, text: text}).then(result => {
+                            copyLine.text = result.text
+                            rerender()
+                            showMessage(`Copy text for ${copyLine.tln} saved.`)
+                        })
+                    )
+                }
+
+                const lineEl = button.closest('.witness-line')
+                const line = findWitnessLine(lineEl.dataset.lineId)
+                const row = rows.find(r => r.witness.includes(line))
+
+                if (tool === 'accept') setWitnessTlns([{line_id: line.id, tln: row.copy.tln}], `${row.copy.tln} assigned.`)
+                else if (tool === 'unassign') setWitnessTlns([{line_id: line.id, tln: null, unplaced: true}], 'TLN removed; the line is now in a row of its own.')
+                else if (tool === 'added') setWitnessTlns([{line_id: line.id, tln: suggestAddedTln(line.id)}], 'Marked as an added line. Adjust its TLN if needed.')
+                else if (tool === 'images') openWitnessLineImages(line)
+                else if (tool === 'delete') deleteWitnessLine(line)
+                else if (tool === 'edit') openLineEditor(lineEl, line.text, text =>
+                    saveEdit({action: 'edit-witness-text', line_id: line.id, text: text}).then(result => {
+                        line.text = result.text
+                        rerender()
+                        showMessage('Transcription saved.')
+                    })
+                )
+            })
+
+            // double-click an image to edit the regions of the line it belongs to
+            onDelegate(rowsEl(), 'dblclick', '.line-images img', (event, img) => {
+                const lineEl = img.closest('.witness-line')
+                if (lineEl) openWitnessLineImages(findWitnessLine(lineEl.dataset.lineId))
+                else openCopyTextImages(img.closest('.copy-cell'))
+            })
+
+            imageEditor = new LineImageEditor({
+                corpusId: corpusId,
+                playPrefix: playPrefix,
+                csrfToken: '{{ csrf_token }}',
+                onSave: (lineId, images) => {
+                    // the line may be this witness's, the base text's (shown under the copy text), or both
+                    const line = findWitnessLine(lineId)
+                    if (line) line.images = images
+                    copyText.forEach(copyLine => { if (copyLine.base_line_id === lineId) copyLine.images = images })
+                    rerender()
+                    showMessage('Images saved.')
+                },
+            })
+
+            // TLN inputs: a copy text TLN renames the line (carrying witness lines with it); a witness
+            // TLN (on rows outside the copy text) assigns that line
+            onDelegate(rowsEl(), 'change', 'input.copy-tln', event => {
+                const input = event.target
+                const copyLine = copyText.find(line => line.id === input.dataset.playLineId)
+                const newTln = fullTln(input.value)
+                if (!newTln || newTln === copyLine.tln) return input.value = displayTln(copyLine.tln)
+                saveEdit({action: 'rename-copy-tln', play_line_id: copyLine.id, tln: newTln})
+                    .then(result => {
+                        witnessLines.forEach(line => { if (line.tln === result.old_tln) line.tln = result.tln })
+                        copyLine.tln = result.tln
+                        rerender()
+                        showMessage(`${result.old_tln} renamed to ${result.tln}; ${result.witness_lines_updated} witness lines across all witnesses updated.`)
+                    })
+                    .catch(() => input.value = displayTln(copyLine.tln))
+            })
+            onDelegate(rowsEl(), 'change', 'input.witness-tln', event => {
+                const input = event.target
+                const line = findWitnessLine(input.dataset.lineId)
+                setWitnessTlns([{line_id: line.id, tln: fullTln(input.value) || null, unplaced: true}], 'TLN saved.')
+                    .catch(() => input.value = displayTln(line.tln))
+            })
+
+        })
+
+        // for lines that aren't part of the play, like running headers left in by the transcription
+        function deleteWitnessLine(line) {
+            const witness = getEl('witness-select').selectedOptions[0].textContent.trim()
+            if (!confirm(`Delete "${line.text}" from ${witness}?\n\nIf the region is still in the transcription project, it will come back when ${witness} is re-imported, so remove it in Transcribe too.`)) return
+            saveEdit({action: 'delete-witness-line', line_id: line.id}).then(result => {
+                witnessLines = witnessLines.filter(other => other.id !== result.removed_line_id)
+                rerender()
+                showMessage('Line deleted.')
+            })
+        }
+
+        // for copy text lines that aren't part of the play, like a running header in the base text; witness
+        // lines aligned with it lose its TLN and become suggestions again
+        function deleteCopyTextLine(cell) {
+            const copyLine = copyText.find(line => line.id === cell.dataset.playLineId)
+            if (!confirm(`Delete "${copyLine.text}" (${copyLine.tln}) from the copy text?\n\nAny witness lines aligned with ${copyLine.tln}, in every witness, will lose that TLN and need realigning. The base text's own line for it isn't deleted; delete that from the base text too if it doesn't belong.`)) return
+            saveEdit({action: 'delete-copy-line', play_line_id: copyLine.id}).then(result => {
+                copyText = copyText.filter(line => line.id !== result.removed_play_line_id)
+                witnessLines.forEach(line => { if (line.tln === result.tln) line.tln = null })
+                rerender()
+                showMessage(`${result.tln} deleted from the copy text; ${result.witness_lines_unaligned} witness line${result.witness_lines_unaligned === 1 ? '' : 's'} across all witnesses lost that TLN.`)
+            })
+        }
+
+        function openWitnessLineImages(line) {
+            imageEditor.open({
+                lineId: line.id,
+                witnessId: witnessId,
+                images: line.images,
+                title: `${getEl('witness-select').selectedOptions[0].textContent.trim()}${line.tln ? ` ${line.tln}` : ''}`,
+                text: line.text,
+            })
+        }
+
+        // copy text images are the base text's line with the same TLN
+        function openCopyTextImages(cell) {
+            const copyLine = copyText.find(line => line.id === cell.dataset.playLineId)
+            if (!copyLine || !copyLine.base_line_id) return showMessage("This copy text line has no base text line to edit images for.", true)
+            imageEditor.open({
+                lineId: copyLine.base_line_id,
+                witnessId: baseWitnessId,
+                images: copyLine.images,
+                title: `the base text's ${copyLine.tln}`,
+                text: findWitnessLine(copyLine.base_line_id)?.text ?? copyLine.text,
+            })
+        }
+
+        function openLineEditor(container, text, save) {
+            const textEl = container.querySelector('.line-text')
+            if (container.querySelector('.line-editor')) return
+            hideEl(textEl)
+            const editor = htmlToEl(`
+                <div class="line-editor">
+                    <textarea rows="2" class="form-control form-control-sm">${escapeHtml(text)}</textarea>
+                    <div class="mt-1 d-flex gap-1">
+                        <button class="btn btn-sm btn-primary" data-editor="save">Save</button>
+                        <button class="btn btn-sm btn-light border" data-editor="cancel">Cancel</button>
+                    </div>
+                </div>`)
+            textEl.after(editor)
+            const textarea = editor.querySelector('textarea')
+            textarea.focus()
+            const close = () => { editor.remove(); showEl(textEl) }
+            onEl(editor.querySelector('[data-editor="cancel"]'), 'click', close)
+            onEl(editor.querySelector('[data-editor="save"]'), 'click', () => save(textarea.value).catch(close))
+        }
+
+        // ------------------------------------------------------------------
+        // NAVIGATION
+        // ------------------------------------------------------------------
+        function scrollToRow(el) {
+            // scrolling off the top of the page lets the header stick higher up, so line the row up
+            // under the header, then again once the header has settled
+            for (let pass = 0; pass < 2; pass++) {
+                const top = getEl('lineator-header').getBoundingClientRect().bottom
+                scrollInstantly(el.getBoundingClientRect().top - top - 8)
+            }
+            el.classList.remove('flash')
+            void el.offsetWidth
+            el.classList.add('flash')
+        }
+
+        function jumpToTln(value) {
+            value = value.trim()
+            if (!value) return
+            const tln = fullTln(value)
+            const el = getElWithQuery(`.lineator-row[data-target-tln="${CSS.escape(tln)}"]`)
+            if (el) scrollToRow(el)
+            else showMessage(`${tln} isn't in the copy text or this witness.`, true)
+        }
+
+        // steps through unresolved rows from the last one jumped to, or from the top of the screen if
+        // the reader has scrolled elsewhere since
+        let lastUnresolvedKey = null
+        function scrollToNextUnresolved() {
+            const top = getEl('lineator-header').getBoundingClientRect().bottom
+            const unresolved = [...getEl('lineator-rows').children].filter(el => el.querySelector('.witness-line.suggested, .witness-line.unplaced'))
+            const last = lastUnresolvedKey ? getElWithQuery(`[data-key="${lastUnresolvedKey}"]`) : null
+
+            let next
+            if (last && Math.abs(last.getBoundingClientRect().top - top - 8) < 40) {
+                next = unresolved.find(el => last.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+            } else {
+                next = unresolved.find(el => el.getBoundingClientRect().top >= top - 2)
+            }
+            next = next || unresolved[0]
+
+            if (next) {
+                lastUnresolvedKey = next.dataset.key
+                scrollToRow(next)
+            }
+            else showMessage('Every line of this witness has a TLN.')
+        }
+    </script>
+{% endblock %}
