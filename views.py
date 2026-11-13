@@ -6,7 +6,6 @@ from django.shortcuts import render, HttpResponse
 from django.http import Http404
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from mongoengine.queryset.visitor import Q
 from PIL import Image, ImageDraw
 from manager.utilities import (
     _get_context, get_scholar_corpus, _contains, _clean,
@@ -41,32 +40,10 @@ def playviewer(request, corpus_id=None, play_prefix=None):
 
     corpus = get_corpus(corpus_id)
     play = corpus.get_content('Play', {'prefix': play_prefix}, single_result=True)
-    nvs_session = get_nvs_session(request, play_prefix, reset='reset' in request.GET)
-    act_scene = request.GET.get('scene', nvs_session['filter']['act_scene'])
-    character = request.GET.get('character', nvs_session['filter']['character'])
-
-    session_changed = False
-
-    if 'play_id' not in nvs_session or nvs_session['play_id'] != str(play.id):
-        nvs_session['play_id'] = str(play.id)
-        session_changed = True
-    if nvs_session['filter']['character'] != character:
-        nvs_session['filter']['character'] = character
-        nvs_session['filter']['character_lines'] = []
-        session_changed = True
-    if nvs_session['filter']['act_scene'] != act_scene:
-        nvs_session['filter']['act_scene'] = act_scene
-        session_changed = True
-
-    if session_changed:
-        nvs_session['is_filtered'] = character != 'all' or act_scene != 'all'
-        nvs_session['filter']['no_results'] = False
-        filter_session_lines_by_character(corpus, play, nvs_session)
-        set_nvs_session(request, nvs_session, play_prefix)
 
     return render(
         request,
-        'prototype.html',
+        'playviewer.html',
         {
             'site_request': site_request,
             'corpora_host': corpora_url,
@@ -78,34 +55,8 @@ def playviewer(request, corpus_id=None, play_prefix=None):
     )
 
 
-def get_session_lines(corpus, session, only_ids=False):
-    if session['filter']['no_results']:
-        return []
-
-    line_criteria = {
-        'play': session['play_id'],
-    }
-
-    if session['filter']['character_lines']:
-        line_criteria['id__in'] = session['filter']['character_lines']
-
-    lines = corpus.get_content('PlayLine', line_criteria).exclude('play', 'witness_locations').order_by('line_number')
-
-    if session['filter']['act_scene'] != 'all':
-        act_scenes = session['filter']['act_scene'].split(',')
-        condition = None
-        for act_scene in act_scenes:
-            act, scene = act_scene.split('.')
-
-            if not condition:
-                condition = (Q(act=act) & Q(scene=scene))
-            else:
-                condition = condition | (Q(act=act) & Q(scene=scene))
-        lines = lines.filter(condition)
-
-    if only_ids:
-        lines = lines.only('id', 'xml_id')
-    return lines
+def get_play_lines(corpus, play_id):
+    return corpus.get_content('PlayLine', {'play': play_id}).exclude('play', 'witness_locations').order_by('line_number')
 
 
 def get_lines_by_range(corpus, play_id, high, low):
@@ -289,12 +240,12 @@ def play_minimap(request, corpus_id=None, play_prefix=None):
     if _contains(request.GET, ['lowest-line-no', 'highest-line-no']):
         lines = get_lines_by_range(
             corpus,
-            nvs_session['play_id'],
+            play.id,
             int(request.GET['highest-line-no']),
             int(request.GET['lowest-line-no'])
         )
     else:
-        lines = get_session_lines(corpus, nvs_session)
+        lines = get_play_lines(corpus, play.id)
 
     highlight_lines = []
     if 'results' in nvs_session['search']:
@@ -1378,16 +1329,6 @@ def api_lines(request, corpus_id=None, play_prefix=None, starting_line_id=None, 
                 elif started_collecting:
                     lines.append(line.to_dict())
 
-        elif _contains_any(request.GET, ['character', 'scene']):
-            nvs_session = get_nvs_session(request, play_prefix, True, True)
-            nvs_session['play_id'] = str(play.id)
-            nvs_session['filter']['character'] = request.GET.get('character', 'all')
-            nvs_session['filter']['character_lines'] = []
-            nvs_session['filter']['act_scene'] = request.GET.get('scene', 'all')
-            filter_session_lines_by_character(corpus, play, nvs_session)
-            lines = get_session_lines(corpus, nvs_session, only_ids='only_ids' in request.GET)
-            lines = [line.to_dict() for line in lines]
-
     return HttpResponse(
         json.dumps(lines),
         content_type='application/json'
@@ -1576,12 +1517,6 @@ def api_search(request, corpus_id=None, play_prefix=None):
             'last_commentary_line': 0
         }
 
-        line_filter = {}
-        if nvs_session['filter']['character'] != 'all' or nvs_session['filter']['act_scene'] != 'all':
-            filtered_lines = get_session_lines(corpus, nvs_session, only_ids=True)
-            for filtered_line in filtered_lines:
-                line_filter[filtered_line.xml_id] = None
-
         if quick_search:
             if 'playtext' in search_contents:
                 lines_found = {}
@@ -1626,12 +1561,11 @@ def api_search(request, corpus_id=None, play_prefix=None):
 
                             if matches:
                                 line_xml_id = "tln_{0}".format(line[:line.index(' />')])
-                                if (not line_filter) or line_xml_id in line_filter:
-                                    lines_found[line_xml_id] = True
-                                    results['lines'].append({
-                                        'xml_id': line_xml_id,
-                                        'matches': matches
-                                    })
+                                lines_found[line_xml_id] = True
+                                results['lines'].append({
+                                    'xml_id': line_xml_id,
+                                    'matches': matches
+                                })
 
                 # SEARCH PLAY LINES VIA PlayLine CT
                 lines_query = {
@@ -1651,7 +1585,7 @@ def api_search(request, corpus_id=None, play_prefix=None):
 
                 for record in qs_results['records']:
                     line_xml_id = record['xml_id']
-                    if line_xml_id not in lines_found and ((not line_filter) or line_xml_id in line_filter):
+                    if line_xml_id not in lines_found:
                         for hit in record['_search_highlights']['text']:
                             matches = re.findall(r'<em>([^<]*)</em>', hit)
 
@@ -1687,7 +1621,7 @@ def api_search(request, corpus_id=None, play_prefix=None):
                 variant_lines = {}
                 for record in variant_results['records']:
                     variant_line_id = record['lines'][0]['xml_id']
-                    if variant_line_id not in variant_lines and ((not line_filter) or variant_line_id in line_filter):
+                    if variant_line_id not in variant_lines:
                         result = {
                             'xml_id': variant_line_id,
                             'matches': []
@@ -1735,15 +1669,11 @@ def api_search(request, corpus_id=None, play_prefix=None):
 
                 for record in comm_results['records']:
                     if 'lines' in record:
-                        has_relevant_line = False
-
                         for line in record['lines']:
-                            if (not line_filter) or line['xml_id'] in line_filter:
-                                has_relevant_line = True
-                                if line['line_number'] > results['last_commentary_line']:
-                                    results['last_commentary_line'] = line['line_number']
+                            if line['line_number'] > results['last_commentary_line']:
+                                results['last_commentary_line'] = line['line_number']
 
-                        if has_relevant_line:
+                        if record['lines']:
                             result = {
                                 'comm_id': record['xml_id'],
                                 'matches': []
@@ -1947,41 +1877,11 @@ def get_nvs_session(request, play_prefix, deserialize=True, reset=False):
     else:
         default_session = {
             'search': {},
-            'is_filtered': False,
-            'filter': {
-                'act_scene': 'all',
-                'character': 'all',
-                'character_lines': [],
-                'no_results': False
-            },
-            'preferences': {
-                'show_quantitative_view': False,
-                'show_reader_view': True,
-                'show_list_view': False
-            }
         }
 
         if deserialize:
             return default_session
         return json.dumps(default_session)
-
-
-def filter_session_lines_by_character(corpus, play, nvs_session):
-    if nvs_session['filter']['character'] != 'all':
-        char_line_results = corpus.search_content(
-            content_type='Speech',
-            page=1,
-            page_size=5000,
-            fields_filter={'play.id': str(play.id), 'speaking.xml_id|': '__'.join(nvs_session['filter']['character'].split(','))},
-            fields_sort=[{'lines.line_number': {'order': 'ASC'}}],
-            only=['lines.id']
-        )
-        if char_line_results['records']:
-            for record in char_line_results['records']:
-                for line in record['lines']:
-                    nvs_session['filter']['character_lines'].append(line['id'])
-        else:
-            nvs_session['filter']['no_results'] = True
 
 
 def get_nvs_witnesses(corpus, play):
