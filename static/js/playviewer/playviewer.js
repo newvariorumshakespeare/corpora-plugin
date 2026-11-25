@@ -64,8 +64,7 @@ export class PlayViewer {
                         this.commViewer.navigateTo(commID)
                         searchForTargets = false
                     } else if (searchForTargets && el.classList.contains('comm-heading')) {
-                        let lineRow = getEl(`${el.dataset.first_line}-row`)
-                        if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
+                        this.scrollToLine(el.dataset.first_line)
                         searchForTargets = false
                     }
                 })
@@ -108,21 +107,16 @@ export class PlayViewer {
                     lineNoGoBox.value = ''
                     lineNoGoBox.blur()
 
-                    let lineRow = getEl(`tln_${lineNo}-row`)
-                    if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
-                    else {
+                    if (!this.scrollToLine(`tln_${lineNo}`)) {
                         while (lineNo.length < 4) {
                             lineNo = '0' + lineNo
                         }
-                        lineRow = getEl(`tln_${lineNo}-row`)
-                        if (lineRow) lineRow.scrollIntoView({behavior: 'smooth'})
-                        else {
+                        if (!this.scrollToLine(`tln_${lineNo}`)) {
                             fetch(`${window.nvs.endpoints.line}?f_play.prefix=${window.nvs.play}&f_alt_xml_ids=tln_${lineNo}&page-size=1&only=xml_id`)
                                 .then(res => res.json())
                                 .then(lineInfo => {
                                     if (lineInfo.records && lineInfo.records.length === 1) {
-                                        let lineID = lineInfo.records[0].xml_id
-                                        getEl(`${lineID}-row`).scrollIntoView({behavior: 'smooth'})
+                                        this.scrollToLine(lineInfo.records[0].xml_id)
                                     }
                                 })
                         }
@@ -483,13 +477,15 @@ export class PlayViewer {
             // topmost line was visible and navigate back to it after that reflow
             if (lowestVisibleLineNo in this.lineNoIDMap) lowestLineID = this.lineNoIDMap[lowestVisibleLineNo]
             setCssVar('--nvs-play-row-min-height', `${this.observedLineHeight}px`)
-            if (lowestLineID) setTimeout(() => this.navigateTo(lowestLineID), 1000)
+            if (lowestLineID) setTimeout(() => this.navigateTo(lowestLineID, false, null, false), 1000)
             return true
         }
         return false
     }
 
-    async navigateTo(lineID, openVariants=false, callback=null) {
+    async navigateTo(lineID, openVariants=false, callback=null, reveal=true) {
+        // reveal opens the line if it's hidden by default; pass false to land on its ghost line instead
+        if (reveal) this.revealLine(lineID)
         getEl(`${lineID}-row`).scrollIntoView({block: 'start', behavior: 'smooth'})
 
         if (callback !== null) {
@@ -546,7 +542,7 @@ export class PlayViewer {
 
             // make sure lines are displayed right away
             let params = this.getEndpointParams({
-                only: 'xml_id,line_number,line_label,act,scene',
+                only: 'xml_id,line_number,line_label,act,scene,hidden_by_default',
                 'page-size': 10000
             })
             let url = `${window.nvs.endpoints.line}?${params.toString()}`
@@ -558,14 +554,31 @@ export class PlayViewer {
                 let lines = lineResults.records
                 let skelHTML = ''
 
+                // Lines hidden by default start collapsed. Each run of adjacent hidden lines
+                // shares one ghost line, placed right after the run's last row: it sits between
+                // the run's neighbours while the run is collapsed and below the run once it's open.
+                let ghostRun = []
+                const closeGhostRun = () => {
+                    if (ghostRun.length) {
+                        skelHTML += sender.makeGhostLine(ghostRun)
+                        ghostRun = []
+                    }
+                }
+
                 lines.forEach(line => {
                     let actScene = makeActScene(line.act, line.scene)
                     if (!sender.actScenes.includes(actScene)) {
                         sender.actScenes.push(actScene)
                     }
 
+                    let ghostAttrs = ''
+                    if (line.hidden_by_default) {
+                        let groupID = ghostRun.length ? ghostRun[0].xml_id : line.xml_id
+                        ghostAttrs = ` hidden-line collapsed" data-ghost_group="${groupID}`
+                    } else closeGhostRun()
+
                     skelHTML += `<div id="${line.xml_id}-row"
-                        class="play-row d-flex flex-column"
+                        class="play-row d-flex flex-column${ghostAttrs}"
                         data-line_id="${line.xml_id}"
                         data-line_number="${line.line_number}"
                         data-line_label="${line.line_label}"
@@ -574,13 +587,24 @@ export class PlayViewer {
                         data-actscene="${actScene}">
                         </div>`
 
+                    if (line.hidden_by_default) ghostRun.push(line)
+
                     sender.lineNoIDMap[line.line_number] = line.xml_id
                     if (sender.lowestLineNo === null) sender.lowestLineNo = line.line_number
                     sender.highestLineNo = line.line_number
                 })
+                closeGhostRun()
 
                 sender.viewer.innerHTML = skelHTML
                 forElsMatching('.play-row', (playRow) => sender.lineObserver.observe(playRow))
+                forElsMatching('.ghost-tab', (tab) => {
+                    tab.onclick = (e) => {
+                        // keep the body's click handler from treating this as a click on the
+                        // commentary lemma underneath the tab
+                        e.stopPropagation()
+                        sender.toggleGhostGroup(tab.closest('.ghost-line').dataset.ghost_group)
+                    }
+                })
 
                 sender.renderActSceneNav()
                 sender.renderMiniMap()
@@ -610,6 +634,76 @@ export class PlayViewer {
         })
     }
 
+    makeGhostLine(run) {
+        // A ghost line marks the place of one or more lines hidden by default (lines that are in
+        // the play text so notes can target them, but that aren't part of the base text as
+        // printed). Its tab is ghostline.svg from the NVS design files.
+        let groupID = run[0].xml_id
+        let label = run[0].line_label
+        if (run.length > 1) label += `–${run[run.length - 1].line_label}`
+        let description = run.length > 1 ? `${run.length} lines not in the base text` : 'line not in the base text'
+
+        return `<div id="${groupID}-ghost" class="ghost-line" data-ghost_group="${groupID}">
+            <button type="button" class="ghost-tab" aria-expanded="false"
+                data-tooltip="${label}: ${description}"
+                title="${label}: ${description}. Click to show."
+                aria-label="${label}: ${description}. Show.">
+                <svg viewBox="0 0 22.28 21" aria-hidden="true">
+                    <polygon class="ghost-tab-body" points="0 10.65 12 0 22.28 0 22.28 21 11.14 21 0 10.65"/>
+                    <path class="ghost-tab-chevron" d="M14.12,13.48l-4.2-4.19c-.06-.06-.09-.14-.09-.23,0-.08.03-.16.09-.22l1.01-1.01c.06-.06.14-.09.22-.09.08,0,.16.03.23.09l2.96,2.96,2.96-2.96c.06-.06.14-.09.23-.09.07,0,.16.03.22.09l1.01,1.01c.06.06.09.14.09.22,0,.08-.03.16-.09.23l-4.2,4.19c-.06.06-.14.09-.22.09s-.16-.03-.22-.09Z"/>
+                </svg>
+            </button>
+        </div>`
+    }
+
+    toggleGhostGroup(groupID, open=null) {
+        let ghost = getEl(`${groupID}-ghost`)
+        if (!ghost) return
+
+        if (open === null) open = !ghost.classList.contains('open')
+        ghost.classList.toggle('open', open)
+
+        let tab = ghost.querySelector('.ghost-tab')
+        let tooltip = tab.dataset.tooltip
+        tab.setAttribute('aria-expanded', open ? 'true' : 'false')
+        tab.title = `${tooltip}. Click to ${open ? 'hide' : 'show'}.`
+        tab.setAttribute('aria-label', `${tooltip}. ${open ? 'Hide' : 'Show'}.`)
+
+        forElsMatching(`.play-row[data-ghost_group="${groupID}"]`, (row) => {
+            row.classList.toggle('collapsed', !open)
+
+            // a meter drawn while its row was collapsed may be sized wrong, so redraw it now
+            // that the row has its real height
+            if (open && this.currentBreakpoint != null) {
+                let meter = getEl(`${row.dataset.line_id}-witness-meter`)
+                if (meter) requestAnimationFrame(() => this.noteManager.drawWitnessMeter(meter))
+            }
+        })
+    }
+
+    revealLine(lineID) {
+        // opens a hidden line (and the rest of its run) so that whatever navigated to it can show it
+        let row = getEl(`${lineID}-row`)
+        if (row && row.classList.contains('collapsed')) this.toggleGhostGroup(row.dataset.ghost_group, true)
+    }
+
+    scrollToLine(lineID) {
+        let row = getEl(`${lineID}-row`)
+        if (row) {
+            this.revealLine(lineID)
+            row.scrollIntoView({behavior: 'smooth'})
+        }
+        return row
+    }
+
+    syncGhostLineVisibility() {
+        // the line filter hides rows with d-none; a ghost line goes with its rows
+        forElsMatching('.ghost-line', (ghost) => {
+            let shownRow = getElWithQuery(`.play-row[data-ghost_group="${ghost.dataset.ghost_group}"]:not(.d-none)`)
+            ghost.classList.toggle('d-none', !shownRow)
+        })
+    }
+
     renderActSceneNav() {
         let actSceneFrame = getEl('act-scene-frame')
         let actSceneHTML = ''
@@ -630,12 +724,15 @@ export class PlayViewer {
                 // because act/scene jumps are so large, we want to navigate intelligently by moving the screen
                 // to the area where the line will lazy load and then scroll to the location of the line once
                 // lines in that area have been placed
+                // A scene that opens with a hidden line (e.g. MND's "Actus Quartus.") lands on its
+                // ghost line without opening it.
                 let targetRow = getElWithQuery(`.play-row[data-actscene="${el.dataset.actscene}"]`)
                 if (targetRow)
                     this.navigateTo(
                         targetRow.dataset.line_id,
                         false,
-                        () => targetRow.scrollIntoView({block: 'start', behavior: 'smooth'})
+                        () => targetRow.scrollIntoView({block: 'start', behavior: 'smooth'}),
+                        false
                     )
             }
         })
@@ -698,7 +795,9 @@ export class PlayViewer {
                 if (dir === 'next') sibling = el.nextElementSibling
                 else sibling = el.previousElementSibling
                 if (sibling) {
-                    if (sibling.classList.contains('d-none')) return getVisibleSibling(sibling, dir)
+                    // ghost lines sit between rows and have no line number, so skip them
+                    if (sibling.classList.contains('d-none') || !sibling.classList.contains('play-row'))
+                        return getVisibleSibling(sibling, dir)
                     else return sibling
                 }
                 return null

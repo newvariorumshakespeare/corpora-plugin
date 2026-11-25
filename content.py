@@ -578,6 +578,21 @@ REGISTRY = [
                 "inherited": False
             },
             {
+                "name": "hidden_by_default",
+                "label": "Hidden by Default",
+                "indexed": False,
+                "unique": False,
+                "multiple": False,
+                "in_lists": True,
+                "type": "boolean",
+                "choices": [],
+                "cross_reference_type": "",
+                "indexed_with": [],
+                "unique_with": [],
+                "stats": {},
+                "inherited": False
+            },
+            {
                 "name": "play",
                 "label": "Play",
                 "indexed": True,

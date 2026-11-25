@@ -16,6 +16,7 @@
     --nvs-mid-gray: #828282;
     --nvs-yellow-gray: #3b371c;
     --nvs-dark-blue: #2a69a1;
+    --nvs-ghost-blue: #2b69a1;
     --nvs-light-blue: #6c9ecc;
     --nvs-lightest-blue: #EBF4FC;
     --nvs-primary-orange: #CC5F38;
@@ -530,6 +531,84 @@ body.mobile #playtext-col::-webkit-scrollbar-thumb {
     box-sizing: border-box;
     /*content-visibility: auto;
     contain-intrinsic-size: 1px 5000px;*/
+}
+
+/* -----------------------------
+|| LINES HIDDEN BY DEFAULT ("GHOST LINES")
+|| A collapsed line takes no space. A ghost line (a heavier dark-blue rule ending in a tab, flush
+|| with the right edge of the TLN column) marks its place, and the tab opens and closes it.
+|| -------------------------- */
+.play-row.hidden-line.collapsed {
+    min-height: 0;
+    height: 0;
+    border-top: none;
+    overflow: hidden;
+    /* leaves room above the ghost line's tab when something scrolls to a collapsed line */
+    scroll-margin-top: 20px;
+}
+
+/* The play text gets its own stacking context so a ghost line's z-index only lifts it above the
+   rows around it. Without it, ghost lines paint over the commentary pane, which overlays the
+   bottom of the play text at the md breakpoint. */
+#playtext-col {
+    isolation: isolate;
+}
+
+.ghost-line {
+    position: relative;
+    height: 0;
+    z-index: 3;
+}
+
+.ghost-line::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 16px;
+    top: -1px;
+    height: 2px;
+    background-color: var(--nvs-ghost-blue);
+}
+
+/* At 28px wide the tab's white chevron draws at about the size of the variant toggler's chevron
+   (TV-expand-variants.svg, which shrinks to roughly 30px wide in its row). */
+.ghost-tab {
+    position: absolute;
+    right: 0;
+    top: 0;
+    transform: translateY(-50%);
+    width: 28px;
+    aspect-ratio: 22.28 / 21;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.ghost-tab svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.ghost-tab-body {
+    fill: var(--nvs-ghost-blue);
+}
+
+.ghost-tab-chevron {
+    fill: #FFFFFF;
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform .15s ease;
+}
+
+.ghost-line.open .ghost-tab-chevron {
+    transform: rotate(180deg);
+}
+
+.ghost-tab:focus-visible {
+    outline: 2px solid var(--nvs-primary-orange);
+    outline-offset: 1px;
 }
 
 .play-label {

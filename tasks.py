@@ -801,6 +801,8 @@ PLAY TEXT INGESTION
             'sibling_playtag_id': None,
             'self_closing_pair_sibling': None,
             'css_classes': '',
+            'hidden_by_default': False,
+            'hidden_line_labels': [],
             'text': ''
         }
 
@@ -881,6 +883,11 @@ PLAY TEXT INGESTION
             json.dump(ordered_line_ids, line_info_out, indent=4)
 
         report += "{0} lines ingested.\n\n".format(line_info['line_number'])
+        if line_info['hidden_line_labels']:
+            report += "{0} lines are hidden by default (display=\"electronic(collapse)\"): {1}\n\n".format(
+                len(line_info['hidden_line_labels']),
+                ", ".join(line_info['hidden_line_labels'])
+            )
         line_info['unhandled_tags'] = list(set(line_info['unhandled_tags']))
         if line_info['unhandled_tags']:
             report += "When ingesting lines from the play text, the following TEI tags were not properly converted to HTML: {0}\n\n".format(
@@ -935,6 +942,11 @@ def handle_playtext_tag(corpus, play, tag, line_info):
 
                 if css_classes:
                     line_info['css_classes'] = ' '.join(css_classes)
+
+            # display="electronic(collapse)" marks a line that isn't part of the base text as printed
+            # (e.g. MND's F-only act headings and stage directions). It stays in the play so notes
+            # can target it, but the variorum reader collapses it until the reader opens it.
+            line_info['hidden_by_default'] = tag.attrs.get('display', '').strip() == 'electronic(collapse)'
 
         # nvsSeg
         elif tag.name == 'nvsSeg':
@@ -1161,12 +1173,17 @@ def make_playtext_line(corpus, play, line_info):
         line.witness_locations.append(line_info['witness_location_id'])
     line.text = line_info['text'].strip()
     line.css_classes = line_info['css_classes']
+    line.hidden_by_default = line_info['hidden_by_default']
     line.witness_meter = "0" * (line_info['witness_count'] + 1)
     line.save()
+
+    if line.hidden_by_default:
+        line_info['hidden_line_labels'].append(line.line_label)
 
     line_info['line_number'] += 1
     line_info['text'] = ''
     line_info['css_classes'] = ''
+    line_info['hidden_by_default'] = False
 
     if line_info['current_speech']:
         line_info['current_speech'].lines.append(line)

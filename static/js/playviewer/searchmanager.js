@@ -321,6 +321,8 @@ export class SearchManager {
 
                         })
 
+                        window.nvs.playViewer.syncGhostLineVisibility()
+
                         if (sceneFiltered || charFiltered) {
                             window.nvs.playViewer.disableMiniMap()
                             window.nvs.playViewer.isFiltered = true
